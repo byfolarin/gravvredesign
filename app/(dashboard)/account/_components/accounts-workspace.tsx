@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeftRight,
   Check,
   ChevronLeft,
@@ -35,8 +36,57 @@ import { OpenAccountFlow } from "./open-account-flow";
 import { AccountSheet } from "./account-sheet";
 
 type Section = "accounts" | "applications";
-type Tab = "All" | AccountStatus;
+type Tab = "All" | AccountStatus | "Needs action";
 const TABS: Tab[] = ["All", "Active", "Pending", "Frozen", "Closed"];
+type View = "filled" | "empty" | "errors" | "loading";
+const blocked = (a: Account) => !!a.problem && a.problem.kind !== "stale";
+
+/** Prototype "Errors" state: the failures this page actually has to explain. */
+function withProblems(all: Account[]): Account[] {
+  let info = 0;
+  let declined = 0;
+  let stale = 0;
+  const staleSince = new Date(AS_OF - 2 * 60 * 60_000).toISOString();
+  return all.map((a) => {
+    if (a.status === "Pending" && info < 3) {
+      info++;
+      return {
+        ...a,
+        problem: {
+          kind: "needs-info",
+          text:
+            a.category === "Business"
+              ? `${a.bank} needs ${a.customer.name}'s certificate of incorporation and proof of address before it can open the account.`
+              : `${a.bank} needs a clearer photo of ${a.customer.name.split(" ")[0]}'s ID — the last one was blurred.`,
+          since: a.stepSince ?? a.createdAt,
+        },
+      };
+    }
+    if (a.status === "Pending" && declined < 1) {
+      declined++;
+      return {
+        ...a,
+        problem: {
+          kind: "rejected",
+          text: `${a.bank} declined this application — they don't onboard ${a.category === "Business" ? "businesses in this sector" : "residents of this country"}. Nothing was charged. You can open the same account with another bank.`,
+          since: a.stepSince ?? a.createdAt,
+        },
+      };
+    }
+    if (a.status === "Active" && a.bank === "Stearns Bank" && stale < 6) {
+      stale++;
+      return {
+        ...a,
+        problem: {
+          kind: "stale",
+          text: "Stearns Bank hasn't sent a balance since 7:02 AM.",
+          since: staleSince,
+        },
+      };
+    }
+    return a;
+  });
+}
 const CURRENCIES: ("All" | Currency)[] = ["All", ...ALL_CURRENCIES];
 /** The balance can be shown in up to this many currencies at once. */
 const MAX_SHOWN = 4;
@@ -113,6 +163,8 @@ function pageList(current: number, total: number): (number | "…")[] {
 
 export function AccountsWorkspace() {
   const [list, setList] = useState(ALL);
+  // Prototype: show the page as a new account, with problems, or loading.
+  const [view, setView] = useState<View>("filled");
   const [section, setSection] = useState<Section>("accounts");
   const [tab, setTab] = useState<Tab>("All");
   const [currency, setCurrency] = useState<"All" | Currency>("All");
@@ -180,9 +232,45 @@ export function AccountsWorkspace() {
           a.accountNumber,
         ].some((v) => v.toLowerCase().includes(q)),
     );
-  const rows = scoped.filter((a) => tab === "All" || a.status === tab);
-  const count = (t: Tab) =>
-    t === "All" ? scoped.length : scoped.filter((a) => a.status === t).length;
+  const inTab = (a: Account, t: Tab) =>
+    t === "All" ? true : t === "Needs action" ? blocked(a) : a.status === t;
+  const rows = scoped.filter((a) => inTab(a, tab));
+  const count = (t: Tab) => scoped.filter((a) => inTab(a, t)).length;
+  const tabs: Tab[] = count("Needs action")
+    ? ["All", "Needs action", ...TABS.slice(1)]
+    : TABS;
+  const staleOnes = list.filter((a) => a.problem?.kind === "stale");
+  const switchView = (v: View) => {
+    setView(v);
+    setList(v === "empty" ? [] : v === "errors" ? withProblems(ALL) : ALL);
+    setTab(v === "errors" ? "Needs action" : "All");
+    setCurrency("All");
+    setQuery("");
+    reset();
+  };
+  const fix = (a: Account) => {
+    const p = a.problem;
+    if (!p) return;
+    if (p.kind === "needs-info") {
+      update(a.id, { problem: undefined });
+      setToast(
+        `Documents sent to ${a.bank} — they usually review them within a day`,
+      );
+    } else if (p.kind === "rejected") {
+      setOpening({ currency: a.currency });
+    }
+  };
+  const retrySync = () => {
+    setToast("Asked Stearns Bank again…");
+    setTimeout(() => {
+      setList((all) =>
+        all.map((a) =>
+          a.problem?.kind === "stale" ? { ...a, problem: undefined } : a,
+        ),
+      );
+      setToast("Stearns Bank is back — balances are current");
+    }, 2500);
+  };
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   const current = Math.min(page, pages);
   const visible = rows.slice((current - 1) * PER_PAGE, current * PER_PAGE);
@@ -222,6 +310,23 @@ export function AccountsWorkspace() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Dropdown
+              label="State"
+              variant="compact"
+              align="right"
+              value={view}
+              options={[
+                { value: "filled", label: "Filled", hint: "Today's accounts" },
+                { value: "empty", label: "Empty", hint: "A new business" },
+                {
+                  value: "errors",
+                  label: "Errors",
+                  hint: "Needs info, declined, stale",
+                },
+                { value: "loading", label: "Loading", hint: "Skeletons" },
+              ]}
+              onChange={switchView}
+            />
             <button
               type="button"
               onClick={() => setToast("Transfers between accounts are next")}
@@ -249,9 +354,12 @@ export function AccountsWorkspace() {
               [
                 "applications",
                 "Applications",
-                APPLICATIONS.filter(
-                  (a) => a.status === "In review" || a.status === "Needs info",
-                ).length,
+                view === "empty"
+                  ? 0
+                  : APPLICATIONS.filter(
+                      (a) =>
+                        a.status === "In review" || a.status === "Needs info",
+                    ).length,
               ],
             ] as const
           ).map(([id, label, n]) => (
@@ -268,17 +376,54 @@ export function AccountsWorkspace() {
               }`}
             >
               {label}
-              <span className="text-xs text-neutral-500 tabular-nums">
-                <Roll value={n.toLocaleString("en-US")} />
-              </span>
+              {view !== "loading" && (
+                <span className="text-xs text-neutral-500 tabular-nums">
+                  <Roll value={n.toLocaleString("en-US")} />
+                </span>
+              )}
             </button>
           ))}
         </div>
 
-        {section === "applications" ? (
-          <Applications />
+        {view === "loading" ? (
+          <AccountsSkeleton applications={section === "applications"} />
+        ) : section === "applications" ? (
+          view === "empty" ? (
+            <p className="mt-16 text-center text-[13px] text-neutral-500">
+              No applications yet. When you open an account, its application
+              shows here until the bank approves it.
+            </p>
+          ) : (
+            <Applications />
+          )
+        ) : list.length === 0 ? (
+          <EmptyAccounts onOpen={(c) => setOpening({ currency: c })} />
         ) : (
           <>
+            {staleOnes.length > 0 && (
+              <div className="mt-8 flex items-center gap-3 rounded-lg border border-amber-300/20 bg-amber-300/[0.06] px-4 py-3 text-[13px]">
+                <AlertTriangle
+                  size={15}
+                  strokeWidth={1.75}
+                  className="shrink-0 text-amber-300"
+                />
+                <span className="min-w-0 flex-1 text-neutral-200">
+                  Stearns Bank hasn&apos;t sent balances since 7:02 AM, so{" "}
+                  {staleOnes.length} balances may be out of date.
+                  <span className="text-neutral-500">
+                    {" "}
+                    Gravv retries every 5 minutes; money still moves.
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={retrySync}
+                  className="h-8 shrink-0 rounded-full border border-white/15 px-3 text-[12.5px] text-neutral-100 hover:border-white/35"
+                >
+                  Retry now
+                </button>
+              </div>
+            )}
             {/* Balance with its trend, and the two numbers that need attention */}
             <div className="mt-8 grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px]">
               <BalancePanel
@@ -340,20 +485,30 @@ export function AccountsWorkspace() {
                   label="Being provisioned"
                   value={<Roll value={String(pending.length)} />}
                   note={
-                    oldest
-                      ? `Oldest waiting ${ago(oldest.createdAt)} · ${oldest.bank}`
-                      : "Nothing waiting on a bank"
+                    count("Needs action")
+                      ? `${count("Needs action")} need you · ${list.filter((x) => x.problem?.kind === "needs-info").length} docs, ${list.filter((x) => x.problem?.kind === "rejected").length} declined`
+                      : oldest
+                        ? `Oldest waiting ${ago(oldest.createdAt)} · ${oldest.bank}`
+                        : "Nothing waiting on a bank"
                   }
                   action={
-                    oldest
+                    count("Needs action")
                       ? {
                           label: "Review",
                           onClick: () => {
-                            setTab("Pending");
+                            setTab("Needs action");
                             reset();
                           },
                         }
-                      : undefined
+                      : oldest
+                        ? {
+                            label: "Review",
+                            onClick: () => {
+                              setTab("Pending");
+                              reset();
+                            },
+                          }
+                        : undefined
                   }
                 />
               </div>
@@ -365,7 +520,7 @@ export function AccountsWorkspace() {
                 role="tablist"
                 className="flex shrink-0 items-center gap-0.5"
               >
-                {TABS.map((t) => (
+                {tabs.map((t) => (
                   <button
                     key={t}
                     type="button"
@@ -537,13 +692,20 @@ export function AccountsWorkspace() {
                           {a.status === "Pending" ? (
                             <span className="text-neutral-600">—</span>
                           ) : (
-                            <Money
-                              value={a.balance}
-                              currency={a.currency}
-                              className={
-                                a.balance ? "text-white" : "text-neutral-500"
-                              }
-                            />
+                            <>
+                              <Money
+                                value={a.balance}
+                                currency={a.currency}
+                                className={
+                                  a.balance ? "text-white" : "text-neutral-500"
+                                }
+                              />
+                              {a.problem?.kind === "stale" && (
+                                <div className="text-[11px] text-amber-200">
+                                  As of 2h ago
+                                </div>
+                              )}
+                            </>
                           )}
                         </td>
                         <td className="py-3">
@@ -592,6 +754,8 @@ export function AccountsWorkspace() {
                               account={a}
                               onViewAll={() => setSheetId(a.id)}
                               onClose={() => setOpenId(null)}
+                              onFix={() => fix(a)}
+                              onRetry={retrySync}
                             />
                           </td>
                         </tr>
@@ -605,7 +769,9 @@ export function AccountsWorkspace() {
                       colSpan={7}
                       className="border-t border-white/6 py-16 text-center text-neutral-500"
                     >
-                      No accounts match.
+                      {tab === "Needs action"
+                        ? "Nothing needs you — every application is moving."
+                        : "No accounts match."}
                     </td>
                   </tr>
                 )}
@@ -707,6 +873,18 @@ export function AccountsWorkspace() {
 
 /** Same chip system as the rest of the platform. Pending reads as "Provisioning" — that's what's happening. */
 function Status({ account: a }: { account: Account }) {
+  if (a.problem?.kind === "needs-info" || a.problem?.kind === "rejected")
+    return (
+      <span
+        className={`inline-flex h-6 items-center rounded-full border px-2.5 text-xs leading-none font-medium ${
+          a.problem.kind === "rejected"
+            ? "border-transparent bg-rose-400/10 text-rose-300"
+            : "border-transparent bg-amber-300/10 text-amber-200"
+        }`}
+      >
+        {a.problem.kind === "rejected" ? "Declined" : "Needs info"}
+      </span>
+    );
   const label = a.status === "Pending" ? "Provisioning" : a.status;
   const tone =
     a.status === "Active"
@@ -738,10 +916,14 @@ function Preview({
   account: a,
   onViewAll,
   onClose,
+  onFix,
+  onRetry,
 }: {
   account: Account;
   onViewAll: () => void;
   onClose: () => void;
+  onFix: () => void;
+  onRetry: () => void;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -749,8 +931,38 @@ function Preview({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
   const pending = a.status === "Pending";
+  const p = a.problem;
   return (
     <div className="orbit-pop rounded-xl border border-white/8 bg-surface">
+      {p && (
+        <div className="flex items-start gap-3 border-b border-white/6 px-5 py-3.5">
+          <AlertTriangle
+            size={15}
+            strokeWidth={1.75}
+            className={`mt-[2px] shrink-0 ${p.kind === "rejected" ? "text-rose-300" : "text-amber-300"}`}
+          />
+          <p className="min-w-0 flex-1 text-[13px] leading-relaxed whitespace-normal text-neutral-200">
+            {p.text}
+            {p.since && (
+              <span className="text-neutral-500">
+                {" "}
+                · since {dateFmt.format(new Date(p.since))}
+              </span>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={p.kind === "stale" ? onRetry : onFix}
+            className="h-8 shrink-0 rounded-full bg-white px-3.5 text-[12.5px] font-medium text-black hover:bg-neutral-200"
+          >
+            {p.kind === "needs-info"
+              ? "Upload documents"
+              : p.kind === "rejected"
+                ? "Open with another bank"
+                : "Retry now"}
+          </button>
+        </div>
+      )}
       <div className="grid gap-x-8 gap-y-4 px-5 py-4 sm:grid-cols-2 lg:grid-cols-4">
         <Detail label="Account holder" value={a.customer.name} copy />
         <Detail
@@ -844,6 +1056,181 @@ function Detail({
         )}
       </div>
     </div>
+  );
+}
+
+const OFFER: {
+  currency: Currency;
+  bank: string;
+  rails: string;
+  time: string;
+}[] = [
+  {
+    currency: "USD",
+    bank: "Lead Bank",
+    rails: "ACH and wire, with a routing number",
+    time: "Usually same day",
+  },
+  {
+    currency: "EUR",
+    bank: "Banking Circle",
+    rails: "SEPA, with an IBAN in their name",
+    time: "1–2 business days",
+  },
+  {
+    currency: "GBP",
+    bank: "Clear Junction",
+    rails: "Faster Payments, with a sort code",
+    time: "1–2 business days",
+  },
+  {
+    currency: "NGN",
+    bank: "Access Bank",
+    rails: "NIP transfers, with a NUBAN",
+    time: "In minutes",
+  },
+];
+
+/** A new business: what an account is, what they can open, and the one button to do it. */
+function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
+  return (
+    <div className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+      <div>
+        <h2 className="text-[22px] font-medium tracking-[-0.02em] text-white">
+          No accounts yet
+        </h2>
+        <p className="mt-3 max-w-[420px] text-[14px] leading-relaxed text-neutral-400">
+          Give each customer a bank account in their own name and currency.
+          Money that lands in it shows up here, with its balance, and can settle
+          straight to a wallet.
+        </p>
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => onOpen()}
+            className="flex h-9 items-center gap-1.5 rounded-full bg-white pr-4 pl-3 text-[13px] font-medium text-black hover:bg-neutral-200"
+          >
+            <Plus size={14} strokeWidth={2} />
+            Open your first account
+          </button>
+          <span className="flex items-center gap-1 text-[12px] text-neutral-500">
+            or with the API:{" "}
+            <span className="font-mono text-neutral-300">
+              POST /v1/accounts
+            </span>
+            <CopyButton value="POST /v1/accounts" label="Copy endpoint" />
+          </span>
+        </div>
+      </div>
+      <div>
+        <div className="text-[12px] text-neutral-500">What you can open</div>
+        <ul className="mt-2 divide-y divide-white/6 border-y border-white/8">
+          {OFFER.map((o) => (
+            <li key={o.currency}>
+              <button
+                type="button"
+                onClick={() => onOpen(o.currency)}
+                className="group flex w-full items-center gap-4 py-3.5 text-left"
+              >
+                <Flag currency={o.currency} />
+                <span className="w-10 text-[13px] font-medium text-white">
+                  {o.currency}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] text-neutral-200">
+                    {o.bank}
+                  </span>
+                  <span className="block truncate text-[12px] text-neutral-500">
+                    {o.rails}
+                  </span>
+                </span>
+                <span className="shrink-0 text-[12px] text-neutral-500">
+                  {o.time}
+                </span>
+                <ChevronRight
+                  size={14}
+                  strokeWidth={1.75}
+                  className="shrink-0 text-neutral-600 transition-colors group-hover:text-white"
+                />
+              </button>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-[12px] text-neutral-500">
+          Plus JPY, CAD, AUD and more when you open one.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Bone({
+  w,
+  h = "h-3",
+  className = "",
+}: {
+  w: string;
+  h?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`animate-pulse rounded bg-white/[0.07] ${w} ${h} ${className}`}
+    />
+  );
+}
+
+/** Loading: the page's own shapes, so nothing jumps when the numbers arrive. */
+function AccountsSkeleton({ applications }: { applications: boolean }) {
+  const rows = (
+    <div
+      aria-busy="true"
+      aria-label="Loading accounts"
+      className="mt-3 border-t border-white/15"
+    >
+      {Array.from({ length: 8 }, (_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-6 border-b border-white/6 px-4 py-4"
+        >
+          <Bone w="w-28" />
+          <Bone w="w-44" />
+          <Bone w="w-28" className="ml-auto" />
+          <Bone w="w-12" />
+          <Bone w="w-24" />
+          <Bone w="w-20" h="h-5" />
+        </div>
+      ))}
+    </div>
+  );
+  if (applications) return <div className="mt-8">{rows}</div>;
+  return (
+    <>
+      <div className="mt-8 grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div>
+          <Bone w="w-40" h="h-6" />
+          <Bone w="w-72" h="h-10" className="mt-4" />
+          <Bone w="w-56" className="mt-3" />
+          <div className="mt-6 h-[220px] animate-pulse rounded-xl bg-white/[0.04]" />
+        </div>
+        <div className="grid gap-3">
+          {[0, 1].map((i) => (
+            <div key={i} className="rounded-2xl border border-white/8 p-5">
+              <Bone w="w-28" />
+              <Bone w="w-20" h="h-8" className="mt-3" />
+              <Bone w="w-full" h="h-1.5" className="mt-5" />
+              <Bone w="w-40" className="mt-6" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="mt-10 flex items-center gap-2">
+        {["w-16", "w-20", "w-20", "w-16", "w-16"].map((w, i) => (
+          <Bone key={i} w={w} h="h-7" className="rounded-full" />
+        ))}
+      </div>
+      {rows}
+    </>
   );
 }
 
@@ -1519,7 +1906,7 @@ function SideFact({
   action?: { label: string; onClick: () => void };
 }) {
   return (
-    <div className="flex flex-col rounded-2xl border border-white/8 p-5">
+    <div className="flex min-w-0 flex-col rounded-2xl border border-white/8 p-5">
       <div className="text-[13px] text-neutral-500">{label}</div>
       <div className="mt-2 text-[28px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
         {value}
@@ -1533,7 +1920,9 @@ function SideFact({
         </div>
       )}
       <div className="mt-auto flex items-center justify-between gap-3 pt-4 text-[12px] text-neutral-500">
-        <span className="truncate">{note}</span>
+        <span className="min-w-0 truncate" title={note}>
+          {note}
+        </span>
         {action && (
           <button
             type="button"

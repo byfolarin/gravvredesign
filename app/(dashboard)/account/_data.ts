@@ -69,6 +69,12 @@ export type Account = {
   /** Pending only: current provisioning step (0–2) and when it started. */
   step?: number;
   stepSince?: string;
+  /** Something stopping it: the bank wants documents, declined it, or stopped sending balances. */
+  problem?: {
+    kind: "needs-info" | "rejected" | "stale";
+    text: string;
+    since?: string;
+  };
 };
 
 export type ApplicationStatus =
