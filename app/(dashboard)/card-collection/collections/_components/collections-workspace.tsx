@@ -468,18 +468,17 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
           className="mt-3 w-full scroll-mt-6 table-fixed border-t border-white/15 text-[13px]"
         >
           <colgroup>
-            <col className="w-10" />
-            <col className="w-[118px]" />
+            <col className="w-11" />
             <col />
-            <col className="w-[210px]" />
-            <col className="w-[150px]" />
-            <col className="w-[172px]" />
-            <col className="w-[150px]" />
+            <col className="w-[170px]" />
+            <col className="w-[230px]" />
+            <col className="w-[140px]" />
+            <col className="w-[180px]" />
             <col className="w-12" />
           </colgroup>
           <thead>
             <tr className="text-left text-xs text-neutral-500">
-              <th className="py-2.5 pl-3 font-normal">
+              <th className="py-3 pl-3 font-normal">
                 <Check
                   on={allChecked}
                   label="Select all"
@@ -490,13 +489,12 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
                   }
                 />
               </th>
-              <th className="py-2.5 font-normal">Date</th>
-              <th className="py-2.5 font-normal">Payment</th>
-              <th className="py-2.5 font-normal">Customer</th>
-              <th className="py-2.5 pr-6 text-right font-normal">Subtotal</th>
-              <th className="py-2.5 font-normal">Status</th>
-              <th className="py-2.5 font-normal">Checks</th>
-              <th className="py-2.5 font-normal">
+              <th className="py-3 font-normal">Customer</th>
+              <th className="py-3 pr-10 text-right font-normal">Amount</th>
+              <th className="py-3 font-normal">Status</th>
+              <th className="py-3 font-normal">Date</th>
+              <th className="py-3 font-normal">Payment ID</th>
+              <th className="py-3 font-normal">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -505,6 +503,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
             {rows.slice(0, shown).map((c) => {
               const open = openId === c.id;
               const muted = !wasCharged(c);
+              const why = reasonOf(c);
               return (
                 <Fragment key={c.id}>
                   <tr
@@ -512,7 +511,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
                     className={`group cursor-pointer border-t border-white/6 transition-colors ${open ? "bg-white/[0.04]" : "hover:bg-white/[0.03]"}`}
                   >
                     <td
-                      className="py-3 pl-3"
+                      className="py-4 pl-3"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Check
@@ -528,51 +527,25 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
                         }
                       />
                     </td>
-                    <td className="py-3 tabular-nums">
-                      <div className="text-neutral-200">
-                        {dayFmt.format(new Date(c.createdAt))}
-                      </div>
-                      <div className="text-[11px] text-neutral-500">
-                        {timeFmt.format(new Date(c.createdAt))}
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className="flex min-w-0 items-center gap-0.5">
-                        <span
-                          title={c.id}
-                          className="truncate font-mono text-[12px] text-neutral-200"
-                        >
-                          {short(c.id, 13, 0)}
-                        </span>
-                        <span
-                          className="opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <CopyButton value={c.id} label="Copy payment ID" />
-                        </span>
-                      </span>
-                      <div className="truncate text-[11px] text-neutral-500">
-                        {c.source.kind === "Payment link"
-                          ? c.source.name
-                          : "API"}{" "}
-                        ·{" "}
-                        <span title={c.reference} className="font-mono">
-                          {short(c.reference, 13, 0)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4">
+                    <td className="py-4 pr-6">
                       <div className="truncate text-neutral-100">
                         {c.customer.name}
                       </div>
-                      <div className="truncate text-[11px] text-neutral-500">
+                      <div className="mt-1 truncate text-[12px] text-neutral-500">
                         {c.card.brand} ••{c.card.last4}{" "}
                         <span aria-label={c.card.country}>
                           {flag(c.card.country)}
                         </span>
+                        <span className="text-neutral-600">
+                          {" "}
+                          ·{" "}
+                          {c.source.kind === "Payment link"
+                            ? c.source.name
+                            : "API"}
+                        </span>
                       </div>
                     </td>
-                    <td className="py-3 pr-6 text-right">
+                    <td className="py-4 pr-10 text-right">
                       <div
                         className={
                           muted
@@ -584,38 +557,51 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
                       >
                         <Usdc value={c.subtotal} />
                       </div>
-                      <div className="amount text-[11px] text-neutral-500 tabular-nums">
+                      <div className="amount mt-1 text-[12px] text-neutral-500 tabular-nums">
                         {muted ? "Not charged" : `${fiat(c.charged)} charged`}
                       </div>
                     </td>
-                    <td className="py-3">
+                    <td className="py-4 pr-4">
                       <Status status={c.status} />
+                      {why && (
+                        <div
+                          className={`mt-1.5 truncate text-[12px] ${why.bad ? "text-rose-300" : "text-neutral-500"}`}
+                        >
+                          {why.text}
+                        </div>
+                      )}
                     </td>
-                    <td className="py-3">
-                      <div
-                        className={
-                          c.protection === "Declined"
-                            ? "text-rose-300"
-                            : "text-neutral-300"
-                        }
-                      >
-                        {c.protection === "Review" ? "Reviewed" : c.protection}
+                    <td className="py-4 tabular-nums">
+                      <div className="text-neutral-200">
+                        {dayFmt.format(new Date(c.createdAt))}
                       </div>
-                      <div
-                        className={`text-[11px] ${c.threeDS === "Failed" ? "text-rose-300" : "text-neutral-500"}`}
-                      >
-                        {c.threeDS === "Not required"
-                          ? "No 3-D Secure"
-                          : `3DS ${c.threeDS.toLowerCase()}`}
+                      <div className="mt-1 text-[12px] text-neutral-500">
+                        {timeFmt.format(new Date(c.createdAt))}
                       </div>
                     </td>
-                    <td className="py-3 pr-2 text-right">
+                    <td className="py-4 pr-2">
+                      <span className="flex min-w-0 items-center gap-0.5">
+                        <span
+                          title={c.id}
+                          className="truncate font-mono text-[12px] text-neutral-400"
+                        >
+                          {short(c.id, 13, 0)}
+                        </span>
+                        <span
+                          className="opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <CopyButton value={c.id} label="Copy payment ID" />
+                        </span>
+                      </span>
+                    </td>
+                    <td className="py-4 pr-2 text-right">
                       <RowMenu items={menu(c)} label="Payment actions" />
                     </td>
                   </tr>
                   {open && (
                     <tr className="bg-white/[0.04]">
-                      <td colSpan={8} className="px-3 pb-4">
+                      <td colSpan={7} className="px-3 pb-4">
                         <Preview
                           c={c}
                           onClose={() => setOpenId(null)}
@@ -632,7 +618,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
             {rows.length === 0 && (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={7}
                   className="border-t border-white/6 py-16 text-center text-neutral-500"
                 >
                   {tab === "Settlement failed"
@@ -933,6 +919,26 @@ function Funnel({
       )}
     </section>
   );
+}
+
+/** One short line under the status, only when it adds something. */
+function reasonOf(c: Collection): { text: string; bad?: boolean } | null {
+  if (c.status === "Payment failed")
+    return {
+      bad: true,
+      text:
+        c.protection === "Declined"
+          ? "Blocked by Protection"
+          : c.threeDS === "Failed"
+            ? "3-D Secure failed"
+            : "Declined by the bank",
+    };
+  if (c.status === "Settlement failed")
+    return { bad: true, text: "Charged · Gravv is holding it" };
+  if (c.status === "Partially refunded" && c.refunded)
+    return { text: `${usdc(c.refunded)} USDC refunded` };
+  if (c.disputed) return { bad: true, text: "Disputed" };
+  return null;
 }
 
 const canRefund = (c: Collection) =>
