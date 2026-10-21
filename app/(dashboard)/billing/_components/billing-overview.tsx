@@ -152,12 +152,6 @@ export function BillingOverview({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Link
-              href="/billing/history"
-              className="flex h-9 items-center rounded-full border border-white/12 px-3.5 text-[13px] text-neutral-200 transition-colors hover:border-white/30 hover:text-white"
-            >
-              Fee history
-            </Link>
             <button
               type="button"
               onClick={() => setChanging(true)}
