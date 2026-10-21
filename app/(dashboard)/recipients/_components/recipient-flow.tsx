@@ -75,14 +75,6 @@ const GLOBAL: Record<
     },
   },
 };
-const SWIFT_COUNTRIES = [
-  "United Kingdom",
-  "Nigeria",
-  "United Arab Emirates",
-  "Singapore",
-  "India",
-  "Luxembourg",
-];
 const SEPA_COUNTRIES = [
   "Germany",
   "France",
@@ -111,29 +103,6 @@ const BIC: Record<string, string> = {
   NTSBDEB1: "N26",
 };
 
-export const ACCOUNT_TYPES: {
-  id: AccountType;
-  label: string;
-  sub: string;
-}[] = [
-  {
-    id: "global",
-    label: "Global bank account",
-    sub: "Local bank or mobile money, in their currency",
-  },
-  { id: "us", label: "US bank account", sub: "ACH or wire, in USD" },
-  { id: "swift", label: "SWIFT", sub: "International wire in USD" },
-  { id: "sepa", label: "SEPA", sub: "EUR within Europe, usually same day" },
-];
-
-const countriesFor = (t: AccountType) =>
-  t === "global"
-    ? Object.keys(GLOBAL)
-    : t === "us"
-      ? ["United States"]
-      : t === "swift"
-        ? SWIFT_COUNTRIES
-        : SEPA_COUNTRIES;
 const currencyFor = (t: AccountType, country: string) =>
   t === "global"
     ? (GLOBAL[country]?.currency ?? "USD")
@@ -179,6 +148,73 @@ export const COUNTRIES: {
     rails: [rail],
   };
 });
+
+const ALL_COUNTRIES = Object.keys(FLAGS);
+
+/** Every way Gravv can pay a bank in this country, best first — this is the "account type". */
+function methodsFor(country: string) {
+  const out: {
+    key: string;
+    type: AccountType;
+    rail: Rail;
+    inst?: InstitutionType;
+    label: string;
+    hint: string;
+  }[] = [];
+  if (country === "United States") {
+    out.push({
+      key: "us-ACH",
+      type: "us",
+      rail: "ACH",
+      label: "USD by ACH",
+      hint: "No fee · 1–2 days",
+    });
+    out.push({
+      key: "us-Wire",
+      type: "us",
+      rail: "Wire",
+      label: "USD by wire",
+      hint: "$15 · same day",
+    });
+    return out;
+  }
+  const local = GLOBAL[country];
+  if (local) {
+    out.push({
+      key: "global-Bank",
+      type: "global",
+      rail: "Local transfer",
+      inst: "Bank",
+      label: `${local.currency} to a bank account`,
+      hint: "Minutes · no fee",
+    });
+    if (local.institutions["Mobile money"])
+      out.push({
+        key: "global-Mobile money",
+        type: "global",
+        rail: "Local transfer",
+        inst: "Mobile money",
+        label: `${local.currency} to mobile money`,
+        hint: "Minutes · no fee",
+      });
+  }
+  if (SEPA_COUNTRIES.includes(country))
+    out.push({
+      key: "sepa",
+      type: "sepa",
+      rail: "SEPA",
+      label: "EUR by SEPA",
+      hint: "No fee · usually today",
+    });
+  out.push({
+    key: "swift",
+    type: "swift",
+    rail: "Swift",
+    label: "USD by SWIFT",
+    hint: "$25 · 1–2 days",
+  });
+  return out;
+}
 
 const digits = (v: string) => v.replace(/[\s-]/g, "");
 
@@ -317,9 +353,12 @@ export function RecipientFlow({
   }, [guard]);
 
   const g = GLOBAL[country];
-  const instTypes = (
-    g ? Object.keys(g.institutions) : ["Bank"]
-  ) as InstitutionType[];
+  const methodKey =
+    type === "us"
+      ? `us-${usRail}`
+      : type === "global"
+        ? `global-${instType}`
+        : type;
   const rule = accountRule(type, country, instType);
   const acct = digits(account);
   const acctProblem = acct && !rule.test.test(acct) ? rule.words : null;
@@ -539,66 +578,59 @@ export function RecipientFlow({
                   </p>
                 )}
                 <div className="mt-8 space-y-6">
-                  <Field label="Account type">
-                    <div role="radiogroup" className="grid grid-cols-2 gap-2">
-                      {ACCOUNT_TYPES.map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          role="radio"
-                          aria-checked={type === t.id}
-                          onClick={() => {
-                            if (t.id === type) return;
-                            setType(t.id);
-                            const list = countriesFor(t.id);
-                            setCountry(
-                              list.length === 1
-                                ? list[0]
-                                : list.includes(country)
-                                  ? country
-                                  : "",
-                            );
+                  <Field label="Where is their bank?">
+                    <Dropdown
+                      label="Bank country"
+                      value={country}
+                      active={!!country}
+                      placeholder="Choose a country"
+                      options={ALL_COUNTRIES.map((n) => ({
+                        value: n,
+                        label: n,
+                        icon: <span aria-hidden>{FLAGS[n]}</span>,
+                      }))}
+                      onChange={(v) => {
+                        if (v === country) return;
+                        setCountry(v);
+                        const m = methodsFor(v)[0];
+                        setType(m.type);
+                        if (m.inst) setInstType(m.inst);
+                        if (m.rail === "ACH" || m.rail === "Wire")
+                          setUsRail(m.rail);
+                        setInstitution("");
+                        setAccount("");
+                        setCode("");
+                        setTypedBank("");
+                      }}
+                      className={wide}
+                    />
+                  </Field>
+
+                  {/* The account type follows from the country; only ask when there's a real choice. */}
+                  {country && methodsFor(country).length > 1 && (
+                    <Field label="Pay in">
+                      <Dropdown
+                        label="Pay in"
+                        value={methodKey}
+                        active
+                        options={methodsFor(country).map((m) => ({
+                          value: m.key,
+                          label: m.label,
+                          hint: m.hint,
+                        }))}
+                        onChange={(k) => {
+                          const m = methodsFor(country).find(
+                            (x) => x.key === k,
+                          )!;
+                          setType(m.type);
+                          if (m.inst) setInstType(m.inst);
+                          if (m.rail === "ACH" || m.rail === "Wire")
+                            setUsRail(m.rail);
+                          if (m.type !== type) {
                             setInstitution("");
                             setAccount("");
                             setCode("");
-                          }}
-                          className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                            type === t.id
-                              ? "border-white/45 bg-white/[0.05]"
-                              : "border-white/10 hover:border-white/25"
-                          }`}
-                        >
-                          <div className="text-[13px] text-white">
-                            {t.label}
-                          </div>
-                          <div className="mt-0.5 text-[11px] leading-snug text-neutral-500">
-                            {t.sub}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </Field>
-
-                  {type !== "us" && (
-                    <Field label="Country">
-                      <Dropdown
-                        label="Country"
-                        value={country}
-                        active={!!country}
-                        placeholder="Choose a country"
-                        options={countriesFor(type).map((n) => ({
-                          value: n,
-                          label: n,
-                          hint: currencyFor(type, n),
-                          icon: <span aria-hidden>{FLAGS[n]}</span>,
-                        }))}
-                        onChange={(v) => {
-                          setCountry(v);
-                          setInstitution("");
-                          const types = Object.keys(
-                            GLOBAL[v]?.institutions ?? { Bank: 1 },
-                          );
-                          if (!types.includes(instType)) setInstType("Bank");
+                          }
                         }}
                         className={wide}
                       />
@@ -607,30 +639,6 @@ export function RecipientFlow({
 
                   {country && type === "global" && (
                     <>
-                      {instTypes.length > 1 && (
-                        <div
-                          role="radiogroup"
-                          aria-label="Institution type"
-                          className="flex rounded-full bg-white/[0.06] p-0.5"
-                        >
-                          {instTypes.map((k) => (
-                            <button
-                              key={k}
-                              type="button"
-                              role="radio"
-                              aria-checked={instType === k}
-                              onClick={() => {
-                                setInstType(k);
-                                setInstitution("");
-                                setAccount("");
-                              }}
-                              className={`h-8 flex-1 rounded-full text-[13px] transition-colors ${instType === k ? "bg-surface font-medium text-white shadow-[0_1px_2px_rgb(0_0_0/0.25)]" : "text-neutral-400 hover:text-white"}`}
-                            >
-                              {k}
-                            </button>
-                          ))}
-                        </div>
-                      )}
                       <Field
                         label={
                           instType === "Mobile money" ? "Provider" : "Bank"
@@ -655,30 +663,6 @@ export function RecipientFlow({
                         />
                       </Field>
                     </>
-                  )}
-
-                  {type === "us" && (
-                    <Field label="Send by">
-                      <div role="radiogroup" className="grid grid-cols-2 gap-2">
-                        {(["ACH", "Wire"] as const).map((r) => (
-                          <button
-                            key={r}
-                            type="button"
-                            role="radio"
-                            aria-checked={usRail === r}
-                            onClick={() => setUsRail(r)}
-                            className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${usRail === r ? "border-white/45 bg-white/[0.05]" : "border-white/10 hover:border-white/25"}`}
-                          >
-                            <div className="text-[13px] text-white">{r}</div>
-                            <div className="mt-0.5 text-[11px] text-neutral-500">
-                              {r === "ACH"
-                                ? "No fee · 1–2 business days"
-                                : "$15 fee · same day before 4pm ET"}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </Field>
                   )}
 
                   {country && (type !== "global" || institution) && (
@@ -839,8 +823,8 @@ export function RecipientFlow({
                 </h2>
                 <div className="mt-8 divide-y divide-white/6 rounded-xl border border-white/8">
                   <Row
-                    label="Account type"
-                    value={ACCOUNT_TYPES.find((t) => t.id === type)!.label}
+                    label="Pay in"
+                    value={`${methodsFor(country).find((x) => x.key === methodKey)?.label ?? "—"}${instType === "Mobile money" && type === "global" ? " · mobile money" : ""} · arrives ${arrival[rail].toLowerCase()}`}
                     onEdit={() => setStep("account")}
                   />
                   <Row
@@ -873,11 +857,6 @@ export function RecipientFlow({
                     label={rule.label.split(" (")[0]}
                     value={acct || "—"}
                     mono
-                    onEdit={() => setStep("account")}
-                  />
-                  <Row
-                    label="Send by"
-                    value={`${rail === "Local transfer" ? (instType === "Mobile money" ? "Mobile money" : "Bank account") : rail} · arrives ${arrival[rail].toLowerCase()}`}
                     onEdit={() => setStep("account")}
                   />
                   <Row
