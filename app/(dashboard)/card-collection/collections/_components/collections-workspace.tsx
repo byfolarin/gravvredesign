@@ -14,12 +14,7 @@ import {
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
-import {
-  BucketBars,
-  bucketStarts,
-  readOpen,
-  writeOpen,
-} from "@/app/_components/bucket-bars";
+import { readOpen, writeOpen } from "@/app/_components/bucket-bars";
 import {
   DiscardConfirm,
   useDiscardGuard,
@@ -124,10 +119,6 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
   const [toast, setToast] = useState<string | null>(null);
   const [period, setPeriod] = useState<30 | 90>(90);
   const [shown, setShown] = useState(50);
-  // A day or week picked on the chart narrows the table to it.
-  const [bucket, setBucket] = useState<{ start: number; size: number } | null>(
-    null,
-  );
 
   useEffect(() => {
     if (!toast) return;
@@ -206,17 +197,6 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
   const change = settledPrev
     ? ((settledSum - settledPrev) / settledPrev) * 100
     : 0;
-  const through = last30.length
-    ? Math.round((settledNow.length / last30.length) * 100)
-    : 0;
-  const lostCard = last30.filter((c) => c.status === "Payment failed").length;
-  const lostCheckout = last30.filter((c) => inTab(c, "Didn't finish")).length;
-  const lostSettle = last30.filter(isStuck).length;
-  const biggestLoss = [
-    { n: lostCard, words: "declined at the card" },
-    { n: lostCheckout, words: "left the checkout" },
-    { n: lostSettle, words: "charged but not settled" },
-  ].sort((a, b) => b.n - a.n)[0];
   const stuck = list.filter(isStuck);
   const stuckSum = stuck.reduce((s, c) => s + c.subtotal, 0);
 
@@ -240,11 +220,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
     });
   const rows = scoped
     .filter((c) => inTab(c, tab))
-    .filter((c) => {
-      if (!bucket) return true;
-      const t = Date.parse(c.createdAt);
-      return t >= bucket.start && t < bucket.start + bucket.size;
-    })
+
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const tabs: Tab[] = [
     "All",
@@ -310,7 +286,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
           </Link>
         </div>
 
-        {/* Three facts: what arrived, how much got through, what's stuck */}
+        {/* Three facts: what arrived, what it cost, what's stuck */}
         <div className="mt-10 grid gap-y-8 border-t border-white/8 pt-7 lg:grid-cols-3">
           <Fact
             label="Settled · 30 days"
@@ -330,51 +306,21 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
             footer={
               <span className="tabular-nums">
                 {settledNow.length}{" "}
-                {settledNow.length === 1 ? "payment" : "payments"} ·{" "}
-                <span className="amount">{usdc(fees)}</span> USDC in fees
+                {settledNow.length === 1 ? "payment" : "payments"}
               </span>
             }
           />
           <Fact
-            label="Paid through · 30 days"
-            value={
-              <span className="tabular-nums">
-                <Roll value={String(through)} />
-                <span className="text-[0.6em] text-neutral-500">%</span>
-              </span>
-            }
+            label="Card fees · 30 days"
+            value={<Usdc value={fees} />}
             aside={
               <span className="text-neutral-400 tabular-nums">
-                {settledNow.length} of {last30.length}
+                {settledSum + fees
+                  ? `${((fees / (settledSum + fees)) * 100).toFixed(1)}% effective`
+                  : "—"}
               </span>
             }
-            footer={
-              biggestLoss.n ? (
-                <>
-                  <span className="truncate">
-                    Most lost: {biggestLoss.n} {biggestLoss.words}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTab(
-                        biggestLoss.words === "declined at the card"
-                          ? "Payment failed"
-                          : biggestLoss.words === "left the checkout"
-                            ? "Didn't finish"
-                            : "Settlement failed",
-                      );
-                      setRange("30");
-                    }}
-                    className="shrink-0 text-neutral-200 transition-colors hover:text-white"
-                  >
-                    Show
-                  </button>
-                </>
-              ) : (
-                <span>Every payment got through</span>
-              )
-            }
+            footer={<span>2.9% + 0.30 on each card payment that settles</span>}
           />
           <Fact
             label="Charged, not settled"
@@ -408,42 +354,18 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
           />
         </div>
 
-        <OutcomeChart
+        <Funnel
           list={list}
           period={period}
-          onPeriod={(p) => {
-            setPeriod(p);
-            setBucket(null);
-          }}
-          selected={bucket?.start ?? null}
-          onSelect={(start, size) => {
-            setBucket(start === null ? null : { start, size });
-            if (start !== null) setRange("all");
+          onPeriod={setPeriod}
+          onOpen={(t) => {
+            setTab(t);
+            setRange(String(period) as Range);
+            document
+              .getElementById("collections-table")
+              ?.scrollIntoView({ behavior: "smooth", block: "start" });
           }}
         />
-
-        {bucket && (
-          <div className="mt-6 flex items-center justify-between rounded-lg bg-white/[0.04] px-4 py-2.5 text-[13px]">
-            <span className="text-neutral-300">
-              Showing payments {bucket.size > DAY ? "in the week of " : "on "}
-              <span className="font-medium text-white">
-                {dayFmt.format(new Date(bucket.start))}
-              </span>
-              <span className="text-neutral-500">
-                {" "}
-                · {rows.length} {rows.length === 1 ? "payment" : "payments"}
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setBucket(null)}
-              className="flex items-center gap-1 text-neutral-400 hover:text-white"
-            >
-              <X size={13} strokeWidth={1.75} />
-              Clear
-            </button>
-          </div>
-        )}
 
         {/* Tabs + tools */}
         <div className="mt-12 flex flex-wrap items-center justify-between gap-4">
@@ -522,7 +444,10 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
           </div>
         </div>
 
-        <table className="mt-3 w-full table-fixed border-t border-white/15 text-[13px]">
+        <table
+          id="collections-table"
+          className="mt-3 w-full scroll-mt-6 table-fixed border-t border-white/15 text-[13px]"
+        >
           <colgroup>
             <col className="w-10" />
             <col className="w-[118px]" />
@@ -786,99 +711,101 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
   );
 }
 
-const OUTCOMES = [
-  {
-    key: "settled",
-    label: "Settled",
-    swatch: "bg-[var(--flow-in)]",
-    test: (c: Collection) => inTab(c, "Settled"),
-  },
-  {
-    key: "stuck",
-    label: "Charged, not settled",
-    swatch: "bg-rose-400",
-    test: (c: Collection) =>
-      c.status === "Settlement failed" || c.status === "Settlement pending",
-  },
-  {
-    key: "declined",
-    label: "Declined at the card",
-    swatch: "bg-neutral-500",
-    test: (c: Collection) => c.status === "Payment failed",
-  },
-  {
-    key: "left",
-    label: "Didn't finish",
-    swatch: "bg-white/15",
-    test: (c: Collection) => inTab(c, "Didn't finish"),
-  },
-] as const;
-const CHART_KEY = "gravv-collections-chart";
-const shortDay = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC",
-});
+const CHART_KEY = "gravv-collections-funnel";
 
-/** Every payment started, per day or week, stacked by how it ended. Settled at the bottom. */
-function OutcomeChart({
+/**
+ * Where payments drop off, in order: checkout → checks → the bank → settlement. Each gap says
+ * how many were lost there and why, and opens those payments. Numbers carry it, not shapes.
+ */
+function Funnel({
   list,
   period,
   onPeriod,
-  selected,
-  onSelect,
+  onOpen,
 }: {
   list: Collection[];
   period: 30 | 90;
   onPeriod: (p: 30 | 90) => void;
-  selected: number | null;
-  onSelect: (start: number | null, size: number) => void;
+  onOpen: (t: Tab) => void;
 }) {
   const [open, setOpen] = useState(true);
   useEffect(() => {
     const t = setTimeout(() => setOpen(readOpen(CHART_KEY)), 0);
     return () => clearTimeout(t);
   }, []);
-  const { size, starts } = bucketStarts(AS_OF, period);
-  const inPeriod = list.filter((c) => Date.parse(c.createdAt) >= starts[0]);
-  const groups = starts.map((start) =>
-    inPeriod.filter((c) => {
-      const t = Date.parse(c.createdAt);
-      return t >= start && t < start + size;
-    }),
+  const xs = list.filter((c) => Date.parse(c.createdAt) > AS_OF - period * DAY);
+  const expired = xs.filter((c) => c.status === "Expired").length;
+  const closed = xs.filter((c) => c.status === "Abandoned").length;
+  const atCheckout = xs.filter((c) => !inTab(c, "Didn't finish"));
+  const blocked = atCheckout.filter(
+    (c) =>
+      c.status === "Payment failed" &&
+      (c.protection === "Declined" || c.threeDS === "Failed"),
   );
-  const buckets = starts.map((start, i) => ({
-    start,
-    segments: OUTCOMES.map((o) => ({
-      value: groups[i].filter(o.test).length,
-      className: o.swatch,
-    })),
-    label: `${shortDay.format(start)}: ${groups[i].length} payments`,
-  }));
-  const settledUsdc = inPeriod
-    .filter(OUTCOMES[0].test)
-    .reduce((s, c) => s + net(c), 0);
-  const when = (start: number) =>
-    size > DAY ? `Week of ${shortDay.format(start)}` : shortDay.format(start);
+  const passed = atCheckout.filter((c) => !blocked.includes(c));
+  const bank = passed.filter((c) => c.status === "Payment failed");
+  const charged = passed.filter(wasCharged);
+  const notSettled = charged.filter(
+    (c) =>
+      c.status === "Settlement failed" || c.status === "Settlement pending",
+  );
+  const settled = charged.filter((c) => inTab(c, "Settled"));
+  const settledUsdc = settled.reduce((s, c) => s + net(c), 0);
+  const pct = (n: number) =>
+    xs.length ? `${Math.round((n / xs.length) * 100)}%` : "—";
+
+  const steps = [
+    { label: "Started", n: xs.length, note: "Checkouts opened" },
+    { label: "Paid at checkout", n: atCheckout.length, note: "Entered a card" },
+    {
+      label: "Passed checks",
+      n: passed.length,
+      note: "Protection and 3-D Secure",
+    },
+    { label: "Charged", n: charged.length, note: "The bank approved it" },
+    {
+      label: "Settled",
+      n: settled.length,
+      note: (
+        <>
+          <span className="amount text-neutral-300">{usdc(settledUsdc)}</span>{" "}
+          USDC in your wallet
+        </>
+      ),
+    },
+  ];
+  const drops: { n: number; words: string; tab: Tab; urgent?: boolean }[] = [
+    {
+      n: atCheckout.length - xs.length,
+      words: `left the checkout${expired && closed ? ` · ${expired} timed out, ${closed} closed it` : ""}`,
+      tab: "Didn't finish",
+    },
+    {
+      n: -blocked.length,
+      words: "blocked by Protection or 3-D Secure",
+      tab: "Payment failed",
+    },
+    { n: -bank.length, words: "declined by their bank", tab: "Payment failed" },
+    {
+      n: -notSettled.length,
+      words: "charged, not settled yet",
+      tab: notSettled.some((c) => c.status === "Settlement failed")
+        ? "Settlement failed"
+        : "Settling",
+      urgent: notSettled.some((c) => c.status === "Settlement failed"),
+    },
+  ];
 
   return (
     <section className="mt-12">
-      <div className="flex flex-wrap items-center gap-x-7 gap-y-3">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <h2 className="text-[15px] font-medium tracking-[-0.01em] text-white">
-          How payments ended
+          Where payments drop off
         </h2>
-        {OUTCOMES.map((o) => (
-          <span key={o.key} className="flex items-center gap-2 text-xs">
-            <span
-              aria-hidden
-              className={`h-2.5 w-1.5 rounded-[1px] ${o.swatch}`}
-            />
-            <span className="text-neutral-500">{o.label}</span>
-            <span className="text-neutral-200 tabular-nums">
-              {inPeriod.filter(o.test).length}
-            </span>
-          </span>
-        ))}
+        <span className="text-xs text-neutral-500">
+          {pct(settled.length)} of payments started in the last {period} days
+          reached your wallet
+        </span>
         <div className="ml-auto flex items-center gap-2">
           {open && (
             <div
@@ -913,7 +840,7 @@ function OutcomeChart({
             aria-expanded={open}
             className="flex h-8 items-center gap-1.5 rounded-full border border-white/10 px-3 text-[13px] text-neutral-300 transition-colors hover:border-white/25 hover:text-white"
           >
-            {open ? "Hide chart" : "Show chart"}
+            {open ? "Hide" : "Show"}
             <ChevronDown
               size={14}
               strokeWidth={1.75}
@@ -922,51 +849,67 @@ function OutcomeChart({
           </button>
         </div>
       </div>
+
       {open && (
-        <div className="orbit-pop mt-6">
-          <BucketBars
-            buckets={buckets}
-            format={(v) => String(Math.round(v))}
-            selected={selected}
-            onSelect={(start) => onSelect(start, size)}
-            axis={[
-              shortDay.format(starts[0]),
-              shortDay.format(starts[Math.floor(starts.length / 2)]),
-              size > DAY ? "This week" : "Today",
-            ]}
-            tooltip={(b, i) => (
-              <>
-                <div className="text-neutral-400">{when(b.start)}</div>
-                {OUTCOMES.map((o, k) => (
-                  <div
-                    key={o.key}
-                    className={`mt-1 flex justify-between tabular-nums ${b.segments[k].value ? "text-neutral-200" : "text-neutral-600"}`}
+        <div className="orbit-pop mt-6 grid grid-cols-5 border-y border-white/8">
+          {steps.map((st, i) => {
+            const last = i === steps.length - 1;
+            const drop = drops[i - 1];
+            return (
+              <div
+                key={st.label}
+                className={`flex min-w-0 flex-col py-5 ${i ? "border-l border-white/8 pl-5" : ""} pr-5`}
+              >
+                <div className="text-[12px] text-neutral-500">{st.label}</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span
+                    className={`text-[28px] leading-none font-medium tracking-[-0.03em] tabular-nums ${last ? "text-[var(--flow-in)]" : "text-white"}`}
                   >
-                    <span>{o.label}</span>
-                    <span>{b.segments[k].value}</span>
-                  </div>
-                ))}
-                <div className="mt-1.5 flex justify-between border-t border-white/8 pt-1.5 font-medium text-white tabular-nums">
-                  <span>Settled</span>
-                  <span className="amount">
-                    {usdc(
-                      groups[i]
-                        .filter(OUTCOMES[0].test)
-                        .reduce((s, c) => s + net(c), 0),
-                    )}{" "}
-                    USDC
+                    <Roll value={String(st.n)} />
                   </span>
+                  {i > 0 && (
+                    <span className="text-[12px] text-neutral-500 tabular-nums">
+                      {pct(st.n)}
+                    </span>
+                  )}
                 </div>
-              </>
-            )}
-          />
-          <p className="mt-4 text-[12px] text-neutral-500">
-            <span className="amount text-neutral-300">
-              {usdc(settledUsdc)} USDC
-            </span>{" "}
-            settled from {inPeriod.filter(OUTCOMES[0].test).length} of{" "}
-            {inPeriod.length} payments started in the last {period} days.
-          </p>
+                {/* Share of everything started still in at this step */}
+                <div className="mt-3 h-[3px] rounded-full bg-white/[0.06]">
+                  <div
+                    className={`h-full rounded-full ${last ? "bg-[var(--flow-in)]" : "bg-white/45"}`}
+                    style={{
+                      width: xs.length ? `${(st.n / xs.length) * 100}%` : 0,
+                    }}
+                  />
+                </div>
+                <div className="mt-2 truncate text-[12px] text-neutral-500">
+                  {st.note}
+                </div>
+                <div className="mt-auto pt-4">
+                  {drop ? (
+                    drop.n ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpen(drop.tab)}
+                        className={`text-left text-[12px] leading-snug transition-colors hover:text-white ${drop.urgent ? "text-rose-300" : "text-neutral-400"}`}
+                      >
+                        <span className="tabular-nums">
+                          −{Math.abs(drop.n)}
+                        </span>{" "}
+                        {drop.words}
+                      </button>
+                    ) : (
+                      <span className="text-[12px] text-neutral-600">
+                        None lost here
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-[12px] text-neutral-600">&nbsp;</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </section>
