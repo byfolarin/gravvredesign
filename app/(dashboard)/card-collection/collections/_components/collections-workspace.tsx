@@ -51,16 +51,16 @@ const inTab = (c: Collection, t: Tab) =>
 type Scope = "Payment ID" | "Reference" | "Customer";
 type Range = "7" | "30" | "90" | "all";
 
-const dayFmt = new Intl.DateTimeFormat("en-US", {
+export const dayFmt = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
   year: "numeric",
 });
-const timeFmt = new Intl.DateTimeFormat("en-US", {
+export const timeFmt = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",
   minute: "2-digit",
 });
-const fullFmt = new Intl.DateTimeFormat("en-US", {
+export const fullFmt = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
   year: "numeric",
@@ -68,7 +68,7 @@ const fullFmt = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
   second: "2-digit",
 });
-const usdc = (v: number) =>
+export const usdc = (v: number) =>
   v.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -78,14 +78,20 @@ const fiat = (c: Collection["charged"]) =>
     style: "currency",
     currency: c.currency,
   }).format(c.amount);
-const flag = (cc: string) =>
+export const flag = (cc: string) =>
   String.fromCodePoint(...[...cc].map((ch) => 0x1f1a5 + ch.charCodeAt(0)));
-const short = (s: string, a = 8, b = 4) =>
+export const short = (s: string, a = 8, b = 4) =>
   s.length <= a + b + 1 ? s : `${s.slice(0, a)}…${b ? s.slice(-b) : ""}`;
 const net = (c: Collection) => c.subtotal - (c.refunded ?? 0);
 
 /** USDC with superscript cents, marked so "Hide amounts" can pixelate it. */
-function Usdc({ value, unit = true }: { value: number; unit?: boolean }) {
+export function Usdc({
+  value,
+  unit = true,
+}: {
+  value: number;
+  unit?: boolean;
+}) {
   const [whole, cents] = usdc(value).split(".");
   return (
     <span className="amount tabular-nums">
@@ -744,7 +750,7 @@ function Fact({
   );
 }
 
-function Check({
+export function Check({
   on,
   label,
   onChange,
@@ -1256,7 +1262,7 @@ function DetailsSheet({
   );
 }
 
-function Group({
+export function Group({
   title,
   children,
 }: {
@@ -1271,7 +1277,7 @@ function Group({
   );
 }
 
-function Field({
+export function Field({
   label,
   value,
   display,

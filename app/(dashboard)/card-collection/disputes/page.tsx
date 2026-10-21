@@ -1,5 +1,6 @@
-import { PagePlaceholder } from "@/app/_components/page-placeholder";
+import { DisputesWorkspace } from "./_components/disputes-workspace";
+import { disputes } from "./_data";
 
 export default function Page() {
-  return <PagePlaceholder title="Disputes" />;
+  return <DisputesWorkspace initial={disputes} />;
 }
