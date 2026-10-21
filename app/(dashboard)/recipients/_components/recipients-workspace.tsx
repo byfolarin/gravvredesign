@@ -31,6 +31,13 @@ const amount = (v: number, currency: string) =>
     currency,
     currencyDisplay: "narrowSymbol",
   }).format(v);
+/** How Gravv names the way money arrives: "Mobile money" for wallets, otherwise the rail. */
+const railLabel = (r: Recipient) =>
+  r.institutionType === "Mobile money"
+    ? "Mobile money"
+    : r.rail === "Local transfer"
+      ? "Bank account"
+      : r.rail;
 const flagOf = (country: string) =>
   COUNTRIES.find((c) => c.name === country)?.flag ?? "";
 
@@ -461,7 +468,7 @@ export function RecipientsWorkspace({
                                 {r.institution}
                               </div>
                               <div className="truncate text-[11px] text-neutral-500 tabular-nums">
-                                ••{r.account.slice(-4)} · {r.rail}
+                                ••{r.account.slice(-4)} · {railLabel(r)}
                                 {r.currency !== "USD" && ` · ${r.currency}`}
                               </div>
                             </>
@@ -856,14 +863,19 @@ function RecipientPanel({
       >
         {r.account ? (
           <dl className="space-y-2">
-            <Detail label="Bank" value={r.institution} />
+            <Detail
+              label={r.institutionType === "Mobile money" ? "Provider" : "Bank"}
+              value={r.institution}
+            />
             <Detail
               label={
-                r.rail === "Swift"
+                r.rail === "Swift" || r.rail === "SEPA"
                   ? "IBAN / account"
-                  : r.rail === "Local transfer"
-                    ? "RIB"
-                    : "Account"
+                  : r.institutionType === "Mobile money"
+                    ? "Number"
+                    : r.country === "Morocco"
+                      ? "RIB"
+                      : "Account"
               }
               value={r.account}
               mono
@@ -879,7 +891,7 @@ function RecipientPanel({
             )}
             <Detail
               label="Send by"
-              value={`${r.rail} · ${r.currency}`}
+              value={`${railLabel(r)} · ${r.currency}`}
               sub={`Arrives ${arrival[r.rail].toLowerCase()}`}
             />
           </dl>

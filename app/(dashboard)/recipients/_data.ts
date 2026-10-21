@@ -1,5 +1,7 @@
 export type RecipientStatus = "Active" | "Pending";
-export type Rail = "ACH" | "Wire" | "Swift" | "Local transfer";
+export type Rail = "ACH" | "Wire" | "Swift" | "SEPA" | "Local transfer";
+/** Gravv's four ways to add a recipient. */
+export type AccountType = "global" | "us" | "swift" | "sepa";
 
 export type VerificationStep = {
   label: string;
@@ -39,6 +41,8 @@ export type Recipient = {
   verification?: VerificationStep[];
   /** Set when these bank details match another recipient. */
   duplicateOf?: string;
+  /** Global accounts: a bank, or a mobile money wallet (MTN MoMo, M-Pesa, OPay…). */
+  institutionType?: "Bank" | "Mobile money";
   /** Asked to add their own bank details through a link. */
   invite?: { email: string; link: string; sentAt: string };
   payments: RecipientPayment[];

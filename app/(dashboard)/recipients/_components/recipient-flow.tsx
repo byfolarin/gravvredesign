@@ -1,84 +1,260 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, ChevronRight, Copy, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Copy, X } from "lucide-react";
 import { Dropdown } from "@/app/_components/dropdown";
 import {
   DiscardConfirm,
   useDiscardGuard,
 } from "@/app/_components/discard-guard";
-import { pendingSteps, type Rail, type Recipient } from "../_data";
+import {
+  pendingSteps,
+  type AccountType,
+  type Rail,
+  type Recipient,
+} from "../_data";
 import { arrival } from "./send-money";
 
 const AS_OF = Date.UTC(2026, 9, 20, 9, 0, 0);
 
-/** Where Gravv pays out, and how: the country decides the currency and the rails on offer. */
+const FLAGS: Record<string, string> = {
+  "United States": "🇺🇸",
+  Nigeria: "🇳🇬",
+  Ghana: "🇬🇭",
+  Kenya: "🇰🇪",
+  Morocco: "🇲🇦",
+  "United Kingdom": "🇬🇧",
+  Luxembourg: "🇱🇺",
+  "United Arab Emirates": "🇦🇪",
+  Singapore: "🇸🇬",
+  India: "🇮🇳",
+  Germany: "🇩🇪",
+  France: "🇫🇷",
+  Netherlands: "🇳🇱",
+  Spain: "🇪🇸",
+  Ireland: "🇮🇪",
+};
+
+type InstitutionType = "Bank" | "Mobile money";
+/** Global bank accounts: paid locally in the recipient's own currency, from Gravv's institution list. */
+const GLOBAL: Record<
+  string,
+  { currency: string; institutions: Partial<Record<InstitutionType, string[]>> }
+> = {
+  Nigeria: {
+    currency: "NGN",
+    institutions: {
+      Bank: [
+        "Guaranty Trust Bank",
+        "Access Bank",
+        "Zenith Bank",
+        "First Bank of Nigeria",
+        "Kuda Microfinance Bank",
+      ],
+      "Mobile money": ["OPay", "PalmPay", "Moniepoint"],
+    },
+  },
+  Ghana: {
+    currency: "GHS",
+    institutions: {
+      Bank: ["GCB Bank", "Ecobank Ghana", "Stanbic Bank Ghana"],
+      "Mobile money": ["MTN MoMo", "Telecel Cash", "AirtelTigo Money"],
+    },
+  },
+  Kenya: {
+    currency: "KES",
+    institutions: {
+      Bank: ["Equity Bank", "KCB Bank"],
+      "Mobile money": ["M-Pesa", "Airtel Money"],
+    },
+  },
+  Morocco: {
+    currency: "MAD",
+    institutions: {
+      Bank: ["Attijariwafa Bank", "Bank of Africa", "Banque Populaire"],
+    },
+  },
+};
+const SWIFT_COUNTRIES = [
+  "United Kingdom",
+  "Nigeria",
+  "United Arab Emirates",
+  "Singapore",
+  "India",
+  "Luxembourg",
+];
+const SEPA_COUNTRIES = [
+  "Germany",
+  "France",
+  "Netherlands",
+  "Spain",
+  "Ireland",
+  "Luxembourg",
+];
+
+// Codes Gravv already knows, so the bank name fills itself in instead of being typed twice.
+const ROUTING: Record<string, string> = {
+  "101019644": "Lead Bank",
+  "021000021": "JPMorgan Chase",
+  "021214891": "Cross River Bank",
+  "091202590": "Stearns Bank",
+  "026009593": "Bank of America",
+};
+const BIC: Record<string, string> = {
+  BCIRLULL: "Banking Circle S.A.",
+  CLJUGB21: "Clear Junction Limited",
+  ABNGNGLA: "Access Bank Plc",
+  BARCGB22: "Barclays",
+  DEUTDEFF: "Deutsche Bank",
+  BNPAFRPP: "BNP Paribas",
+  INGBNL2A: "ING Bank",
+  NTSBDEB1: "N26",
+};
+
+export const ACCOUNT_TYPES: {
+  id: AccountType;
+  label: string;
+  sub: string;
+}[] = [
+  {
+    id: "global",
+    label: "Global bank account",
+    sub: "Local bank or mobile money, in their currency",
+  },
+  { id: "us", label: "US bank account", sub: "ACH or wire, in USD" },
+  { id: "swift", label: "SWIFT", sub: "International wire in USD" },
+  { id: "sepa", label: "SEPA", sub: "EUR within Europe, usually same day" },
+];
+
+const countriesFor = (t: AccountType) =>
+  t === "global"
+    ? Object.keys(GLOBAL)
+    : t === "us"
+      ? ["United States"]
+      : t === "swift"
+        ? SWIFT_COUNTRIES
+        : SEPA_COUNTRIES;
+const currencyFor = (t: AccountType, country: string) =>
+  t === "global"
+    ? (GLOBAL[country]?.currency ?? "USD")
+    : t === "sepa"
+      ? "EUR"
+      : "USD";
+export const typeOf = (r: Pick<Recipient, "rail">): AccountType =>
+  r.rail === "ACH" || r.rail === "Wire"
+    ? "us"
+    : r.rail === "Swift"
+      ? "swift"
+      : r.rail === "SEPA"
+        ? "sepa"
+        : "global";
+
+/** Every country Gravv pays to, with what you'd most likely use there. For flags and requests. */
 export const COUNTRIES: {
   name: string;
   flag: string;
   currency: string;
   rails: Rail[];
-}[] = [
-  {
-    name: "United States",
-    flag: "🇺🇸",
-    currency: "USD",
-    rails: ["ACH", "Wire"],
-  },
-  { name: "United Kingdom", flag: "🇬🇧", currency: "USD", rails: ["Swift"] },
-  { name: "Luxembourg", flag: "🇱🇺", currency: "USD", rails: ["Swift"] },
-  { name: "Nigeria", flag: "🇳🇬", currency: "USD", rails: ["Swift"] },
-  { name: "Morocco", flag: "🇲🇦", currency: "MAD", rails: ["Local transfer"] },
+}[] = Object.keys(FLAGS).map((name) => {
+  const t: AccountType =
+    name === "United States"
+      ? "us"
+      : GLOBAL[name]
+        ? "global"
+        : SEPA_COUNTRIES.includes(name) && name !== "Luxembourg"
+          ? "sepa"
+          : "swift";
+  const rail: Rail =
+    t === "us"
+      ? "ACH"
+      : t === "global"
+        ? "Local transfer"
+        : t === "sepa"
+          ? "SEPA"
+          : "Swift";
+  return {
+    name,
+    flag: FLAGS[name],
+    currency: currencyFor(t, name),
+    rails: [rail],
+  };
+});
+
+const digits = (v: string) => v.replace(/[\s-]/g, "");
+
+/** What to call the account field, and the plain-words check for it. */
+function accountRule(t: AccountType, country: string, inst: InstitutionType) {
+  if (t === "us")
+    return {
+      label: "Account number",
+      placeholder: "219079072561",
+      test: /^\d{4,17}$/,
+      words: "US account numbers are 4–17 digits.",
+    };
+  if (t === "sepa")
+    return {
+      label: "IBAN",
+      placeholder: "DE89 3704 0044 0532 0130 00",
+      test: /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/i,
+      words: "An IBAN starts with two letters and two digits, like DE89…",
+    };
+  if (t === "swift")
+    return {
+      label: "IBAN or account number",
+      placeholder: "GB29 NWBK 6016 1331 9268 19",
+      test: /^[A-Z0-9]{8,34}$/i,
+      words: "8–34 letters and digits.",
+    };
+  if (inst === "Mobile money")
+    return {
+      label: "Mobile money number",
+      placeholder: country === "Kenya" ? "0712 345 678" : "024 123 4567",
+      test: /^0\d{9}$/,
+      words: "10 digits, starting with 0.",
+    };
+  if (country === "Nigeria")
+    return {
+      label: "Account number (NUBAN)",
+      placeholder: "0123456789",
+      test: /^\d{10}$/,
+      words: "Nigerian account numbers are 10 digits.",
+    };
+  if (country === "Morocco")
+    return {
+      label: "RIB",
+      placeholder: "007780000123456789012345",
+      test: /^\d{24}$/,
+      words: "A Moroccan RIB is exactly 24 digits.",
+    };
+  return {
+    label: "Account number",
+    placeholder: "1234567890123",
+    test: /^\d{8,16}$/,
+    words: "8–16 digits.",
+  };
+}
+
+// Prototype stand-in for the bank's name lookup on local accounts.
+const LOOKUP = [
+  "TOLULOPE ADEYEMI",
+  "GRACE MENSAH",
+  "WANJIKU KAMAU",
+  "CHIOMA EZE VENTURES LTD",
+  "YOUSSEF EL AMRANI",
+  "KWAME ASANTE",
 ];
 
-const RAIL_WORDS: Record<Rail, string> = {
-  ACH: "Cheapest · no fee",
-  Wire: "Same day · $15 fee",
-  Swift: "International · $25 fee",
-  "Local transfer": "Paid out in dirham · no fee",
-};
-
-const isUS = (r: Rail) => r === "ACH" || r === "Wire";
-const accountLabel = (r: Rail) =>
-  isUS(r)
-    ? "Account number"
-    : r === "Swift"
-      ? "IBAN or account number"
-      : "RIB (24 digits)";
-const routingLabel = (r: Rail) => (isUS(r) ? "Routing number" : "SWIFT / BIC");
-
-/** Plain-words problem with a typed bank field, or null when it looks right. */
-function accountProblem(rail: Rail, v: string) {
-  const s = v.replace(/\s/g, "");
-  if (!s) return null;
-  if (isUS(rail))
-    return /^\d{4,17}$/.test(s) ? null : "US account numbers are 4–17 digits.";
-  if (rail === "Local transfer")
-    return /^\d{24}$/.test(s) ? null : "A Moroccan RIB is exactly 24 digits.";
-  return /^[A-Z0-9]{8,34}$/i.test(s)
-    ? null
-    : "That doesn't look like an IBAN or account number (8–34 letters and digits).";
-}
-function routingProblem(rail: Rail, v: string) {
-  const s = v.replace(/\s/g, "");
-  if (!s) return null;
-  if (isUS(rail))
-    return /^\d{9}$/.test(s) ? null : "Routing numbers are 9 digits.";
-  return /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/i.test(s)
-    ? null
-    : "SWIFT codes are 8 or 11 characters, like BCIRLULL.";
-}
-
-type Step = "who" | "bank" | "review";
+type Step = "account" | "who" | "review";
 const STEPS: { id: Step; label: string }[] = [
+  { id: "account", label: "Account" },
   { id: "who", label: "Recipient" },
-  { id: "bank", label: "Bank details" },
   { id: "review", label: "Review" },
 ];
 
 /**
- * Add a recipient by entering their details, or edit one (opens on the step that needs it).
- * New and changed bank details go through Gravv's bank check before they can be paid.
+ * Add a recipient (Gravv's four account types) or edit one. Pick the type and country first,
+ * so every field after it is the right one; bank names fill in from the code, and local
+ * accounts look the holder's name up so nobody retypes it.
  */
 export function RecipientFlow({
   editing,
@@ -88,13 +264,15 @@ export function RecipientFlow({
   onSave,
 }: {
   editing?: Recipient;
-  /** Open an edit on this step, e.g. "bank" to fix a closed account. */
-  focus?: Step;
+  /** "bank" opens an edit on the account step with the old numbers cleared. */
+  focus?: "bank";
   nextId: string;
   onClose: () => void;
   onSave: (r: Recipient, bankChanged: boolean) => void;
 }) {
   const e = editing;
+  const isEdit = !!editing;
+  const fixing = focus === "bank";
   const [leaving, setLeaving] = useState(false);
   const close = useCallback(() => {
     if (matchMedia("(prefers-reduced-motion: reduce)").matches)
@@ -104,22 +282,30 @@ export function RecipientFlow({
   }, [onClose]);
   const guard = useDiscardGuard(close);
 
-  const [step, setStep] = useState<Step>(focus ?? (e ? "review" : "who"));
+  const [step, setStep] = useState<Step>(
+    fixing ? "account" : e ? "review" : "account",
+  );
+  const [type, setType] = useState<AccountType>(e ? typeOf(e) : "global");
+  const [country, setCountry] = useState(e?.country ?? "");
+  const [instType, setInstType] = useState<InstitutionType>(
+    e?.institutionType ?? "Bank",
+  );
+  const [institution, setInstitution] = useState(
+    e && !fixing && e.institution !== "—" ? e.institution : "",
+  );
+  const [usRail, setUsRail] = useState<Rail>(
+    e?.rail === "Wire" ? "Wire" : "ACH",
+  );
+  const [account, setAccount] = useState(fixing ? "" : (e?.account ?? ""));
+  const [code, setCode] = useState(fixing ? "" : (e?.routing?.value ?? ""));
   const [kind, setKind] = useState<Recipient["kind"]>(e?.kind ?? "Business");
   const [name, setName] = useState(e?.name ?? "");
   const [email, setEmail] = useState(e?.email ?? "");
-  const [country, setCountry] = useState(e?.country ?? "United States");
-  const c = COUNTRIES.find((x) => x.name === country) ?? COUNTRIES[0];
-  const [rail, setRail] = useState<Rail>(e?.rail ?? c.rails[0]);
-  // A fix starts with the bank fields empty, so the closed account isn't resent by mistake.
-  const fixing = focus === "bank";
-  const [bank, setBank] = useState(
-    fixing || !e || e.institution === "—" ? "" : e.institution,
-  );
-  const [account, setAccount] = useState(fixing ? "" : (e?.account ?? ""));
-  const [routing, setRouting] = useState(
-    fixing ? "" : (e?.routing?.value ?? ""),
-  );
+  // Local-account name lookup: idle → looking → found.
+  const [lookup, setLookup] = useState<{
+    state: "idle" | "looking" | "found";
+    name?: string;
+  }>({ state: "idle" });
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
@@ -130,24 +316,102 @@ export function RecipientFlow({
     return () => document.removeEventListener("keydown", onKey);
   }, [guard]);
 
-  const aProblem = accountProblem(rail, account);
-  const rProblem = routingProblem(rail, routing);
+  const g = GLOBAL[country];
+  const instTypes = (
+    g ? Object.keys(g.institutions) : ["Bank"]
+  ) as InstitutionType[];
+  const rule = accountRule(type, country, instType);
+  const acct = digits(account);
+  const acctProblem = acct && !rule.test.test(acct) ? rule.words : null;
+  const cleanCode = digits(code).toUpperCase();
+  const needsCode = type !== "global";
+  const codeLabel =
+    type === "us"
+      ? "Routing number"
+      : type === "sepa"
+        ? "BIC (optional)"
+        : "SWIFT / BIC";
+  const codeProblem = !cleanCode
+    ? null
+    : type === "us"
+      ? /^\d{9}$/.test(cleanCode)
+        ? null
+        : "Routing numbers are 9 digits."
+      : /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(cleanCode)
+        ? null
+        : "SWIFT / BIC codes are 8 or 11 characters, like BCIRLULL.";
+  const knownBank = type === "us" ? ROUTING[cleanCode] : BIC[cleanCode];
+  // Global: picked from Gravv's list. Others: from the code when Gravv knows it, otherwise typed.
+  const [typedBank, setTypedBank] = useState(
+    e && !fixing && type !== "global" && e.institution !== "—"
+      ? e.institution
+      : "",
+  );
+  const bankName =
+    type === "global" ? institution : (knownBank ?? typedBank.trim());
+  const rail: Rail =
+    type === "us"
+      ? usRail
+      : type === "swift"
+        ? "Swift"
+        : type === "sepa"
+          ? "SEPA"
+          : "Local transfer";
+  const currency = currencyFor(type, country);
+
+  // Look the holder's name up once a local account number is complete.
+  const lookupKey =
+    type === "global" && institution && acct && !acctProblem
+      ? `${institution}|${acct}`
+      : "";
+  useEffect(() => {
+    if (!lookupKey) {
+      const t = setTimeout(() => setLookup({ state: "idle" }), 0);
+      return () => clearTimeout(t);
+    }
+    const a = setTimeout(() => setLookup({ state: "looking" }), 0);
+    const b = setTimeout(() => {
+      const found = LOOKUP[Number(lookupKey.slice(-1)) % LOOKUP.length];
+      setLookup({ state: "found", name: found });
+      // The bank's name says whether it's a company; only for new recipients.
+      if (!isEdit)
+        setKind(
+          /\b(LTD|LIMITED|VENTURES|PLC|INC)\b/.test(found)
+            ? "Business"
+            : "Individual",
+        );
+      setName(
+        (n) =>
+          n ||
+          found
+            .replace(/\b(\w)(\w*)/g, (_, f, r) => f + r.toLowerCase())
+            .replace(/\bLtd\b/i, "Ltd"),
+      );
+    }, 900);
+    return () => {
+      clearTimeout(a);
+      clearTimeout(b);
+    };
+  }, [lookupKey, isEdit]);
+
   const ready = {
+    account:
+      !!country &&
+      !!bankName &&
+      !!acct &&
+      !acctProblem &&
+      (!needsCode || type === "sepa" || (!!cleanCode && !codeProblem)) &&
+      !codeProblem &&
+      (type !== "global" || lookup.state === "found"),
     who: name.trim().length > 1 && (!email || /\S+@\S+\.\S+/.test(email)),
-    bank:
-      bank.trim().length > 1 &&
-      !!account.trim() &&
-      !aProblem &&
-      !!routing.trim() &&
-      !rProblem,
   };
   const at = STEPS.findIndex((s) => s.id === step);
   const bankChanged =
     !e ||
-    account.replace(/\s/g, "") !== (e.account ?? "") ||
-    routing.replace(/\s/g, "") !== (e.routing?.value ?? "") ||
+    acct !== (e.account ?? "") ||
+    cleanCode !== (e.routing?.value ?? "") ||
     rail !== e.rail ||
-    bank.trim() !== e.institution;
+    bankName !== e.institution;
   const dirtyEdit =
     !!e &&
     (bankChanged ||
@@ -157,36 +421,39 @@ export function RecipientFlow({
       country !== e.country);
 
   const save = () => {
-    const cleanAccount = account.replace(/\s/g, "");
-    const base: Recipient = {
+    const r: Recipient = {
       id: e?.id ?? nextId,
       name: name.trim(),
       kind,
       image: e?.image,
       country,
-      institution: bank.trim(),
-      account: cleanAccount,
-      routing: {
-        label: routingLabel(rail),
-        value: routing.replace(/\s/g, "").toUpperCase(),
-      },
-      currency: c.currency,
+      institution: bankName,
+      institutionType: type === "global" ? instType : undefined,
+      account: acct,
+      routing: cleanCode
+        ? {
+            label: type === "us" ? "Routing number" : "SWIFT / BIC",
+            value: cleanCode,
+          }
+        : undefined,
+      currency,
       rail,
       status: e && !bankChanged ? e.status : "Pending",
       createdAt: e?.createdAt ?? new Date(AS_OF).toISOString(),
       email: email.trim() || undefined,
-      verification:
-        e && !bankChanged ? e.verification : pendingSteps(bank.trim()),
+      verification: e && !bankChanged ? e.verification : pendingSteps(bankName),
       duplicateOf: e && !bankChanged ? e.duplicateOf : undefined,
       payments: e?.payments ?? [],
     };
     guard.clear();
-    onSave(base, bankChanged);
+    onSave(r, bankChanged);
     close();
   };
 
   const input =
     "h-10 w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 text-[13px] text-white outline-none transition-colors placeholder:text-neutral-500 focus:border-white/35";
+  const wide =
+    "[&>button]:h-10 [&>button]:w-full [&>button]:justify-start [&>button]:rounded-lg [&>button>svg:last-child]:ml-auto";
 
   return (
     <div className="fixed inset-0 z-50" data-leaving={leaving || undefined}>
@@ -226,7 +493,7 @@ export function RecipientFlow({
           </button>
         </div>
 
-        <div className="mx-auto grid max-w-[820px] grid-cols-[150px_minmax(0,1fr)] gap-12 px-6 pb-20">
+        <div className="mx-auto grid max-w-[860px] grid-cols-[150px_minmax(0,1fr)] gap-12 px-6 pb-20">
           <ol className="sticky top-6 mt-10 h-fit border-l border-white/8">
             {STEPS.map((s, i) => (
               <li key={s.id}>
@@ -249,18 +516,270 @@ export function RecipientFlow({
           </ol>
 
           <form
-            className="mt-10 max-w-[480px]"
+            className="mt-10 max-w-[520px]"
             onSubmit={(ev) => {
               ev.preventDefault();
-              if (step === "who" && ready.who) setStep("bank");
-              else if (step === "bank" && ready.bank) setStep("review");
-              else if (step === "review" && ready.who && ready.bank) save();
+              if (step === "account" && ready.account) setStep("who");
+              else if (step === "who" && ready.who) setStep("review");
+              else if (step === "review" && ready.account && ready.who) save();
             }}
           >
+            {step === "account" && (
+              <>
+                <h2 className="text-[22px] font-medium tracking-[-0.02em] text-white">
+                  {fixing
+                    ? `New account for ${e?.name.split(" ")[0]}`
+                    : "Where should the money go?"}
+                </h2>
+                {fixing && (
+                  <p className="mt-2 text-[13px] leading-relaxed text-neutral-400">
+                    The last payment to {e?.institution} ••
+                    {e?.account?.slice(-4)} came back. Enter the account
+                    they&apos;d like to use now.
+                  </p>
+                )}
+                <div className="mt-8 space-y-6">
+                  <Field label="Account type">
+                    <div role="radiogroup" className="grid grid-cols-2 gap-2">
+                      {ACCOUNT_TYPES.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={type === t.id}
+                          onClick={() => {
+                            if (t.id === type) return;
+                            setType(t.id);
+                            const list = countriesFor(t.id);
+                            setCountry(
+                              list.length === 1
+                                ? list[0]
+                                : list.includes(country)
+                                  ? country
+                                  : "",
+                            );
+                            setInstitution("");
+                            setAccount("");
+                            setCode("");
+                          }}
+                          className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                            type === t.id
+                              ? "border-white/45 bg-white/[0.05]"
+                              : "border-white/10 hover:border-white/25"
+                          }`}
+                        >
+                          <div className="text-[13px] text-white">
+                            {t.label}
+                          </div>
+                          <div className="mt-0.5 text-[11px] leading-snug text-neutral-500">
+                            {t.sub}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+
+                  {type !== "us" && (
+                    <Field label="Country">
+                      <Dropdown
+                        label="Country"
+                        value={country}
+                        active={!!country}
+                        placeholder="Choose a country"
+                        options={countriesFor(type).map((n) => ({
+                          value: n,
+                          label: n,
+                          hint: currencyFor(type, n),
+                          icon: <span aria-hidden>{FLAGS[n]}</span>,
+                        }))}
+                        onChange={(v) => {
+                          setCountry(v);
+                          setInstitution("");
+                          const types = Object.keys(
+                            GLOBAL[v]?.institutions ?? { Bank: 1 },
+                          );
+                          if (!types.includes(instType)) setInstType("Bank");
+                        }}
+                        className={wide}
+                      />
+                    </Field>
+                  )}
+
+                  {country && type === "global" && (
+                    <>
+                      {instTypes.length > 1 && (
+                        <div
+                          role="radiogroup"
+                          aria-label="Institution type"
+                          className="flex rounded-full bg-white/[0.06] p-0.5"
+                        >
+                          {instTypes.map((k) => (
+                            <button
+                              key={k}
+                              type="button"
+                              role="radio"
+                              aria-checked={instType === k}
+                              onClick={() => {
+                                setInstType(k);
+                                setInstitution("");
+                                setAccount("");
+                              }}
+                              className={`h-8 flex-1 rounded-full text-[13px] transition-colors ${instType === k ? "bg-surface font-medium text-white shadow-[0_1px_2px_rgb(0_0_0/0.25)]" : "text-neutral-400 hover:text-white"}`}
+                            >
+                              {k}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <Field
+                        label={
+                          instType === "Mobile money" ? "Provider" : "Bank"
+                        }
+                      >
+                        <Dropdown
+                          label={
+                            instType === "Mobile money" ? "Provider" : "Bank"
+                          }
+                          value={institution}
+                          active={!!institution}
+                          placeholder={
+                            instType === "Mobile money"
+                              ? "Choose a provider"
+                              : "Choose a bank"
+                          }
+                          options={(g.institutions[instType] ?? []).map(
+                            (n) => ({ value: n, label: n }),
+                          )}
+                          onChange={setInstitution}
+                          className={wide}
+                        />
+                      </Field>
+                    </>
+                  )}
+
+                  {type === "us" && (
+                    <Field label="Send by">
+                      <div role="radiogroup" className="grid grid-cols-2 gap-2">
+                        {(["ACH", "Wire"] as const).map((r) => (
+                          <button
+                            key={r}
+                            type="button"
+                            role="radio"
+                            aria-checked={usRail === r}
+                            onClick={() => setUsRail(r)}
+                            className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${usRail === r ? "border-white/45 bg-white/[0.05]" : "border-white/10 hover:border-white/25"}`}
+                          >
+                            <div className="text-[13px] text-white">{r}</div>
+                            <div className="mt-0.5 text-[11px] text-neutral-500">
+                              {r === "ACH"
+                                ? "No fee · 1–2 business days"
+                                : "$15 fee · same day before 4pm ET"}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </Field>
+                  )}
+
+                  {country && (type !== "global" || institution) && (
+                    <>
+                      {needsCode && (
+                        <Field label={codeLabel}>
+                          <input
+                            value={code}
+                            onChange={(ev) => setCode(ev.target.value)}
+                            placeholder={
+                              type === "us"
+                                ? "101019644"
+                                : type === "sepa"
+                                  ? "DEUTDEFF"
+                                  : "BCIRLULL"
+                            }
+                            className={`${input} font-mono text-[12.5px] uppercase ${codeProblem ? "border-rose-400/50" : ""}`}
+                          />
+                          {codeProblem ? (
+                            <Hint tone="bad">{codeProblem}</Hint>
+                          ) : knownBank ? (
+                            <Hint>
+                              <span className="text-neutral-200">
+                                {knownBank}
+                              </span>
+                            </Hint>
+                          ) : null}
+                        </Field>
+                      )}
+                      {needsCode && cleanCode && !codeProblem && !knownBank && (
+                        <Field label="Bank name">
+                          <input
+                            value={typedBank}
+                            onChange={(ev) => setTypedBank(ev.target.value)}
+                            placeholder="We don't know this code yet — type the bank's name"
+                            className={input}
+                          />
+                        </Field>
+                      )}
+                      {type === "sepa" && !cleanCode && (
+                        <Field label="Bank name">
+                          <input
+                            value={typedBank}
+                            onChange={(ev) => setTypedBank(ev.target.value)}
+                            placeholder="N26"
+                            className={input}
+                          />
+                        </Field>
+                      )}
+                      <Field label={rule.label}>
+                        <input
+                          inputMode={
+                            type === "global" || type === "us"
+                              ? "numeric"
+                              : undefined
+                          }
+                          value={account}
+                          onChange={(ev) => setAccount(ev.target.value)}
+                          placeholder={rule.placeholder}
+                          className={`${input} font-mono text-[12.5px] ${acctProblem ? "border-rose-400/50" : ""}`}
+                        />
+                        {acctProblem ? (
+                          <Hint tone="bad">{acctProblem}</Hint>
+                        ) : type === "global" && lookup.state === "looking" ? (
+                          <Hint>Checking the name with {institution}…</Hint>
+                        ) : type === "global" && lookup.state === "found" ? (
+                          <div className="mt-2 flex items-center gap-2 rounded-lg bg-white/[0.04] px-3 py-2 text-[13px]">
+                            <Check
+                              size={14}
+                              strokeWidth={2}
+                              className="shrink-0 text-[var(--flow-in)]"
+                            />
+                            <span className="text-neutral-400">
+                              Account name
+                            </span>
+                            <span className="ml-auto truncate font-medium text-white">
+                              {lookup.name}
+                            </span>
+                          </div>
+                        ) : (
+                          <Hint>
+                            Paid in {currency} by{" "}
+                            {rail === "Local transfer"
+                              ? instType === "Mobile money"
+                                ? "mobile money"
+                                : "local transfer"
+                              : rail}{" "}
+                            · arrives {arrival[rail].toLowerCase()}.
+                          </Hint>
+                        )}
+                      </Field>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+
             {step === "who" && (
               <>
                 <h2 className="text-[22px] font-medium tracking-[-0.02em] text-white">
-                  Who are you paying?
+                  Who is it?
                 </h2>
                 <div className="mt-8 space-y-6">
                   <div
@@ -281,11 +800,7 @@ export function RecipientFlow({
                       </button>
                     ))}
                   </div>
-                  <Field
-                    label={
-                      kind === "Business" ? "Legal business name" : "Full name"
-                    }
-                  >
+                  <Field label="Account holder name">
                     <input
                       autoFocus
                       value={name}
@@ -298,8 +813,9 @@ export function RecipientFlow({
                       className={input}
                     />
                     <Hint>
-                      Exactly as it appears on their bank account — the bank
-                      checks it.
+                      {lookup.state === "found"
+                        ? `Filled in from ${institution}. Check it's who you mean to pay.`
+                        : "Exactly as it appears on their bank account — the bank checks it."}
                     </Hint>
                   </Field>
                   <Field label="Email" optional>
@@ -312,108 +828,6 @@ export function RecipientFlow({
                     />
                     <Hint>We send them a receipt each time you pay.</Hint>
                   </Field>
-                  <Field label="Bank country">
-                    <Dropdown
-                      label="Bank country"
-                      value={country}
-                      options={COUNTRIES.map((x) => ({
-                        value: x.name,
-                        label: x.name,
-                        hint: x.currency,
-                        icon: <span aria-hidden>{x.flag}</span>,
-                      }))}
-                      onChange={(v) => {
-                        setCountry(v);
-                        const next = COUNTRIES.find((x) => x.name === v)!;
-                        if (!next.rails.includes(rail)) setRail(next.rails[0]);
-                      }}
-                      className="[&>button]:h-10 [&>button]:w-full [&>button]:justify-between [&>button]:rounded-lg"
-                    />
-                  </Field>
-                </div>
-              </>
-            )}
-
-            {step === "bank" && (
-              <>
-                <h2 className="text-[22px] font-medium tracking-[-0.02em] text-white">
-                  {fixing
-                    ? `New bank details for ${name.split(" ")[0]}`
-                    : "Where should the money go?"}
-                </h2>
-                {fixing && (
-                  <p className="mt-2 text-[13px] leading-relaxed text-neutral-400">
-                    The last payment to {e?.institution} ••
-                    {e?.account?.slice(-4)} came back. Enter the account
-                    they&apos;d like to use now.
-                  </p>
-                )}
-                <div className="mt-8 space-y-6">
-                  {c.rails.length > 1 && (
-                    <Field label="Send by">
-                      <div role="radiogroup" className="grid grid-cols-2 gap-2">
-                        {c.rails.map((r) => (
-                          <button
-                            key={r}
-                            type="button"
-                            role="radio"
-                            aria-checked={rail === r}
-                            onClick={() => setRail(r)}
-                            className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${rail === r ? "border-white/40 bg-white/[0.05]" : "border-white/10 hover:border-white/25"}`}
-                          >
-                            <div className="text-[13px] text-white">{r}</div>
-                            <div className="mt-0.5 text-[11px] text-neutral-500">
-                              {RAIL_WORDS[r]}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                      <Hint>Arrives {arrival[rail].toLowerCase()}.</Hint>
-                    </Field>
-                  )}
-                  <Field label="Bank name">
-                    <input
-                      autoFocus
-                      value={bank}
-                      onChange={(ev) => setBank(ev.target.value)}
-                      placeholder={
-                        isUS(rail) ? "Lead Bank" : "Banking Circle S.A."
-                      }
-                      className={input}
-                    />
-                  </Field>
-                  <Field label={routingLabel(rail)}>
-                    <input
-                      value={routing}
-                      onChange={(ev) => setRouting(ev.target.value)}
-                      placeholder={isUS(rail) ? "101019644" : "BCIRLULL"}
-                      className={`${input} font-mono text-[12.5px] uppercase ${rProblem ? "border-rose-400/50" : ""}`}
-                    />
-                    {rProblem && <Hint tone="bad">{rProblem}</Hint>}
-                  </Field>
-                  <Field label={accountLabel(rail)}>
-                    <input
-                      value={account}
-                      onChange={(ev) => setAccount(ev.target.value)}
-                      placeholder={
-                        isUS(rail)
-                          ? "219079072561"
-                          : rail === "Local transfer"
-                            ? "007780000123456789012345"
-                            : "LU094080000047100391"
-                      }
-                      className={`${input} font-mono text-[12.5px] ${aProblem ? "border-rose-400/50" : ""}`}
-                    />
-                    {aProblem ? (
-                      <Hint tone="bad">{aProblem}</Hint>
-                    ) : (
-                      <Hint>
-                        {c.rails.length === 1
-                          ? `Paid by ${rail} in ${c.currency} · arrives ${arrival[rail].toLowerCase()}.`
-                          : "Ask them to copy it from their bank app, not a cheque."}
-                      </Hint>
-                    )}
-                  </Field>
                 </div>
               </>
             )}
@@ -425,7 +839,49 @@ export function RecipientFlow({
                 </h2>
                 <div className="mt-8 divide-y divide-white/6 rounded-xl border border-white/8">
                   <Row
-                    label="Recipient"
+                    label="Account type"
+                    value={ACCOUNT_TYPES.find((t) => t.id === type)!.label}
+                    onEdit={() => setStep("account")}
+                  />
+                  <Row
+                    label="Country"
+                    value={
+                      country
+                        ? `${FLAGS[country] ?? ""} ${country} · ${currency}`
+                        : "—"
+                    }
+                    onEdit={() => setStep("account")}
+                  />
+                  <Row
+                    label={
+                      type === "global" && instType === "Mobile money"
+                        ? "Provider"
+                        : "Bank"
+                    }
+                    value={bankName || "—"}
+                    onEdit={() => setStep("account")}
+                  />
+                  {cleanCode && (
+                    <Row
+                      label={codeLabel.replace(" (optional)", "")}
+                      value={cleanCode}
+                      mono
+                      onEdit={() => setStep("account")}
+                    />
+                  )}
+                  <Row
+                    label={rule.label.split(" (")[0]}
+                    value={acct || "—"}
+                    mono
+                    onEdit={() => setStep("account")}
+                  />
+                  <Row
+                    label="Send by"
+                    value={`${rail === "Local transfer" ? (instType === "Mobile money" ? "Mobile money" : "Bank account") : rail} · arrives ${arrival[rail].toLowerCase()}`}
+                    onEdit={() => setStep("account")}
+                  />
+                  <Row
+                    label="Holder"
                     value={`${name || "—"} · ${kind}`}
                     onEdit={() => setStep("who")}
                   />
@@ -434,38 +890,13 @@ export function RecipientFlow({
                     value={email || "No email"}
                     onEdit={() => setStep("who")}
                   />
-                  <Row
-                    label="Country"
-                    value={`${c.flag} ${country} · ${c.currency}`}
-                    onEdit={() => setStep("who")}
-                  />
-                  <Row
-                    label="Send by"
-                    value={`${rail} · arrives ${arrival[rail].toLowerCase()}`}
-                    onEdit={() => setStep("bank")}
-                  />
-                  <Row
-                    label="Bank"
-                    value={bank || "—"}
-                    onEdit={() => setStep("bank")}
-                  />
-                  <Row
-                    label={routingLabel(rail)}
-                    value={routing.toUpperCase() || "—"}
-                    mono
-                    onEdit={() => setStep("bank")}
-                  />
-                  <Row
-                    label={accountLabel(rail).split(" (")[0]}
-                    value={account || "—"}
-                    mono
-                    onEdit={() => setStep("bank")}
-                  />
                 </div>
                 <p className="mt-4 text-[12px] leading-relaxed text-neutral-500">
-                  {bankChanged
-                    ? `Before the first payment, Gravv checks with ${bank || "the bank"} that the account name matches — usually under 1 business day. You'll see them under Needs attention until then.`
-                    : "Only their name or email changed, so they stay ready to pay."}
+                  {!bankChanged
+                    ? "Only their name or email changed, so they stay ready to pay."
+                    : lookup.state === "found"
+                      ? `${institution} already confirmed the account name. Gravv runs a quick compliance check — usually minutes.`
+                      : `Before the first payment, Gravv checks with ${bankName || "the bank"} that the account name matches — usually under 1 business day.`}
                 </p>
               </>
             )}
@@ -492,11 +923,11 @@ export function RecipientFlow({
               <button
                 type="submit"
                 disabled={
-                  step === "who"
-                    ? !ready.who
-                    : step === "bank"
-                      ? !ready.bank
-                      : !(ready.who && ready.bank) || (!!e && !dirtyEdit)
+                  step === "account"
+                    ? !ready.account
+                    : step === "who"
+                      ? !ready.who
+                      : !(ready.account && ready.who) || (!!e && !dirtyEdit)
                 }
                 className="flex h-9 items-center gap-1 rounded-full bg-white pr-3 pl-4 text-[13px] font-medium text-black transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-neutral-500"
               >
@@ -515,7 +946,6 @@ export function RecipientFlow({
   );
 }
 
-/** Invite them to add their own bank details: Mercury's "request details" pattern. */
 export function AskForDetails({
   nextId,
   onClose,
@@ -668,7 +1098,7 @@ export function AskForDetails({
                   icon: <span aria-hidden>{x.flag}</span>,
                 }))}
                 onChange={setCountry}
-                className="[&>button]:h-10 [&>button]:w-full [&>button]:justify-between [&>button]:rounded-lg"
+                className="[&>button]:h-10 [&>button]:w-full [&>button]:justify-start [&>button]:rounded-lg [&>button>svg:last-child]:ml-auto"
               />
             </Field>
           </div>

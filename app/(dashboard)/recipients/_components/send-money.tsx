@@ -22,13 +22,21 @@ type Source = FundingSource & { balance: number };
 type Step = "recipient" | "amount" | "review" | "sent";
 
 // Indicative USD → payout currency rates for the prototype.
-const fx: Record<string, number> = { USD: 1, MAD: 9.18 };
+const fx: Record<string, number> = {
+  USD: 1,
+  MAD: 9.18,
+  NGN: 1550,
+  GHS: 15.6,
+  KES: 129,
+  EUR: 0.92,
+};
 
 export const arrival: Record<Rail, string> = {
   ACH: "In 1–2 business days",
   Wire: "Today, if sent before 4pm ET",
   Swift: "In 1–2 business days",
-  "Local transfer": "In 1–3 business days",
+  SEPA: "Usually today",
+  "Local transfer": "In minutes",
 };
 
 const fmt = (v: number, currency: string) =>
