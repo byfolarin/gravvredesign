@@ -1,5 +1,5 @@
 export type RecipientStatus = "Active" | "Pending";
-export type Rail = "ACH Wire" | "Swift" | "Bank account";
+export type Rail = "ACH" | "Wire" | "Swift" | "Local transfer";
 
 export type VerificationStep = {
   label: string;
@@ -16,6 +16,8 @@ export type RecipientPayment = {
   /** What the payment was funded from — USDC is converted at send time. */
   source: string;
   reference: string;
+  /** Why it didn't arrive, in plain words with the next step. */
+  failure?: string;
 };
 
 export type Recipient = {
@@ -35,6 +37,8 @@ export type Recipient = {
   createdAt: string;
   email?: string;
   verification?: VerificationStep[];
+  /** Set when these bank details match another recipient. */
+  duplicateOf?: string;
   payments: RecipientPayment[];
 };
 
@@ -49,8 +53,10 @@ const pendingSteps = (bank: string): VerificationStep[] => [
 ];
 
 // Placeholder people and businesses, shaped like the live dashboard's recipients (Oct 2026).
-const portrait = (path: string) => `https://randomuser.me/api/portraits/${path}.jpg`;
-const logo = (seed: string) => `https://api.dicebear.com/9.x/shapes/svg?seed=${seed}`;
+const portrait = (path: string) =>
+  `https://randomuser.me/api/portraits/${path}.jpg`;
+const logo = (seed: string) =>
+  `https://api.dicebear.com/9.x/shapes/svg?seed=${seed}`;
 
 export const recipients: Recipient[] = [
   {
@@ -68,7 +74,15 @@ export const recipients: Recipient[] = [
     createdAt: "2026-10-09T19:05:04Z",
     email: "finance@northwind.lu",
     payments: [
-      { id: "pay_31a", amount: 18_400, currency: "USD", date: "2026-10-12T10:14:00Z", status: "Completed", source: "USDC · Treasury wallet", reference: "INV-2026-114" },
+      {
+        id: "pay_31a",
+        amount: 18_400,
+        currency: "USD",
+        date: "2026-10-12T10:14:00Z",
+        status: "Completed",
+        source: "USDC · Treasury wallet",
+        reference: "INV-2026-114",
+      },
     ],
   },
   {
@@ -86,8 +100,24 @@ export const recipients: Recipient[] = [
     createdAt: "2026-10-09T13:33:44Z",
     email: "amara.nwosu@example.com",
     payments: [
-      { id: "pay_29c", amount: 2_500, currency: "USD", date: "2026-10-10T09:02:00Z", status: "Completed", source: "USD account", reference: "Expense reimbursement" },
-      { id: "pay_29d", amount: 1, currency: "USD", date: "2026-10-09T13:40:00Z", status: "Completed", source: "USD account", reference: "Test payment" },
+      {
+        id: "pay_29c",
+        amount: 2_500,
+        currency: "USD",
+        date: "2026-10-10T09:02:00Z",
+        status: "Completed",
+        source: "USD account",
+        reference: "Expense reimbursement",
+      },
+      {
+        id: "pay_29d",
+        amount: 1,
+        currency: "USD",
+        date: "2026-10-09T13:40:00Z",
+        status: "Completed",
+        source: "USD account",
+        reference: "Test payment",
+      },
     ],
   },
   {
@@ -100,13 +130,29 @@ export const recipients: Recipient[] = [
     account: "219079072561",
     routing: { label: "Routing number", value: "101019644" },
     currency: "USD",
-    rail: "ACH Wire",
+    rail: "Wire",
     status: "Active",
     createdAt: "2026-10-09T12:53:55Z",
     email: "ap@lumenlabs.io",
     payments: [
-      { id: "pay_27e", amount: 42_750, currency: "USD", date: "2026-10-13T15:21:00Z", status: "Processing", source: "USDC · Payouts float", reference: "Oct services" },
-      { id: "pay_27f", amount: 39_900, currency: "USD", date: "2026-10-10T11:48:00Z", status: "Completed", source: "USDC · Payouts float", reference: "Sep services" },
+      {
+        id: "pay_27e",
+        amount: 42_750,
+        currency: "USD",
+        date: "2026-10-13T15:21:00Z",
+        status: "Processing",
+        source: "USDC · Payouts float",
+        reference: "Oct services",
+      },
+      {
+        id: "pay_27f",
+        amount: 39_900,
+        currency: "USD",
+        date: "2026-10-10T11:48:00Z",
+        status: "Completed",
+        source: "USDC · Payouts float",
+        reference: "Sep services",
+      },
     ],
   },
   {
@@ -119,11 +165,21 @@ export const recipients: Recipient[] = [
     account: "1000005809",
     routing: { label: "Routing number", value: "091202590" },
     currency: "USD",
-    rail: "ACH Wire",
+    rail: "ACH",
     status: "Active",
     createdAt: "2026-10-09T12:34:22Z",
     payments: [
-      { id: "pay_25a", amount: 3_200, currency: "USD", date: "2026-10-11T08:30:00Z", status: "Failed", source: "USD account", reference: "Contractor — Oct" },
+      {
+        id: "pay_25a",
+        amount: 3_200,
+        currency: "USD",
+        date: "2026-10-11T08:30:00Z",
+        status: "Failed",
+        source: "USD account",
+        reference: "Contractor — Oct",
+        failure:
+          "Stearns Bank sent it back: the account is closed (ACH return R02). The $3,200 is back in your USD account. Ask Marcus for new bank details.",
+      },
     ],
   },
   {
@@ -140,8 +196,24 @@ export const recipients: Recipient[] = [
     status: "Active",
     createdAt: "2026-10-01T13:50:44Z",
     payments: [
-      { id: "pay_19b", amount: 5_000, currency: "USD", date: "2026-10-03T14:05:00Z", status: "Completed", source: "USDC · Treasury wallet", reference: "Payroll" },
-      { id: "pay_19c", amount: 5_000, currency: "USD", date: "2026-09-03T14:02:00Z", status: "Completed", source: "USDC · Treasury wallet", reference: "Payroll" },
+      {
+        id: "pay_19b",
+        amount: 5_000,
+        currency: "USD",
+        date: "2026-10-03T14:05:00Z",
+        status: "Completed",
+        source: "USDC · Treasury wallet",
+        reference: "Payroll",
+      },
+      {
+        id: "pay_19c",
+        amount: 5_000,
+        currency: "USD",
+        date: "2026-09-03T14:02:00Z",
+        status: "Completed",
+        source: "USDC · Treasury wallet",
+        reference: "Payroll",
+      },
     ],
   },
   {
@@ -151,14 +223,23 @@ export const recipients: Recipient[] = [
     kind: "Business",
     country: "Morocco",
     institution: "Attijariwafa Bank",
-    account: null,
+    account: "007780000123456789012345",
+    routing: { label: "SWIFT / BIC", value: "BCMAMAMC" },
     currency: "MAD",
-    rail: "Bank account",
+    rail: "Local transfer",
     status: "Active",
     createdAt: "2026-09-22T12:50:39Z",
     email: "finance@atlasrelief.ma",
     payments: [
-      { id: "pay_14d", amount: 120_000, currency: "MAD", date: "2026-09-29T10:00:00Z", status: "Completed", source: "USDC · Treasury wallet", reference: "Grant tranche 1" },
+      {
+        id: "pay_14d",
+        amount: 120_000,
+        currency: "MAD",
+        date: "2026-09-29T10:00:00Z",
+        status: "Completed",
+        source: "USDC · Treasury wallet",
+        reference: "Grant tranche 1",
+      },
     ],
   },
   {
@@ -171,7 +252,7 @@ export const recipients: Recipient[] = [
     account: "343181156633",
     routing: { label: "Routing number", value: "021214891" },
     currency: "USD",
-    rail: "ACH Wire",
+    rail: "ACH",
     status: "Active",
     createdAt: "2026-09-22T11:27:54Z",
     payments: [],
@@ -186,7 +267,7 @@ export const recipients: Recipient[] = [
     account: "213553026988",
     routing: { label: "Routing number", value: "101019644" },
     currency: "USD",
-    rail: "ACH Wire",
+    rail: "ACH",
     status: "Pending",
     createdAt: "2026-09-18T12:00:56Z",
     verification: pendingSteps("Lead Bank"),
@@ -202,7 +283,7 @@ export const recipients: Recipient[] = [
     account: "11434",
     routing: { label: "Routing number", value: "021214891" },
     currency: "USD",
-    rail: "ACH Wire",
+    rail: "ACH",
     status: "Pending",
     createdAt: "2026-09-17T18:33:50Z",
     verification: [
@@ -226,9 +307,10 @@ export const recipients: Recipient[] = [
     account: "11434",
     routing: { label: "Routing number", value: "021214891" },
     currency: "USD",
-    rail: "ACH Wire",
+    rail: "ACH",
     status: "Pending",
     createdAt: "2026-09-07T14:59:05Z",
+    duplicateOf: "rcp_b29f4d6c10",
     verification: [
       { label: "Details submitted", state: "done" },
       {

@@ -33,7 +33,13 @@ import { dateFmt, fullDateFmt, timeFmt } from "../../cards/_lib/format";
 
 type Tab = "All" | RecipientStatus;
 const TABS: Tab[] = ["All", "Active", "Pending"];
-const RAILS: ("All" | Rail)[] = ["All", "ACH Wire", "Swift", "Bank account"];
+const RAILS: ("All" | Rail)[] = [
+  "All",
+  "ACH",
+  "Wire",
+  "Swift",
+  "Local transfer",
+];
 const PAGE_SIZES = [10, 25, 50];
 
 /** Data snapshot time, so "last 30 days" agrees on server and client. */
@@ -153,17 +159,29 @@ export function RecipientsWorkspace({
       .filter((r) => lastPayment(r)?.status === "Failed")
       .map((r) => ({
         r,
-        reason: `Last payment failed · ${lastPayment(r)!.reference}`,
-        action: "Retry" as const,
+        reason:
+          lastPayment(r)!.failure ??
+          `Last payment failed · ${lastPayment(r)!.reference}`,
+        // Retry only helps when the bank didn't reject the details themselves.
+        action: lastPayment(r)!.failure
+          ? ("Review" as const)
+          : ("Retry" as const),
+        failed: true,
       })),
     ...list
-      .filter((r) => r.status === "Pending")
+      // A duplicate is reported once, on the copy to archive.
+      .filter(
+        (r) =>
+          r.status === "Pending" && !list.some((x) => x.duplicateOf === r.id),
+      )
       .map((r) => ({
         r,
-        reason:
-          r.verification?.find((v) => v.state === "current")?.note ??
-          "Verifying bank details",
+        reason: r.duplicateOf
+          ? "Two recipients have these exact bank details, and the account number looks too short. Fix it on one, archive the other."
+          : (r.verification?.find((v) => v.state === "current")?.note ??
+            "Verifying bank details"),
         action: "Review" as const,
+        failed: false,
       })),
   ];
 
@@ -248,16 +266,10 @@ export function RecipientsWorkspace({
             title="Paid out · 30 days"
             meta={
               paidBefore > 0 ? (
-                <span
-                  className={
-                    paidNow >= paidBefore
-                      ? "text-[var(--flow-in)]"
-                      : "text-neutral-400"
-                  }
-                >
-                  {paidNow >= paidBefore ? "↑" : "↓"}{" "}
-                  {compact(Math.abs(paidNow - paidBefore))}
-                  <span className="text-neutral-500"> vs prev</span>
+                <span className="text-neutral-300">
+                  {paidNow >= paidBefore ? "Up" : "Down"} from{" "}
+                  <span className="amount">{compact(paidBefore)}</span>
+                  <span className="text-neutral-500"> the 30 days before</span>
                 </span>
               ) : undefined
             }
@@ -272,7 +284,7 @@ export function RecipientsWorkspace({
               </span>
             </div>
             <ul className="mt-5 space-y-2.5">
-              {top.map(([r, v], i) => (
+              {top.map(([r, v]) => (
                 <li key={r.id}>
                   <button
                     type="button"
@@ -291,7 +303,7 @@ export function RecipientsWorkspace({
                       </span>
                       <span className="mt-1 block h-1 rounded-full bg-white/[0.06]">
                         <span
-                          className={`block h-full rounded-full ${i === 0 ? "bg-[var(--flow-in)]" : "bg-white/30"}`}
+                          className="block h-full rounded-full bg-white/30"
                           style={{
                             width: `${Math.max(4, (v / (top[0]?.[1] || 1)) * 100)}%`,
                           }}
@@ -363,10 +375,10 @@ export function RecipientsWorkspace({
             }
           >
             <ul className="-mx-2">
-              {attention.map(({ r, reason, action }) => (
+              {attention.map(({ r, reason, action, failed }) => (
                 <li
                   key={`${r.id}${action}`}
-                  className="flex items-center gap-3 rounded-lg px-2 py-2"
+                  className="flex items-start gap-3 rounded-lg px-2 py-2"
                 >
                   <RecipientAvatar recipient={r} size={26} />
                   <span className="min-w-0 flex-1">
@@ -375,7 +387,7 @@ export function RecipientsWorkspace({
                     </span>
                     <span
                       title={reason}
-                      className={`block truncate text-[11px] ${action === "Retry" ? "text-rose-300" : "text-neutral-500"}`}
+                      className={`line-clamp-2 block text-[11px] leading-snug ${failed ? "text-rose-300" : "text-neutral-500"}`}
                     >
                       {reason}
                     </span>
@@ -569,6 +581,13 @@ export function RecipientsWorkspace({
                           <div className="flex items-center gap-1 truncate text-[11px] text-neutral-500">
                             <span aria-hidden>{FLAGS[r.country]}</span>
                             {r.kind} · {r.country}
+                            {(r.duplicateOf ||
+                              list.some((x) => x.duplicateOf === r.id)) && (
+                              <span className="text-amber-300">
+                                {" "}
+                                · Same details as another recipient
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -867,12 +886,16 @@ function Preview({
         <Fact2 label="Email" value={r.email ?? "—"} copy={!!r.email} />
       </div>
       <div className="flex items-center justify-between gap-4 border-t border-white/6 px-5 py-2.5">
-        <span className="truncate text-[12px] text-neutral-500">
+        <span
+          className={`text-[12px] whitespace-normal ${last?.failure && !pending ? "text-rose-300" : "text-neutral-500"}`}
+        >
           {pending && step
             ? `${step.label} · ${step.note ?? "In progress"}`
-            : last
-              ? `${sent.length} ${sent.length === 1 ? "payment" : "payments"} · last “${last.reference}” on ${fullDateFmt.format(new Date(last.date))}`
-              : "Nothing sent to this recipient yet"}
+            : last?.failure
+              ? last.failure
+              : last
+                ? `${sent.length} ${sent.length === 1 ? "payment" : "payments"} · last “${last.reference}” on ${fullDateFmt.format(new Date(last.date))}`
+                : "Nothing sent to this recipient yet"}
         </span>
         <div className="flex shrink-0 items-center gap-2">
           {!pending && (
@@ -1416,6 +1439,11 @@ function PaymentRow({ payment: p }: { payment: RecipientPayment }) {
             <span className="font-medium text-neutral-300"> · Failed</span>
           )}
         </span>
+        {p.failure && (
+          <span className="mt-1 block text-xs leading-relaxed whitespace-normal text-rose-300">
+            {p.failure}
+          </span>
+        )}
       </span>
       <span
         className={`text-[13px] tabular-nums ${failed ? "text-neutral-600 line-through" : "text-neutral-100"}`}

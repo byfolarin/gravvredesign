@@ -9,9 +9,19 @@ const initials = (name: string) =>
     .join("");
 
 /** Businesses get a rounded square, people a circle — tells them apart without another column. */
-export function RecipientAvatar({ recipient, size = 32 }: { recipient: Recipient; size?: number }) {
+export function RecipientAvatar({
+  recipient,
+  size = 32,
+}: {
+  recipient: Recipient;
+  size?: number;
+}) {
   const business = recipient.kind === "Business";
-  const shape = business ? (size >= 44 ? "rounded-xl" : "rounded-lg") : "rounded-full";
+  const shape = business
+    ? size >= 44
+      ? "rounded-xl"
+      : "rounded-lg"
+    : "rounded-full";
   if (recipient.image) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- remote placeholder images

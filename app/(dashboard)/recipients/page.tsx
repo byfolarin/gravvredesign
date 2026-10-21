@@ -3,5 +3,10 @@ import { recipients } from "./_data";
 import { fundingSources } from "../cards/_data";
 
 export default function RecipientsPage() {
-  return <RecipientsWorkspace initialRecipients={recipients} sources={fundingSources} />;
+  return (
+    <RecipientsWorkspace
+      initialRecipients={recipients}
+      sources={fundingSources}
+    />
+  );
 }

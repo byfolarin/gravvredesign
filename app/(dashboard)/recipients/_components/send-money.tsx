@@ -25,9 +25,10 @@ type Step = "recipient" | "amount" | "review" | "sent";
 const fx: Record<string, number> = { USD: 1, MAD: 9.18 };
 
 const arrival: Record<Rail, string> = {
-  "ACH Wire": "Today, if sent before 4pm ET",
+  ACH: "In 1–2 business days",
+  Wire: "Today, if sent before 4pm ET",
   Swift: "In 1–2 business days",
-  "Bank account": "In 1–3 business days",
+  "Local transfer": "In 1–3 business days",
 };
 
 const fmt = (v: number, currency: string) =>
