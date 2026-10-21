@@ -43,6 +43,7 @@ nothing persists. Owner: Folarin (product designer).
   `TopBar` (search · "Updated n min ago" (click = refresh) · **Move money ▾** menu (Send money / Request payment / Convert currency) · │ · hide amounts (eye, ⇧H) · settings · bell),
   sidebar with Hugeicons stroke icons.
 - Sheets/flows with typed input must not lose it to a stray click: once dirty, scrim click / Esc / × ask "Discard …? [Keep editing] [Discard]" (Esc = keep). Use `useDiscardGuard` + `DiscardConfirm` (`app/_components/discard-guard.tsx`); `[data-keeps-clean]` excludes controls, `clear()` on success. Every create/send flow has it.
+- Bar charts: shared `BucketBars` (`app/_components/bucket-bars.tsx`) — day (30D) or week (90D) buckets, optional stacking with 2px gaps, left value axis, hover tooltip dims the rest, click a bar to filter the table (banner with Clear), summary line + range switch + "Hide chart" pill, no panel background, open by default and remembered. Used by Collections ("How payments ended", stacked by outcome) and Payment links ("Collected", USD-eq, avg line, top links in tooltip).
 - Tables: hairline rows, row click expands an inline preview, "View all details" opens a right sheet;
   bulk selection uses a black floating bar; ⋮ row menus.
 

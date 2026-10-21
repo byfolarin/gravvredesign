@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  ChevronDown,
   Download,
   ExternalLink,
   RotateCcw,
@@ -13,6 +14,12 @@ import {
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
+import {
+  BucketBars,
+  bucketStarts,
+  readOpen,
+  writeOpen,
+} from "@/app/_components/bucket-bars";
 import {
   DiscardConfirm,
   useDiscardGuard,
@@ -115,6 +122,12 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
   const [refundId, setRefundId] = useState<string | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
+  const [period, setPeriod] = useState<30 | 90>(90);
+  const [shown, setShown] = useState(50);
+  // A day or week picked on the chart narrows the table to it.
+  const [bucket, setBucket] = useState<{ start: number; size: number } | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!toast) return;
@@ -227,6 +240,11 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
     });
   const rows = scoped
     .filter((c) => inTab(c, tab))
+    .filter((c) => {
+      if (!bucket) return true;
+      const t = Date.parse(c.createdAt);
+      return t >= bucket.start && t < bucket.start + bucket.size;
+    })
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const tabs: Tab[] = [
     "All",
@@ -390,6 +408,43 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
           />
         </div>
 
+        <OutcomeChart
+          list={list}
+          period={period}
+          onPeriod={(p) => {
+            setPeriod(p);
+            setBucket(null);
+          }}
+          selected={bucket?.start ?? null}
+          onSelect={(start, size) => {
+            setBucket(start === null ? null : { start, size });
+            if (start !== null) setRange("all");
+          }}
+        />
+
+        {bucket && (
+          <div className="mt-6 flex items-center justify-between rounded-lg bg-white/[0.04] px-4 py-2.5 text-[13px]">
+            <span className="text-neutral-300">
+              Showing payments {bucket.size > DAY ? "in the week of " : "on "}
+              <span className="font-medium text-white">
+                {dayFmt.format(new Date(bucket.start))}
+              </span>
+              <span className="text-neutral-500">
+                {" "}
+                · {rows.length} {rows.length === 1 ? "payment" : "payments"}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setBucket(null)}
+              className="flex items-center gap-1 text-neutral-400 hover:text-white"
+            >
+              <X size={13} strokeWidth={1.75} />
+              Clear
+            </button>
+          </div>
+        )}
+
         {/* Tabs + tools */}
         <div className="mt-12 flex flex-wrap items-center justify-between gap-4">
           <div role="tablist" className="flex flex-wrap items-center gap-1">
@@ -503,7 +558,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((c) => {
+            {rows.slice(0, shown).map((c) => {
               const open = openId === c.id;
               const muted = !wasCharged(c);
               return (
@@ -644,8 +699,21 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
             )}
           </tbody>
         </table>
-        <div className="border-t border-white/6 pt-4 text-[13px] text-neutral-500 tabular-nums">
-          {rows.length} {rows.length === 1 ? "payment" : "payments"}
+        <div className="flex items-center justify-between border-t border-white/6 pt-4 text-[13px] text-neutral-500 tabular-nums">
+          <span>
+            {rows.length > shown
+              ? `Showing ${shown} of ${rows.length} payments`
+              : `${rows.length} ${rows.length === 1 ? "payment" : "payments"}`}
+          </span>
+          {rows.length > shown && (
+            <button
+              type="button"
+              onClick={() => setShown((n) => n + 50)}
+              className="h-8 rounded-full border border-white/12 px-3.5 text-neutral-200 transition-colors hover:border-white/30 hover:text-white"
+            >
+              Show {Math.min(50, rows.length - shown)} more
+            </button>
+          )}
         </div>
       </div>
 
@@ -715,6 +783,193 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
         </div>
       )}
     </div>
+  );
+}
+
+const OUTCOMES = [
+  {
+    key: "settled",
+    label: "Settled",
+    swatch: "bg-[var(--flow-in)]",
+    test: (c: Collection) => inTab(c, "Settled"),
+  },
+  {
+    key: "stuck",
+    label: "Charged, not settled",
+    swatch: "bg-rose-400",
+    test: (c: Collection) =>
+      c.status === "Settlement failed" || c.status === "Settlement pending",
+  },
+  {
+    key: "declined",
+    label: "Declined at the card",
+    swatch: "bg-neutral-500",
+    test: (c: Collection) => c.status === "Payment failed",
+  },
+  {
+    key: "left",
+    label: "Didn't finish",
+    swatch: "bg-white/15",
+    test: (c: Collection) => inTab(c, "Didn't finish"),
+  },
+] as const;
+const CHART_KEY = "gravv-collections-chart";
+const shortDay = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+/** Every payment started, per day or week, stacked by how it ended. Settled at the bottom. */
+function OutcomeChart({
+  list,
+  period,
+  onPeriod,
+  selected,
+  onSelect,
+}: {
+  list: Collection[];
+  period: 30 | 90;
+  onPeriod: (p: 30 | 90) => void;
+  selected: number | null;
+  onSelect: (start: number | null, size: number) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setOpen(readOpen(CHART_KEY)), 0);
+    return () => clearTimeout(t);
+  }, []);
+  const { size, starts } = bucketStarts(AS_OF, period);
+  const inPeriod = list.filter((c) => Date.parse(c.createdAt) >= starts[0]);
+  const groups = starts.map((start) =>
+    inPeriod.filter((c) => {
+      const t = Date.parse(c.createdAt);
+      return t >= start && t < start + size;
+    }),
+  );
+  const buckets = starts.map((start, i) => ({
+    start,
+    segments: OUTCOMES.map((o) => ({
+      value: groups[i].filter(o.test).length,
+      className: o.swatch,
+    })),
+    label: `${shortDay.format(start)}: ${groups[i].length} payments`,
+  }));
+  const settledUsdc = inPeriod
+    .filter(OUTCOMES[0].test)
+    .reduce((s, c) => s + net(c), 0);
+  const when = (start: number) =>
+    size > DAY ? `Week of ${shortDay.format(start)}` : shortDay.format(start);
+
+  return (
+    <section className="mt-12">
+      <div className="flex flex-wrap items-center gap-x-7 gap-y-3">
+        <h2 className="text-[15px] font-medium tracking-[-0.01em] text-white">
+          How payments ended
+        </h2>
+        {OUTCOMES.map((o) => (
+          <span key={o.key} className="flex items-center gap-2 text-xs">
+            <span
+              aria-hidden
+              className={`h-2.5 w-1.5 rounded-[1px] ${o.swatch}`}
+            />
+            <span className="text-neutral-500">{o.label}</span>
+            <span className="text-neutral-200 tabular-nums">
+              {inPeriod.filter(o.test).length}
+            </span>
+          </span>
+        ))}
+        <div className="ml-auto flex items-center gap-2">
+          {open && (
+            <div
+              role="radiogroup"
+              aria-label="Period"
+              className="flex rounded-full bg-white/[0.07] p-0.5"
+            >
+              {([30, 90] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  role="radio"
+                  aria-checked={period === p}
+                  onClick={() => onPeriod(p)}
+                  className={`h-7 rounded-full px-2.5 text-xs tabular-nums transition-colors ${
+                    period === p
+                      ? "bg-surface font-medium text-white shadow-[0_1px_2px_rgb(0_0_0/0.25)]"
+                      : "text-neutral-500 hover:text-white"
+                  }`}
+                >
+                  {p}D
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              writeOpen(CHART_KEY, !open);
+              setOpen(!open);
+            }}
+            aria-expanded={open}
+            className="flex h-8 items-center gap-1.5 rounded-full border border-white/10 px-3 text-[13px] text-neutral-300 transition-colors hover:border-white/25 hover:text-white"
+          >
+            {open ? "Hide chart" : "Show chart"}
+            <ChevronDown
+              size={14}
+              strokeWidth={1.75}
+              className={`transition-transform ${open ? "rotate-180" : ""}`}
+            />
+          </button>
+        </div>
+      </div>
+      {open && (
+        <div className="orbit-pop mt-6">
+          <BucketBars
+            buckets={buckets}
+            format={(v) => String(Math.round(v))}
+            selected={selected}
+            onSelect={(start) => onSelect(start, size)}
+            axis={[
+              shortDay.format(starts[0]),
+              shortDay.format(starts[Math.floor(starts.length / 2)]),
+              size > DAY ? "This week" : "Today",
+            ]}
+            tooltip={(b, i) => (
+              <>
+                <div className="text-neutral-400">{when(b.start)}</div>
+                {OUTCOMES.map((o, k) => (
+                  <div
+                    key={o.key}
+                    className={`mt-1 flex justify-between tabular-nums ${b.segments[k].value ? "text-neutral-200" : "text-neutral-600"}`}
+                  >
+                    <span>{o.label}</span>
+                    <span>{b.segments[k].value}</span>
+                  </div>
+                ))}
+                <div className="mt-1.5 flex justify-between border-t border-white/8 pt-1.5 font-medium text-white tabular-nums">
+                  <span>Settled</span>
+                  <span className="amount">
+                    {usdc(
+                      groups[i]
+                        .filter(OUTCOMES[0].test)
+                        .reduce((s, c) => s + net(c), 0),
+                    )}{" "}
+                    USDC
+                  </span>
+                </div>
+              </>
+            )}
+          />
+          <p className="mt-4 text-[12px] text-neutral-500">
+            <span className="amount text-neutral-300">
+              {usdc(settledUsdc)} USDC
+            </span>{" "}
+            settled from {inPeriod.filter(OUTCOMES[0].test).length} of{" "}
+            {inPeriod.length} payments started in the last {period} days.
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 

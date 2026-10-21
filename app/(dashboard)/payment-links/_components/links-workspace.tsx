@@ -34,6 +34,12 @@ import { QRCodeSVG } from "qrcode.react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
+import {
+  BucketBars,
+  bucketStarts,
+  readOpen,
+  writeOpen,
+} from "@/app/_components/bucket-bars";
 import { CheckoutCustomizer } from "./checkout-customizer";
 import {
   AS_OF,
@@ -144,6 +150,11 @@ export function LinksWorkspace() {
   // Set alongside a toast when the change can be taken back.
   const [undo, setUndo] = useState<(() => void) | null>(null);
   const [extending, setExtending] = useState(false);
+  const [period, setPeriod] = useState<30 | 90>(90);
+  // A day or week picked on the chart narrows the table to links paid in it.
+  const [bucket, setBucket] = useState<{ start: number; size: number } | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!toast) return;
@@ -208,8 +219,15 @@ export function LinksWorkspace() {
           v.toLowerCase().includes(q),
         ),
     );
+  const paidIn = (l: PaymentLink) =>
+    !bucket ||
+    paidOf(l).some((p) => {
+      const t = Date.parse(p.date);
+      return t >= bucket.start && t < bucket.start + bucket.size;
+    });
   const rows = scoped
     .filter((l) => status === "All" || l.status === status)
+    .filter(paidIn)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const count = (t: StatusFilter) =>
     scoped.filter((l) => t === "All" || l.status === t).length;
@@ -396,6 +414,42 @@ export function LinksWorkspace() {
             }
           />
         </div>
+
+        <CollectedChart
+          list={list}
+          period={period}
+          onPeriod={(p) => {
+            setPeriod(p);
+            setBucket(null);
+          }}
+          selected={bucket?.start ?? null}
+          onSelect={(start, size) =>
+            setBucket(start === null ? null : { start, size })
+          }
+        />
+
+        {bucket && (
+          <div className="mt-6 flex items-center justify-between rounded-lg bg-white/[0.04] px-4 py-2.5 text-[13px]">
+            <span className="text-neutral-300">
+              Links paid {bucket.size > DAY ? "in the week of " : "on "}
+              <span className="font-medium text-white">
+                {dateFmt.format(new Date(bucket.start))}
+              </span>
+              <span className="text-neutral-500">
+                {" "}
+                · {rows.length} {rows.length === 1 ? "link" : "links"}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setBucket(null)}
+              className="flex items-center gap-1 text-neutral-400 hover:text-white"
+            >
+              <X size={13} strokeWidth={1.75} />
+              Clear
+            </button>
+          </div>
+        )}
 
         {/* Tabs + tools, same as Transactions and Wallets */}
         <div className="mt-12 flex flex-wrap items-center justify-between gap-4">
@@ -673,6 +727,184 @@ export function LinksWorkspace() {
         </div>
       )}
     </div>
+  );
+}
+
+const CHART_KEY = "gravv-links-chart";
+const utcDay = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+/** Money collected through links per day or week (USD equivalent), one series. */
+function CollectedChart({
+  list,
+  period,
+  onPeriod,
+  selected,
+  onSelect,
+}: {
+  list: PaymentLink[];
+  period: 30 | 90;
+  onPeriod: (p: 30 | 90) => void;
+  selected: number | null;
+  onSelect: (start: number | null, size: number) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setOpen(readOpen(CHART_KEY)), 0);
+    return () => clearTimeout(t);
+  }, []);
+  const { size, starts } = bucketStarts(AS_OF, period);
+  const end = starts[starts.length - 1] + size;
+  const paid = list.flatMap((l) =>
+    paidOf(l).map((p) => ({
+      link: l,
+      t: Date.parse(p.date),
+      usd: p.amount * TO_USD[l.currency],
+    })),
+  );
+  const between = (a: number, b: number) =>
+    paid.filter((p) => p.t >= a && p.t < b);
+  const groups = starts.map((s) => between(s, s + size));
+  const total = groups.flat().reduce((s, p) => s + p.usd, 0);
+  const before = between(starts[0] - (end - starts[0]), starts[0]).reduce(
+    (s, p) => s + p.usd,
+    0,
+  );
+  const change = before ? ((total - before) / before) * 100 : 0;
+  const count = groups.flat().length;
+  const top = (ps: typeof paid) =>
+    [
+      ...ps.reduce(
+        (m, p) => m.set(p.link, (m.get(p.link) ?? 0) + p.usd),
+        new Map<PaymentLink, number>(),
+      ),
+    ]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+  const leader = top(groups.flat())[0];
+  const buckets = starts.map((start, i) => ({
+    start,
+    segments: [
+      {
+        value: groups[i].reduce((s, p) => s + p.usd, 0),
+        className: "bg-[var(--flow-in)]",
+      },
+    ],
+    label: `${utcDay.format(start)}: $${usd(groups[i].reduce((s, p) => s + p.usd, 0))} collected`,
+  }));
+
+  return (
+    <section className="mt-12">
+      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-3">
+        <h2 className="text-[15px] font-medium tracking-[-0.01em] text-white">
+          Collected
+        </h2>
+        <span className="amount text-[17px] font-medium tracking-[-0.01em] text-white tabular-nums">
+          ${usd(total)}
+        </span>
+        {before > 0 && (
+          <span
+            className={`text-xs tabular-nums ${change >= 0 ? "text-[var(--flow-in)]" : "text-neutral-400"}`}
+          >
+            {change >= 0 ? "+" : "−"}
+            {Math.abs(change).toFixed(0)}% vs previous {period} days
+          </span>
+        )}
+        <span className="text-xs text-neutral-500 tabular-nums">
+          {count} payments
+          {leader ? ` · most from ${leader[0].name}` : ""}
+        </span>
+        <div className="ml-auto flex items-center gap-2 self-center">
+          {open && (
+            <div
+              role="radiogroup"
+              aria-label="Period"
+              className="flex rounded-full bg-white/[0.07] p-0.5"
+            >
+              {([30, 90] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  role="radio"
+                  aria-checked={period === p}
+                  onClick={() => onPeriod(p)}
+                  className={`h-7 rounded-full px-2.5 text-xs tabular-nums transition-colors ${
+                    period === p
+                      ? "bg-surface font-medium text-white shadow-[0_1px_2px_rgb(0_0_0/0.25)]"
+                      : "text-neutral-500 hover:text-white"
+                  }`}
+                >
+                  {p}D
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              writeOpen(CHART_KEY, !open);
+              setOpen(!open);
+            }}
+            aria-expanded={open}
+            className="flex h-8 items-center gap-1.5 rounded-full border border-white/10 px-3 text-[13px] text-neutral-300 transition-colors hover:border-white/25 hover:text-white"
+          >
+            {open ? "Hide chart" : "Show chart"}
+            <ChevronDown
+              size={14}
+              strokeWidth={1.75}
+              className={`transition-transform ${open ? "rotate-180" : ""}`}
+            />
+          </button>
+        </div>
+      </div>
+      {open && (
+        <div className="orbit-pop mt-6">
+          <BucketBars
+            buckets={buckets}
+            format={(v) => (v ? `$${compact(v)}` : "0")}
+            selected={selected}
+            onSelect={(start) => onSelect(start, size)}
+            average={{
+              value: total / starts.length,
+              label: `avg $${compact(total / starts.length)}/${size > DAY ? "week" : "day"}`,
+            }}
+            axis={[
+              utcDay.format(starts[0]),
+              utcDay.format(starts[Math.floor(starts.length / 2)]),
+              size > DAY ? "This week" : "Today",
+            ]}
+            tooltip={(b, i) => (
+              <>
+                <div className="text-neutral-400">
+                  {size > DAY
+                    ? `Week of ${utcDay.format(b.start)}`
+                    : utcDay.format(b.start)}
+                </div>
+                <div className="mt-1.5 flex justify-between font-medium text-white tabular-nums">
+                  <span>Collected</span>
+                  <span className="amount">${usd(b.segments[0].value)}</span>
+                </div>
+                {top(groups[i]).map(([l, v]) => (
+                  <div
+                    key={l.id}
+                    className="mt-1 flex justify-between gap-3 text-neutral-400 tabular-nums"
+                  >
+                    <span className="truncate">{l.name}</span>
+                    <span className="amount shrink-0">${compact(v)}</span>
+                  </div>
+                ))}
+                {!groups[i].length && (
+                  <div className="mt-1 text-neutral-500">No payments</div>
+                )}
+              </>
+            )}
+          />
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -174,7 +174,7 @@ const round = (v: number) => Math.round(v * 100) / 100;
 function make(i: number, status: CollectionStatus): Collection {
   const [name, email, country] = pick(CUSTOMERS);
   // Newest first, spread over ~90 days with a few clustered on the same day.
-  const t = AS_OF - Math.floor(i * 2.3 * DAY + rand() * 0.8 * DAY);
+  const t = AS_OF - Math.floor(i * 0.64 * DAY + rand() * 0.5 * DAY);
   const currency = CURRENCY[country];
   const usd = pick(AMOUNTS);
   const chargedAmount = round(usd / TO_USD[currency]);
@@ -307,7 +307,32 @@ function make(i: number, status: CollectionStatus): Collection {
   };
 }
 
-export const collections: Collection[] = PLAN.map((s, i) => make(i, s));
+// ~140 payments over 90 days: the hand-written start (newest), then a weighted mix like the
+// real account — most settle, a fair share fail at the card, a few fail after charging.
+const MIX: [CollectionStatus, number][] = [
+  ["Settlement completed", 0.56],
+  ["Payment failed", 0.18],
+  ["Expired", 0.08],
+  ["Abandoned", 0.05],
+  ["Settlement failed", 0.04],
+  ["Refunded", 0.05],
+  ["Partially refunded", 0.04],
+];
+const mixed = (): CollectionStatus => {
+  let r = rand();
+  for (const [st, w] of MIX) if ((r -= w) < 0) return st;
+  return "Settlement completed";
+};
+// Older payments that failed to settle have long since been retried; keep the stuck ones recent.
+const plan: CollectionStatus[] = [
+  ...PLAN.slice(0, 14),
+  ...Array.from({ length: 126 }, (_, i) => {
+    const st = mixed();
+    return st === "Settlement failed" && i > 30 ? "Settlement completed" : st;
+  }),
+];
+
+export const collections: Collection[] = plan.map((s, i) => make(i, s));
 
 /** Money stuck after the card was charged. */
 export const isStuck = (c: Collection) => c.status === "Settlement failed";
