@@ -494,7 +494,7 @@ html[data-intro] .content-theme {
  */
 :root { --app-zoom: 1; }
 @media (max-width: 1799px) { :root { --app-zoom: 0.94; } }
-@media (max-width: 1599px) { :root { --app-zoom: 0.88; } }
+@media (max-width: 1599px) { :root { --app-zoom: 0.9; } }
 @media (max-width: 1439px) { :root { --app-zoom: 0.82; } }
 @media (max-width: 1279px) { :root { --app-zoom: 0.78; } }
 html { zoom: var(--app-zoom); }
