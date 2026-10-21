@@ -861,7 +861,7 @@ function CollectedChart({
         </div>
       </div>
       {open && (
-        <div className="orbit-pop mt-6">
+        <div className="orbit-pop mt-6 rounded-2xl border border-white/5 bg-white/[0.015] px-6 pt-6 pb-5">
           <BucketBars
             buckets={buckets}
             format={(v) => (v ? `$${compact(v)}` : "0")}
