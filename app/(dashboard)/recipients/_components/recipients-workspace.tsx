@@ -769,7 +769,7 @@ function RecipientPanel({
     r.status === "Pending" && r.verification && p?.tone !== "bad";
 
   return (
-    <aside className="orbit-pop sidebar-scroll sticky top-6 max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-2xl border border-white/8 bg-surface">
+    <aside className="orbit-pop sidebar-scroll sticky top-6 max-h-[calc(100dvh/var(--app-zoom)-7rem)] overflow-y-auto rounded-2xl border border-white/8 bg-surface">
       <div className="flex items-start gap-3 px-5 pt-5">
         <RecipientAvatar recipient={r} size={40} />
         <div className="min-w-0 flex-1">

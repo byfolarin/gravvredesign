@@ -229,7 +229,7 @@ export function CustomerDetail({ c }: { c: Customer }) {
           </div>
 
           {/* Side column */}
-          <aside className="space-y-8 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto sidebar-scroll lg:-mr-2 lg:pr-2">
+          <aside className="space-y-8 lg:sticky lg:top-6 lg:max-h-[calc(100dvh/var(--app-zoom)-7rem)] lg:overflow-y-auto sidebar-scroll lg:-mr-2 lg:pr-2">
             <section>
               <h2 className="text-[13px] text-neutral-500">Details</h2>
               <dl className="mt-3 space-y-3">

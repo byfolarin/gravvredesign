@@ -31,6 +31,8 @@ nothing persists. Owner: Folarin (product designer).
 
 ## Design system (keep consistent)
 
+- **Screen-size scaling:** the app is designed at full size for big monitors and scales down as one on smaller screens via `html { zoom: var(--app-zoom) }` (globals.css): 1 at ≥1800px, 0.94 / 0.88 (MacBook Pro 14", 1512px) / 0.82 / 0.78 below. Don't use `h-screen`/`100vh` for full-height layouts — use `.app-fill` / `.app-fill-min` or `calc(100dvh / var(--app-zoom) - …)` so zoomed layouts still fill the window.
+
 - Fonts: Geist + Geist Mono (local `geist` package). Dark first; light theme under
   `[data-theme="light"] .content-theme`. Theme switch (Light / Dark / System) in the sidebar footer.
 - Weights: page titles and headline numbers are **font-medium**, never semibold.

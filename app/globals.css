@@ -485,3 +485,18 @@ html[data-intro] .content-theme {
 @media (prefers-reduced-motion: reduce) {
   .pixel-cell { animation: none !important; }
 }
+
+/* ─── Screen-size scaling ───────────────────────────────────────────────────
+ * The layout is designed at full size for big monitors. On smaller screens the
+ * whole app scales down as one — type, components, spacing — instead of
+ * cramming full-size parts into less room. Full-height layouts divide by
+ * --app-zoom so they still fill the window.
+ */
+:root { --app-zoom: 1; }
+@media (max-width: 1799px) { :root { --app-zoom: 0.94; } }
+@media (max-width: 1599px) { :root { --app-zoom: 0.88; } }
+@media (max-width: 1439px) { :root { --app-zoom: 0.82; } }
+@media (max-width: 1279px) { :root { --app-zoom: 0.78; } }
+html { zoom: var(--app-zoom); }
+.app-fill { height: calc(100dvh / var(--app-zoom)); }
+.app-fill-min { min-height: calc(100dvh / var(--app-zoom)); }

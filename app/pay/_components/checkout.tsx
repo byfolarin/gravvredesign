@@ -671,7 +671,7 @@ function Shell({
   linkId: string;
 }) {
   return (
-    <div className="min-h-screen bg-[#f6f6f5] px-5 py-12 text-neutral-900 sm:px-8 sm:py-16">
+    <div className="app-fill-min bg-[#f6f6f5] px-5 py-12 text-neutral-900 sm:px-8 sm:py-16">
       {children}
       <div className="fixed bottom-4 left-4 flex items-center gap-2 rounded-xl border border-neutral-200 bg-white p-1.5 text-xs text-neutral-600 shadow-lg">
         <Link
