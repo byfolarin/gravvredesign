@@ -282,7 +282,7 @@ export function CardsWorkspace({
       )}
       <div
         ref={contentRef}
-        className={`mx-auto max-w-[1180px] px-8 pt-12 pb-16 transition-opacity duration-700 ease-out ${
+        className={`mx-auto max-w-(--page-max) px-8 pt-12 pb-16 transition-opacity duration-700 ease-out ${
           revealed ? "opacity-100" : "opacity-0"
         }`}
       >

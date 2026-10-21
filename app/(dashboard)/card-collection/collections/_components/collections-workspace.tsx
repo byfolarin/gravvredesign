@@ -90,17 +90,36 @@ const net = (c: Collection) => c.subtotal - (c.refunded ?? 0);
 export function Usdc({
   value,
   unit = true,
+  big = false,
 }: {
   value: number;
   unit?: boolean;
+  /** Headline figures: quiet cents and a small unit, so the number leads. */
+  big?: boolean;
 }) {
   const [whole, cents] = usdc(value).split(".");
   return (
     <span className="amount tabular-nums">
       {whole}
-      <sup className="ml-px align-[0.5em] text-[0.62em]">.{cents}</sup>
+      <sup
+        className={
+          big
+            ? "ml-0.5 align-[0.85em] text-[0.42em] font-normal tracking-normal text-neutral-500"
+            : "ml-px align-[0.5em] text-[0.62em]"
+        }
+      >
+        .{cents}
+      </sup>
       {unit && (
-        <span className="ml-1 text-[0.85em] text-neutral-500">USDC</span>
+        <span
+          className={
+            big
+              ? "ml-2 text-[13px] font-normal tracking-normal text-neutral-500"
+              : "ml-1 text-[0.85em] text-neutral-500"
+          }
+        >
+          USDC
+        </span>
       )}
     </span>
   );
@@ -266,7 +285,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
 
   return (
     <div className="sidebar-scroll h-full overflow-y-auto">
-      <div className="mx-auto max-w-[1180px] px-8 pt-12 pb-28">
+      <div className="mx-auto max-w-(--page-max) px-8 pt-12 pb-28">
         <div className="flex items-start justify-between gap-6">
           <div>
             <h1 className="text-[26px] font-medium tracking-[-0.025em] text-white">
@@ -290,7 +309,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
         <div className="mt-10 grid gap-y-8 border-t border-white/8 pt-7 lg:grid-cols-3">
           <Fact
             label="Settled · 30 days"
-            value={<Usdc value={settledSum} />}
+            value={<Usdc value={settledSum} big />}
             aside={
               settledPrev ? (
                 <span
@@ -312,7 +331,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
           />
           <Fact
             label="Card fees · 30 days"
-            value={<Usdc value={fees} />}
+            value={<Usdc value={fees} big />}
             aside={
               <span className="text-neutral-400 tabular-nums">
                 {settledSum + fees
@@ -324,7 +343,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
           />
           <Fact
             label="Charged, not settled"
-            value={stuck.length ? <Usdc value={stuckSum} /> : "None"}
+            value={stuck.length ? <Usdc value={stuckSum} big /> : "None"}
             aside={
               stuck.length ? (
                 <span className="text-rose-300 tabular-nums">
@@ -933,7 +952,7 @@ function Fact({
   return (
     <div className="flex min-w-0 flex-col border-white/8 lg:px-8 lg:first:pl-0 lg:last:pr-0 lg:[&:not(:first-child)]:border-l">
       <div className="text-[13px] text-neutral-500">{label}</div>
-      <div className="mt-2 flex items-baseline justify-between gap-3">
+      <div className="mt-3 flex items-baseline justify-between gap-3">
         <span className="text-[34px] leading-none font-medium tracking-[-0.035em] text-white tabular-nums">
           {value}
         </span>
@@ -941,7 +960,7 @@ function Fact({
           <span className="text-[13px] whitespace-nowrap">{aside}</span>
         )}
       </div>
-      <div className="mt-3 flex min-w-0 items-center justify-between gap-3 text-xs text-neutral-500">
+      <div className="mt-4 flex min-w-0 items-center justify-between gap-3 text-xs text-neutral-500">
         {footer}
       </div>
     </div>

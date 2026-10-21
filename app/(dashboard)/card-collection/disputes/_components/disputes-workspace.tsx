@@ -102,7 +102,7 @@ export function DisputesWorkspace({ initial }: { initial: Dispute[] }) {
 
   return (
     <div className="sidebar-scroll h-full overflow-y-auto">
-      <div className="mx-auto max-w-[1180px] px-8 pt-12 pb-20">
+      <div className="mx-auto max-w-(--page-max) px-8 pt-12 pb-20">
         <h1 className="text-[26px] font-medium tracking-[-0.025em] text-white">
           Disputes
         </h1>
@@ -150,7 +150,7 @@ export function DisputesWorkspace({ initial }: { initial: Dispute[] }) {
           />
           <Fact
             label="Held for open disputes"
-            value={<Usdc value={held} />}
+            value={<Usdc value={held} big />}
             footer={
               <span>Amounts plus network fees · released if you win</span>
             }
@@ -442,7 +442,7 @@ function Fact({
   return (
     <div className="flex min-w-0 flex-col border-white/8 lg:px-8 lg:first:pl-0 lg:last:pr-0 lg:[&:not(:first-child)]:border-l">
       <div className="text-[13px] text-neutral-500">{label}</div>
-      <div className="mt-2 flex items-baseline justify-between gap-3">
+      <div className="mt-3 flex items-baseline justify-between gap-3">
         <span className="text-[34px] leading-none font-medium tracking-[-0.035em] text-white tabular-nums">
           {value}
         </span>
@@ -450,7 +450,7 @@ function Fact({
           <span className="text-[13px] whitespace-nowrap">{aside}</span>
         )}
       </div>
-      <div className="mt-3 flex min-w-0 items-center justify-between gap-3 text-xs text-neutral-500">
+      <div className="mt-4 flex min-w-0 items-center justify-between gap-3 text-xs text-neutral-500">
         {footer}
       </div>
     </div>

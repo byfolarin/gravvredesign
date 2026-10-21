@@ -230,7 +230,7 @@ export function RecipientsWorkspace({
 
   return (
     <div className="sidebar-scroll h-full overflow-y-auto">
-      <div className="mx-auto max-w-[1180px] px-8 pt-12 pb-24">
+      <div className="mx-auto max-w-(--page-max) px-8 pt-12 pb-24">
         {/* Heading */}
         <div className="flex items-start justify-between gap-6">
           <div>

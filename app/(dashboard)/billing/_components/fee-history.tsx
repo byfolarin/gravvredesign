@@ -79,7 +79,7 @@ export function FeeHistory({ fees }: { fees: Fee[] }) {
 
   return (
     <div className="sidebar-scroll h-full overflow-y-auto">
-      <div className="mx-auto max-w-[1080px] px-8 pt-12 pb-24">
+      <div className="mx-auto max-w-(--page-max-narrow) px-8 pt-12 pb-24">
         <div className="flex items-start justify-between gap-6">
           <div>
             <h1 className="text-[26px] font-medium tracking-[-0.025em] text-white">

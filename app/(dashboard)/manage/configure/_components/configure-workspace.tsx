@@ -183,7 +183,7 @@ export function ConfigureWorkspace() {
   };
 
   return (
-    <div className="mx-auto max-w-[1180px] px-8 pt-12 pb-28">
+    <div className="mx-auto max-w-(--page-max) px-8 pt-12 pb-28">
       <div className="flex items-start justify-between gap-6">
         <div>
           <h1 className="text-[26px] font-medium tracking-[-0.025em] text-white">

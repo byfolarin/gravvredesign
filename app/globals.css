@@ -500,3 +500,8 @@ html[data-intro] .content-theme {
 html { zoom: var(--app-zoom); }
 .app-fill { height: calc(100dvh / var(--app-zoom)); }
 .app-fill-min { min-height: calc(100dvh / var(--app-zoom)); }
+
+/* Page column: full design width on big monitors; a little wider on smaller
+ * screens (where the app is zoomed down) so toolbars and tables keep their air. */
+:root { --page-max: 1180px; --page-max-narrow: 1080px; }
+@media (max-width: 1799px) { :root { --page-max: 1280px; --page-max-narrow: 1160px; } }

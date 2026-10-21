@@ -50,7 +50,7 @@ export function CustomerDetail({ c }: { c: Customer }) {
 
   return (
     <div className="sidebar-scroll h-full overflow-y-auto">
-      <div className="mx-auto max-w-[1180px] px-8 pt-8 pb-16">
+      <div className="mx-auto max-w-(--page-max) px-8 pt-8 pb-16">
         <Link
           href="/customers"
           className="inline-flex items-center gap-0.5 text-[13px] text-neutral-500 transition-colors hover:text-white"

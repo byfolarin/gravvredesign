@@ -152,7 +152,7 @@ export function RequestsPage() {
   ].filter((x) => x.n);
 
   return (
-    <div className="mx-auto max-w-[1180px] px-8 pt-10 pb-28">
+    <div className="mx-auto max-w-(--page-max) px-8 pt-10 pb-28">
       <Link
         href="/manage/configure"
         className="inline-flex items-center gap-0.5 text-[13px] text-neutral-500 hover:text-white"

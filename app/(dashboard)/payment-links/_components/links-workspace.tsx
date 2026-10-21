@@ -234,7 +234,7 @@ export function LinksWorkspace() {
 
   return (
     <div className="sidebar-scroll h-full overflow-y-auto">
-      <div className="mx-auto max-w-[1180px] px-8 pt-12 pb-16">
+      <div className="mx-auto max-w-(--page-max) px-8 pt-12 pb-16">
         {/* Heading */}
         <div className="flex items-center justify-between gap-6">
           <h1 className="text-[26px] font-medium tracking-[-0.025em] text-white">

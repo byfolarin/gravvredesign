@@ -251,7 +251,7 @@ export function ApprovalsWorkspace() {
   const allOn = rows.length > 0 && rows.every((r) => selected.has(r.id));
 
   return (
-    <div className="mx-auto max-w-[1180px] px-8 pt-12 pb-28">
+    <div className="mx-auto max-w-(--page-max) px-8 pt-12 pb-28">
       <div>
         <h1 className="text-[26px] font-medium tracking-[-0.025em] text-white">
           Approvals

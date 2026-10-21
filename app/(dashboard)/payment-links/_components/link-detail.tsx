@@ -24,7 +24,7 @@ export function LinkDetail({ id }: { id: string }) {
   const l = useLinks().find((x) => x.id === id);
   if (!l)
     return (
-      <div className="mx-auto max-w-[1180px] px-8 pt-8">
+      <div className="mx-auto max-w-(--page-max) px-8 pt-8">
         <Link
           href="/payment-links"
           className="inline-flex items-center gap-0.5 text-[13px] text-neutral-500 transition-colors hover:text-white"
@@ -121,7 +121,7 @@ function LinkPage({ link: l }: { link: PaymentLink }) {
 
   return (
     <div className="sidebar-scroll h-full overflow-y-auto">
-      <div className="mx-auto max-w-[1180px] px-8 pt-8 pb-16">
+      <div className="mx-auto max-w-(--page-max) px-8 pt-8 pb-16">
         <Link
           href="/payment-links"
           className="inline-flex items-center gap-0.5 text-[13px] text-neutral-500 transition-colors hover:text-white"
