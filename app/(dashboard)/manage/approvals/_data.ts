@@ -58,6 +58,39 @@ export type Request = {
   approvers: string[];
   decisions: Decision[];
   state: "pending" | "approved" | "rejected";
+  /** What an approver needs to decide: money, destination, paperwork, history, risk. */
+  context?: Context;
+};
+
+export type Context = {
+  /** Balance of the paying account before this payment, in the request's currency. */
+  balance: number;
+  rail: string;
+  arrival: string;
+  /** Gravv's fee in USD. */
+  fee: number;
+  fx?: { rate: string; gets: string };
+  bank: {
+    label: string;
+    value: string;
+    routing?: { label: string; value: string };
+  };
+  invoice?: { file: string; number: string; amount: number; due: string };
+  /** Payments you've made to this recipient before. */
+  history: {
+    since?: string;
+    count: number;
+    total: number;
+    usual?: number;
+    last?: { amount: number; at: string };
+  };
+  detailsChangedAt?: string;
+  /** A similar payment to the same recipient recently. */
+  similar?: { amount: number; at: string; id: string };
+  screening: "clear" | "review";
+  /** The request lapses (and the requester has to ask again) after this. */
+  expiresAt: string;
+  comments?: { by: string; at: string; text: string }[];
 };
 
 const req = (
@@ -75,7 +108,10 @@ export const REQUESTS: Request[] = [
     id: "apr_otc2292",
     amount: 650_000,
     currency: "USDC",
-    recipient: { name: "Trade desk · USDC → NGN", detail: "Providus Bank ••4412 · rate held 15 min" },
+    recipient: {
+      name: "Trade desk · USDC → NGN",
+      detail: "Providus Bank ••4412 · rate held 15 min",
+    },
     from: "Treasury wallet · USDC",
     requestedBy: "Oluwatobi Bello",
     requestedAt: at(66),
@@ -230,6 +266,221 @@ export const REQUESTS: Request[] = [
     state: "approved",
   }),
 ];
+
+const ahead = (mins: number) => new Date(AS_OF + mins * MIN).toISOString();
+const CONTEXT: Record<string, Context> = {
+  apr_otc2292: {
+    balance: 1_240_000,
+    rail: "Trade desk settlement",
+    arrival:
+      "NGN lands at Providus Bank about 10 minutes after the last approval",
+    fee: 0,
+    fx: { rate: "1 USDC = ₦1,612.21 (held 15 min)", gets: "₦1,047,936,500.00" },
+    bank: { label: "Providus Bank", value: "1304 4412 ••4412" },
+    history: {
+      since: "2026-03-02T09:00:00Z",
+      count: 31,
+      total: 9_420_000,
+      usual: 300_000,
+      last: { amount: 420_000, at: at(60 * 24 * 6) },
+    },
+    screening: "clear",
+    expiresAt: ahead(4),
+  },
+  apr_9f21: {
+    balance: 184_320,
+    rail: "Wire",
+    arrival: "Today, if approved before 4pm ET",
+    fee: 15,
+    bank: {
+      label: "Lead Bank",
+      value: "2190 7907 4410",
+      routing: { label: "Routing", value: "101019644" },
+    },
+    invoice: {
+      file: "MTC-1182.pdf",
+      number: "MTC-1182",
+      amount: 72_500,
+      due: "2026-10-25T00:00:00Z",
+    },
+    history: {
+      since: "2026-03-11T00:00:00Z",
+      count: 7,
+      total: 151_800,
+      usual: 21_700,
+      last: { amount: 22_400, at: at(60 * 24 * 21) },
+    },
+    detailsChangedAt: at(60 * 24 * 2),
+    screening: "clear",
+    expiresAt: ahead(60 * 24 * 3),
+    comments: [
+      {
+        by: "Ikenna Obi",
+        at: at(23),
+        text: "Bank details changed on Monday, so I called Meridian on the number from our contract — they confirmed the new Lead Bank account. Big one because it's three months of shipments in one invoice.",
+      },
+    ],
+  },
+  apr_9f1c: {
+    balance: 48_210,
+    rail: "USDC on Polygon",
+    arrival: "In about a minute",
+    fee: 0,
+    bank: {
+      label: "Polygon wallet",
+      value: "0x8b2e9c4d1f07a3b6e52c9d18e4f0a7c3b29e41fa",
+    },
+    history: { count: 0, total: 0 },
+    screening: "clear",
+    expiresAt: ahead(60 * 24 * 5),
+  },
+  apr_9f0a: {
+    balance: 22_904,
+    rail: "ACH",
+    arrival: "In 1–2 business days",
+    fee: 1,
+    bank: {
+      label: "Cross River Bank",
+      value: "3431 8115 0921",
+      routing: { label: "Routing", value: "021214891" },
+    },
+    invoice: {
+      file: "BPS-0412.pdf",
+      number: "BPS-0412",
+      amount: 6_800,
+      due: "2026-10-31T00:00:00Z",
+    },
+    history: {
+      since: "2026-01-20T00:00:00Z",
+      count: 9,
+      total: 52_000,
+      usual: 5_800,
+      last: { amount: 5_800, at: at(60 * 24 * 23) },
+    },
+    screening: "clear",
+    expiresAt: ahead(60 * 24 * 6),
+  },
+  apr_9ee4: {
+    balance: 61_200,
+    rail: "SEPA",
+    arrival: "Usually today",
+    fee: 0,
+    bank: {
+      label: "Banking Circle",
+      value: "LU42 4080 0000 4711 0942",
+      routing: { label: "BIC", value: "BCIRLULL" },
+    },
+    invoice: {
+      file: "KK-2291.pdf",
+      number: "KK-2291",
+      amount: 24_000,
+      due: "2026-10-30T00:00:00Z",
+    },
+    history: {
+      since: "2026-05-04T00:00:00Z",
+      count: 4,
+      total: 81_000,
+      usual: 19_000,
+      last: { amount: 24_000, at: at(60 * 24 * 7) },
+    },
+    similar: { amount: 24_000, at: at(60 * 24 * 7), id: "pay_8c21" },
+    screening: "clear",
+    expiresAt: ahead(60 * 24 * 4),
+  },
+  apr_9ed2: {
+    balance: 184_320,
+    rail: "Wire",
+    arrival: "Today, if approved before 4pm ET",
+    fee: 15,
+    bank: {
+      label: "Stearns Bank",
+      value: "1000 0057 7731",
+      routing: { label: "Routing", value: "091202590" },
+    },
+    invoice: {
+      file: "NW-Sept.pdf",
+      number: "NW-0917 + 2 more",
+      amount: 54_000,
+      due: "2026-10-28T00:00:00Z",
+    },
+    history: {
+      since: "2025-11-02T00:00:00Z",
+      count: 11,
+      total: 410_000,
+      usual: 48_000,
+      last: { amount: 46_500, at: at(60 * 24 * 32) },
+    },
+    screening: "clear",
+    expiresAt: ahead(60 * 24 * 2),
+  },
+  apr_9eb0: {
+    balance: 40_100,
+    rail: "Swift",
+    arrival: "In 1–2 business days",
+    fee: 25,
+    bank: { label: "Clear Junction", value: "GB29 CLJU 0099 3390" },
+    history: {
+      since: "2026-02-14T00:00:00Z",
+      count: 5,
+      total: 58_000,
+      usual: 11_800,
+    },
+    screening: "clear",
+    expiresAt: at(60 * 24),
+  },
+  apr_9e91: {
+    balance: 48_210,
+    rail: "USDC on Ethereum",
+    arrival: "In a few minutes",
+    fee: 0,
+    bank: {
+      label: "Ethereum wallet",
+      value: "0x1d7c4a92e8b3f05d61c7a2e9b4d8f3a1c6e09a02",
+    },
+    history: { count: 0, total: 0 },
+    screening: "clear",
+    expiresAt: at(60 * 20),
+  },
+  apr_9e70: {
+    balance: 2_400_000,
+    rail: "Book transfer",
+    arrival: "Instantly",
+    fee: 0,
+    bank: { label: "Lead Bank", value: "2190 7907 2208" },
+    history: {
+      since: "2025-09-01T00:00:00Z",
+      count: 14,
+      total: 1_950_000,
+      usual: 140_000,
+    },
+    screening: "clear",
+    expiresAt: at(60 * 40),
+  },
+  apr_9e5d: {
+    balance: 31_000_000,
+    rail: "Local transfer",
+    arrival: "In minutes",
+    fee: 0,
+    bank: { label: "Access Bank", value: "0690 0055 21" },
+    history: {
+      since: "2026-04-01T00:00:00Z",
+      count: 6,
+      total: 30_600_000,
+      usual: 5_100_000,
+    },
+    screening: "clear",
+    expiresAt: at(60 * 60),
+  },
+};
+for (const r of REQUESTS) r.context = CONTEXT[r.id];
+
+export function until(iso: string) {
+  const m = Math.round((Date.parse(iso) - AS_OF) / MIN);
+  if (m <= 0) return "now";
+  if (m < 60) return `${m} min`;
+  const h = Math.round(m / 60);
+  return h < 24 ? `${h}h` : `${Math.round(h / 24)} days`;
+}
 
 export function ago(iso: string) {
   const m = Math.max(1, Math.round((AS_OF - Date.parse(iso)) / MIN));

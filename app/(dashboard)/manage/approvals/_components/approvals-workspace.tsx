@@ -2,7 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  ChevronRight,
+  FileText,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
+import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { PersonAvatar } from "@/app/_components/person-avatar";
 import { ME, MEMBERS, ROLES } from "../../roles/_data";
@@ -12,6 +21,7 @@ import {
   RULES,
   SETTINGS,
   ago,
+  until,
   type Request,
   type Rule,
   type Settings,
@@ -71,6 +81,99 @@ function why(r: Request, rules: Rule[]) {
   return rule.when.kind === "newRecipient"
     ? "New recipient"
     : `${usd(rule.when.min)} or more`;
+}
+
+const amt = (v: number, c: Request["currency"]) =>
+  `${SYMBOL[c]}${v.toLocaleString("en-US")}${c === "USDC" ? " USDC" : ""}`;
+const dateFmt = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+const shortDate = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+});
+
+type Signal = { tone: "warn" | "ok"; text: string; short?: string };
+/** What to look at before approving, worst first: the checks an experienced approver would run. */
+function signals(r: Request): Signal[] {
+  const c = r.context;
+  if (!c) return [];
+  const first = r.recipient.name.split(" ")[0];
+  const out: Signal[] = [];
+  if (c.detailsChangedAt)
+    out.push({
+      tone: "warn",
+      text: `Bank details changed ${ago(c.detailsChangedAt)}. Confirm the change by phone, not email.`,
+      short: `Details changed ${ago(c.detailsChangedAt)}`,
+    });
+  if (c.history.usual && r.amount >= c.history.usual * 2)
+    out.push({
+      tone: "warn",
+      text: `${(r.amount / c.history.usual).toFixed(1)}× what you usually send ${first} (${amt(c.history.usual, r.currency)}).`,
+      short: `${(r.amount / c.history.usual).toFixed(1)}× usual`,
+    });
+  if (c.similar)
+    out.push({
+      tone: "warn",
+      text: `The same ${amt(c.similar.amount, r.currency)} went to ${first} ${ago(c.similar.at)} — possible duplicate.`,
+      short: "Possible duplicate",
+    });
+  if (!c.history.count)
+    out.push({
+      tone: "warn",
+      text: `First payment to ${r.recipient.name} — no history to compare against.`,
+      short: "No history",
+    });
+  if (c.balance < r.amount)
+    out.push({
+      tone: "warn",
+      text: `More than the ${r.from} balance (${amt(c.balance, r.currency)}).`,
+      short: "Over balance",
+    });
+  else if (c.balance - r.amount < c.balance * 0.15)
+    out.push({
+      tone: "warn",
+      text: `Leaves ${amt(c.balance - r.amount, r.currency)} in ${r.from}.`,
+      short: "Drains account",
+    });
+  if (r.state === "pending" && Date.parse(c.expiresAt) - AS_OF < 60 * 60 * 1000)
+    out.push({
+      tone: "warn",
+      text: `${c.fx ? "The rate" : "This request"} expires in ${until(c.expiresAt)}.`,
+      short: `Expires in ${until(c.expiresAt)}`,
+    });
+  if (c.invoice)
+    out.push(
+      c.invoice.amount === r.amount
+        ? {
+            tone: "ok",
+            text: `Matches invoice ${c.invoice.number}, due ${shortDate.format(new Date(c.invoice.due))}.`,
+          }
+        : {
+            tone: "warn",
+            text: `Invoice ${c.invoice.number} is for ${amt(c.invoice.amount, r.currency)}, not ${amt(r.amount, r.currency)}.`,
+            short: "Invoice mismatch",
+          },
+    );
+  if (c.history.count && !c.detailsChangedAt)
+    out.push({
+      tone: "ok",
+      text: `Paid ${c.history.count} times before to the same account.`,
+    });
+  out.push(
+    c.screening === "clear"
+      ? { tone: "ok", text: "Sanctions and fraud screening clear." }
+      : {
+          tone: "warn",
+          text: "Flagged by screening — compliance is reviewing.",
+          short: "Screening flag",
+        },
+  );
+  return out.sort((a, b) =>
+    a.tone === b.tone ? 0 : a.tone === "warn" ? -1 : 1,
+  );
 }
 
 const approvedCount = (r: Request) =>
@@ -303,8 +406,21 @@ export function ApprovalsWorkspace() {
                       </span>
                     </span>
                   </td>
-                  <td className="truncate py-3.5 pr-4 text-neutral-300">
-                    {why(r, rules)}
+                  <td className="py-3.5 pr-4">
+                    <div className="truncate text-neutral-300">
+                      {why(r, rules)}
+                    </div>
+                    {(() => {
+                      const w = signals(r).filter((x) => x.tone === "warn");
+                      return w.length && r.state === "pending" ? (
+                        <div
+                          className="truncate text-[12px] text-amber-200/90"
+                          title={w.map((x) => x.text).join("\n")}
+                        >
+                          {w.map((x) => x.short ?? x.text).join(" · ")}
+                        </div>
+                      ) : null;
+                    })()}
                   </td>
                   <td className="py-3.5 pr-4">
                     {r.state === "pending" ? (
@@ -420,6 +536,24 @@ export function ApprovalsWorkspace() {
           startRejecting={!!sheet?.rejecting}
           onClose={() => setSheet(null)}
           onDecide={(kind, note) => decide([open.id], kind, note)}
+          onComment={(text) =>
+            setRequests((all) =>
+              all.map((x) =>
+                x.id === open.id && x.context
+                  ? {
+                      ...x,
+                      context: {
+                        ...x.context,
+                        comments: [
+                          ...(x.context.comments ?? []),
+                          { by: ME, at: new Date(AS_OF).toISOString(), text },
+                        ],
+                      },
+                    }
+                  : x,
+              ),
+            )
+          }
         />
       )}
 
@@ -486,6 +620,7 @@ function RequestSheet({
   startRejecting,
   onClose,
   onDecide,
+  onComment,
 }: {
   r: Request;
   rules: Rule[];
@@ -493,13 +628,20 @@ function RequestSheet({
   startRejecting: boolean;
   onClose: () => void;
   onDecide: (kind: "approved" | "rejected", note?: string) => void;
+  onComment: (text: string) => void;
 }) {
+  const [comment, setComment] = useState("");
+  const c = r.context;
+  const checks = signals(r);
+  const requester = MEMBERS.find((m) => m.name === r.requestedBy);
   const [rejecting, setRejecting] = useState(startRejecting);
   const [reason, setReason] = useState("");
   // A typed reason is never thrown away by a stray click or Esc: ask first.
   const [asking, setAsking] = useState(false);
   const guard = () =>
-    rejecting && reason.trim() ? setAsking(true) : onClose();
+    (rejecting && reason.trim()) || comment.trim()
+      ? setAsking(true)
+      : onClose();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -527,7 +669,7 @@ function RequestSheet({
         role="dialog"
         aria-modal="true"
         aria-label="Approval request"
-        className="drawer-in sidebar-scroll fixed top-2 right-2 bottom-2 z-40 flex w-[440px] max-w-[calc(100vw-1rem)] flex-col overflow-y-auto rounded-xl border border-white/8 bg-surface-2 shadow-[0_24px_80px_-12px_rgb(0_0_0/0.45)]"
+        className="drawer-in sidebar-scroll fixed top-2 right-2 bottom-2 z-40 flex w-[540px] max-w-[calc(100vw-1rem)] flex-col overflow-y-auto rounded-xl border border-white/8 bg-surface-2 shadow-[0_24px_80px_-12px_rgb(0_0_0/0.45)]"
       >
         <div className="flex items-start justify-between gap-4 border-b border-white/8 px-6 py-5">
           <div className="min-w-0">
@@ -548,6 +690,13 @@ function RequestSheet({
                 </span>
               )}
             </div>
+            {c && r.state === "pending" && (
+              <div className="mt-1 text-[12px] text-neutral-500">
+                {c.rail} ·{" "}
+                {c.arrival.charAt(0).toLowerCase() + c.arrival.slice(1)} ·
+                expires in {until(c.expiresAt)}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <StateChip state={r.state} />
@@ -569,12 +718,167 @@ function RequestSheet({
             </p>
           )}
 
+          {checks.length > 0 && (
+            <section>
+              <h3 className="mb-2 text-xs text-neutral-500">
+                Before you approve
+              </h3>
+              <ul className="space-y-2">
+                {checks.map((x) => (
+                  <li
+                    key={x.text}
+                    className="flex gap-2.5 text-[13px] leading-relaxed"
+                  >
+                    {x.tone === "warn" ? (
+                      <AlertTriangle
+                        size={14}
+                        strokeWidth={1.75}
+                        className="mt-[3px] shrink-0 text-amber-300"
+                      />
+                    ) : (
+                      <Check
+                        size={14}
+                        strokeWidth={2}
+                        className="mt-[3px] shrink-0 text-[var(--flow-in)]"
+                      />
+                    )}
+                    <span
+                      className={
+                        x.tone === "warn"
+                          ? "text-neutral-100"
+                          : "text-neutral-400"
+                      }
+                    >
+                      {x.text}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section>
             <h3 className="mb-1.5 text-xs text-neutral-500">Payment</h3>
             <Field label="From" value={r.from} />
+            {c && (
+              <Field
+                label="Balance"
+                value={`${amt(c.balance, r.currency)} → ${amt(Math.max(0, c.balance - r.amount), r.currency)} after`}
+              />
+            )}
             <Field label="To" value={`${r.recipient.name}`} />
-            <Field label="Destination" value={r.recipient.detail} mono />
-            <Field label="Reference" value={r.id} mono />
+            {c ? (
+              <>
+                <Field label={c.bank.label} value={c.bank.value} mono copy />
+                {c.bank.routing && (
+                  <Field
+                    label={c.bank.routing.label}
+                    value={c.bank.routing.value}
+                    mono
+                    copy
+                  />
+                )}
+                <Field label="Sent by" value={`${c.rail} · ${c.arrival}`} />
+                <Field label="Gravv fee" value={c.fee ? `$${c.fee}` : "None"} />
+                {c.fx && (
+                  <>
+                    <Field label="Rate" value={c.fx.rate} />
+                    <Field label="They get" value={c.fx.gets} />
+                  </>
+                )}
+              </>
+            ) : (
+              <Field label="Destination" value={r.recipient.detail} mono />
+            )}
+            <Field label="Reference" value={r.id} mono copy />
+          </section>
+
+          {c?.invoice && (
+            <section>
+              <h3 className="mb-2 text-xs text-neutral-500">Attached</h3>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-lg border border-white/8 px-3 py-2.5 text-left transition-colors hover:border-white/20"
+              >
+                <FileText
+                  size={16}
+                  strokeWidth={1.5}
+                  className="shrink-0 text-neutral-400"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] text-neutral-100">
+                    {c.invoice.file}
+                  </span>
+                  <span className="block text-[12px] text-neutral-500 tabular-nums">
+                    Invoice {c.invoice.number} ·{" "}
+                    <span className="amount">
+                      {amt(c.invoice.amount, r.currency)}
+                    </span>{" "}
+                    · due {dateFmt.format(new Date(c.invoice.due))}
+                  </span>
+                </span>
+                <span className="text-[12px] text-neutral-400">Open</span>
+              </button>
+            </section>
+          )}
+
+          {c && (
+            <section>
+              <h3 className="mb-1.5 text-xs text-neutral-500">
+                {r.recipient.name}
+              </h3>
+              {c.history.count ? (
+                <>
+                  <Field
+                    label="Paying them since"
+                    value={dateFmt.format(new Date(c.history.since!))}
+                  />
+                  <Field
+                    label="Paid before"
+                    value={`${c.history.count} times · ${amt(c.history.total, r.currency)}`}
+                  />
+                  {c.history.usual && (
+                    <Field
+                      label="Usually"
+                      value={amt(c.history.usual, r.currency)}
+                    />
+                  )}
+                  {c.history.last && (
+                    <Field
+                      label="Last payment"
+                      value={`${amt(c.history.last.amount, r.currency)} · ${ago(c.history.last.at)}`}
+                    />
+                  )}
+                  {c.detailsChangedAt && (
+                    <Field
+                      label="Bank details"
+                      value={`Changed ${ago(c.detailsChangedAt)}`}
+                      tone="warn"
+                    />
+                  )}
+                </>
+              ) : (
+                <p className="text-[13px] text-neutral-400">
+                  You haven&apos;t paid them before.
+                </p>
+              )}
+            </section>
+          )}
+
+          <section>
+            <h3 className="mb-1.5 text-xs text-neutral-500">Requested by</h3>
+            <div className="flex items-center gap-3 py-1.5">
+              <PersonAvatar name={r.requestedBy} size={28} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] text-neutral-100">
+                  {r.requestedBy === ME ? "You" : r.requestedBy}
+                </span>
+                <span className="block text-[12px] text-neutral-500">
+                  {requester ? roleName(requester.role) : "Team member"} · asked{" "}
+                  {ago(r.requestedAt)}
+                </span>
+              </span>
+            </div>
           </section>
 
           <section>
@@ -638,6 +942,78 @@ function RequestSheet({
                   ? "You've approved this. It goes out when the rest sign off."
                   : `Only ${or(r.approvers.map(roleName))} can approve this payment.`}
             </p>
+          )}
+          {c && (
+            <section>
+              <h3 className="mb-2 text-xs text-neutral-500">Comments</h3>
+              {(c.comments ?? []).map((m) => (
+                <div key={m.at + m.by} className="mb-3 flex gap-2.5">
+                  <PersonAvatar name={m.by} size={22} />
+                  <div className="min-w-0">
+                    <div className="text-[12px] text-neutral-500">
+                      <span className="text-neutral-200">
+                        {m.by === ME ? "You" : m.by}
+                      </span>{" "}
+                      · {ago(m.at)}
+                    </div>
+                    <p className="mt-0.5 text-[13px] leading-relaxed text-neutral-300">
+                      {m.text}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!comment.trim()) return;
+                  onComment(comment.trim());
+                  setComment("");
+                }}
+                className="flex items-end gap-2"
+              >
+                <textarea
+                  rows={1}
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder={`Ask ${r.requestedBy === ME ? "the approvers" : r.requestedBy.split(" ")[0]} something…`}
+                  className="min-h-9 flex-1 resize-none rounded-lg border border-white/12 bg-transparent px-3 py-2 text-[13px] text-white outline-none placeholder:text-neutral-500 focus:border-white/35"
+                />
+                <button
+                  type="submit"
+                  disabled={!comment.trim()}
+                  className="h-9 rounded-full border border-white/12 px-3.5 text-[13px] text-neutral-200 hover:border-white/30 disabled:opacity-40"
+                >
+                  Post
+                </button>
+              </form>
+              {asking && !rejecting && (
+                <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-white/12 bg-raised px-3 py-2.5 text-[13px]">
+                  <span className="text-neutral-200">
+                    Discard your comment?
+                  </span>
+                  <span className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      autoFocus
+                      onClick={() => setAsking(false)}
+                      className="h-7 rounded-full bg-white px-3 text-xs font-medium text-black hover:bg-neutral-200"
+                    >
+                      Keep editing
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAsking(false);
+                        onClose();
+                      }}
+                      className="h-7 rounded-full px-3 text-xs text-rose-400 hover:bg-rose-500/10"
+                    >
+                      Discard
+                    </button>
+                  </span>
+                </div>
+              )}
+            </section>
           )}
         </div>
 
@@ -794,18 +1170,28 @@ function Field({
   label,
   value,
   mono = false,
+  copy = false,
+  tone,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  copy?: boolean;
+  tone?: "warn";
 }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-white/6 py-2.5 last:border-0">
       <span className="shrink-0 text-[12px] text-neutral-500">{label}</span>
-      <span
-        className={`truncate ${mono ? "font-mono text-[12px] text-neutral-300" : "text-[13px] text-neutral-100"}`}
-      >
-        {value}
+      <span className="flex min-w-0 items-center gap-0.5">
+        <span
+          title={value}
+          className={`truncate ${mono ? "font-mono text-[12px] text-neutral-300" : tone === "warn" ? "text-[13px] text-amber-200" : "text-[13px] text-neutral-100"}`}
+        >
+          {value}
+        </span>
+        {copy && (
+          <CopyButton value={value} label={`Copy ${label.toLowerCase()}`} />
+        )}
       </span>
     </div>
   );
