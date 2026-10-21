@@ -20,6 +20,11 @@ import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
 import {
+  LOADER_VARIANTS,
+  LoadingState,
+  type LoaderVariant,
+} from "@/app/_components/loading-state";
+import {
   ALL_CURRENCIES,
   AS_OF,
   PROVISION_STEPS,
@@ -165,6 +170,7 @@ export function AccountsWorkspace() {
   const [list, setList] = useState(ALL);
   // Prototype: show the page as a new account, with problems, or loading.
   const [view, setView] = useState<View>("filled");
+  const [loader, setLoader] = useState<LoaderVariant>("Drive");
   const [section, setSection] = useState<Section>("accounts");
   const [tab, setTab] = useState<Tab>("All");
   const [currency, setCurrency] = useState<"All" | Currency>("All");
@@ -314,7 +320,7 @@ export function AccountsWorkspace() {
               label="State"
               variant="compact"
               align="right"
-              value={view}
+              value={view === "loading" ? `loading:${loader}` : view}
               options={[
                 { value: "filled", label: "Filled", hint: "Today's accounts" },
                 { value: "empty", label: "Empty", hint: "A new business" },
@@ -323,9 +329,25 @@ export function AccountsWorkspace() {
                   label: "Errors",
                   hint: "Needs info, declined, stale",
                 },
-                { value: "loading", label: "Loading", hint: "Skeletons" },
+                ...LOADER_VARIANTS.map((v) => ({
+                  value: `loading:${v}`,
+                  label: `Loading · ${v}`,
+                  hint:
+                    v === "Drive"
+                      ? "Chevron wave"
+                      : v === "Dots"
+                        ? "Round cells"
+                        : v === "Orbit"
+                          ? "Comet round the grid"
+                          : "With a video",
+                })),
               ]}
-              onChange={switchView}
+              onChange={(v) => {
+                if (v.startsWith("loading:")) {
+                  setLoader(v.slice(8) as LoaderVariant);
+                  switchView("loading");
+                } else switchView(v as View);
+              }}
             />
             <button
               type="button"
@@ -386,7 +408,10 @@ export function AccountsWorkspace() {
         </div>
 
         {view === "loading" ? (
-          <AccountsSkeleton applications={section === "applications"} />
+          <AccountsSkeleton
+            applications={section === "applications"}
+            loader={loader}
+          />
         ) : section === "applications" ? (
           view === "empty" ? (
             <p className="mt-16 text-center text-[13px] text-neutral-500">
@@ -1181,7 +1206,27 @@ function Bone({
 }
 
 /** Loading: the page's own shapes, so nothing jumps when the numbers arrive. */
-function AccountsSkeleton({ applications }: { applications: boolean }) {
+function AccountsSkeleton({
+  applications,
+  loader,
+}: {
+  applications: boolean;
+  loader: LoaderVariant;
+}) {
+  const status = (
+    <div className="mt-8">
+      <LoadingState
+        variant={loader}
+        label={
+          loader === "Surfer"
+            ? undefined
+            : applications
+              ? "Loading applications"
+              : "Loading accounts"
+        }
+      />
+    </div>
+  );
   const rows = (
     <div
       aria-busy="true"
@@ -1203,10 +1248,17 @@ function AccountsSkeleton({ applications }: { applications: boolean }) {
       ))}
     </div>
   );
-  if (applications) return <div className="mt-8">{rows}</div>;
+  if (applications)
+    return (
+      <>
+        {status}
+        <div className="mt-6">{rows}</div>
+      </>
+    );
   return (
     <>
-      <div className="mt-8 grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+      {status}
+      <div className="mt-6 grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div>
           <Bone w="w-40" h="h-6" />
           <Bone w="w-72" h="h-10" className="mt-4" />
