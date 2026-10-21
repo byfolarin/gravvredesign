@@ -1,26 +1,471 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Pixel illustration (placeholder pages): greyscale take on the brand dot tones */
+  --px-0: #1c1c1c;
+  --px-1: #282828;
+  --px-2: #393939;
+  --px-3: #5a5a5a;
+  --px-4: #9c9c9c;
+  --px-5: #ededed;
+  --px-ground: #282828;
+  --px-glow: rgb(255 255 255 / 0.05);
+  --px-card-bg: rgb(255 255 255 / 0.05);
+  --px-card-border: rgb(255 255 255 / 0.16);
+  --px-tag-bg: #e5e5e5;
+  --px-tag-fg: #171717;
+  /* Brand mint ramp for the crate being lifted */
+  --px-a0: #06261c;
+  --px-a1: #0a3a2b;
+  --px-a2: #0d5640;
+  --px-a3: #10805e;
+  --px-a4: #00c48b;
+  --px-a5: #00ffb4;
+  --background: #000000;
+  --surface: #070707;
+  --surface-2: #050505;
+  --raised: #0a0a0a;
+  --takeover: #000000;
+  --foreground: #ededed;
+  --brand: #00ffb4;
+  /* Money movement in charts: brand mint for in, neutral grey for out — mint carries the colour. */
+  --flow-in: var(--brand);
+  --flow-out: #5e5e5e;
+  /* Success chip: readable text on a soft tint, tuned per theme. */
+  --ok-fg: #43e8b4;
+  --ok-bg: rgb(0 255 180 / 0.08);
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-raised: var(--raised);
+  --color-takeover: var(--takeover);
   --color-foreground: var(--foreground);
+  --color-brand: var(--brand);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2a transparent;
+}
+
+/* Nav icons: dull two-tone until hovered, white when active.
+   Filled icons use .tone-base (muted shape) and .tone-accent (detail);
+   stroke fallbacks use currentColor. */
+.nav-icon {
+  color: #6b6b6b;
+  transition: color 150ms;
+}
+.nav-icon .tone-base {
+  fill: #333333;
+  transition: fill 150ms;
+}
+.nav-icon .tone-accent {
+  fill: #6b6b6b;
+  transition: fill 150ms;
+}
+.group:hover .nav-icon {
+  color: #a3a3a3;
+}
+.group:hover .nav-icon .tone-base {
+  fill: #474747;
+}
+.group:hover .nav-icon .tone-accent {
+  fill: #a3a3a3;
+}
+.nav-icon.is-active {
+  color: #ffffff;
+}
+.nav-icon.is-active .tone-base {
+  fill: rgb(255 255 255 / 0.4);
+}
+.nav-icon.is-active .tone-accent {
+  fill: #ffffff;
+}
+
+/* ------------------------------------------------------------------
+   Content theme. The sidebar nav always stays dark; everything inside
+   .content-theme follows <html data-theme>. Light mode re-maps the
+   Tailwind palette (white ⇄ near-black, neutral scale inverted), so
+   existing utilities like text-white, bg-white/6, text-neutral-400
+   flip without per-component changes.
+   ------------------------------------------------------------------ */
+[data-theme="light"] .content-theme {
+  /* Same lighting as dark mode (lit faces light, shade faces dark), kept soft on a white page */
+  --px-0: #6f6f6f;
+  --px-1: #818181;
+  --px-2: #959595;
+  --px-3: #aaaaaa;
+  --px-4: #c3c3c3;
+  --px-5: #dbdbdb;
+  --px-ground: #e8e8e8;
+  --px-glow: rgb(0 0 0 / 0.04);
+  --px-card-bg: rgb(255 255 255 / 0.7);
+  --px-card-border: rgb(0 0 0 / 0.12);
+  --px-tag-bg: #262626;
+  --px-tag-fg: #fafafa;
+  --px-a0: #2a7a5d;
+  --px-a1: #318b6a;
+  --px-a2: #3a9e79;
+  --px-a3: #48b28a;
+  --px-a4: #62c69d;
+  --px-a5: #8cdbbb;
+  color-scheme: light;
+  --surface: #ffffff;
+  --surface-2: #fafafa;
+  --raised: #ffffff;
+  --takeover: #fafafa;
+  --brand: #0fb468;
+  --flow-in: var(--brand);
+  --flow-out: #b4b4b4;
+  --ok-fg: #0b6b45;
+  --ok-bg: #edf6f1;
+
+  --color-white: #0a0a0a;
+  --color-black: #ffffff;
+  --color-neutral-100: #171717;
+  --color-neutral-200: #262626;
+  --color-neutral-300: #404040;
+  --color-neutral-400: #525252;
+  --color-neutral-500: #6b6b6b;
+  --color-neutral-600: #8a8a8a;
+  --color-neutral-700: #c4c4c4;
+  --color-neutral-800: #e5e5e5;
+  --color-neutral-900: #f5f5f5;
+  --color-neutral-950: #fafafa;
+
+  /* Status colours darkened for contrast on white. */
+  --color-amber-200: #a16207;
+  --color-amber-300: #d97706;
+  --color-red-300: #dc2626;
+  --color-red-400: #dc2626;
+
+  /* Tinted avatars and badges: darker text for contrast on light tints. */
+  --color-sky-300: #0369a1;
+  --color-violet-300: #6d28d9;
+  --color-emerald-300: #047857;
+  --color-rose-300: #be123c;
+  --color-teal-300: #0f766e;
+}
+
+[data-theme="light"] .content-theme .sidebar-scroll {
+  scrollbar-color: #d4d4d4 transparent;
+}
+
+/* Physical objects (card faces) keep their dark finish in both themes. */
+[data-theme="light"] .content-theme .theme-lock-dark {
+  color-scheme: dark;
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-400: #a1a1a1;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #525252;
+  --color-neutral-700: #404040;
+  --color-neutral-800: #262626;
+  --color-neutral-900: #171717;
+  --color-neutral-950: #0a0a0a;
+}
+
+/* Customer-facing pages (the hosted checkout) are always light, so previews keep stock colours in both themes. */
+[data-theme="light"] .content-theme .theme-lock-light {
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-400: #a1a1a1;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #525252;
+  --color-neutral-700: #404040;
+  --color-neutral-800: #262626;
+  --color-neutral-900: #171717;
+  --color-neutral-950: #0a0a0a;
+}
+
+/* Bottom sheet (Create link): panel rises from the bottom over a dimmed page, and sinks back on close. */
+.sheet-panel { animation: sheet-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.sheet-scrim { animation: sheet-fade 300ms ease-out both; }
+[data-leaving] .sheet-panel { animation: sheet-down 260ms cubic-bezier(0.4, 0, 1, 1) both; }
+[data-leaving] .sheet-scrim { animation: sheet-fade 260ms ease-in reverse both; }
+@keyframes sheet-up { from { transform: translateY(100%); } }
+@keyframes sheet-down { to { transform: translateY(100%); } }
+@keyframes sheet-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sheet-panel, .sheet-scrim { animation: none; } }
+
+/* Theme toggle shows the icon for the mode you'd switch to. */
+.theme-icon-sun {
+  display: none;
+}
+[data-theme="dark"] .theme-icon-sun {
+  display: block;
+}
+[data-theme="dark"] .theme-icon-moon {
+  display: none;
+}
+
+
+/* Soft gradient "stage" the card face sits on (lavender → periwinkle wash).
+   No border: the colour field itself defines the area. */
+.card-stage {
+  background:
+    radial-gradient(80% 110% at 0% 0%, rgb(170 160 255 / 0.08), transparent 60%),
+    radial-gradient(90% 120% at 100% 100%, rgb(124 140 255 / 0.16), transparent 62%),
+    #121216;
+}
+[data-theme="light"] .content-theme .card-stage {
+  background:
+    radial-gradient(90% 120% at 0% 0%, rgb(200 190 255 / 0.28), transparent 62%),
+    radial-gradient(90% 120% at 100% 100%, rgb(120 132 255 / 0.26), transparent 62%),
+    #f3f3fa;
+}
+
+/* Faint tint fading down from the top of a panel. */
+.panel-glow {
+  background-image: linear-gradient(180deg, rgb(124 140 255 / 0.09), rgb(124 140 255 / 0.03) 140px, transparent 300px);
+}
+[data-theme="light"] .content-theme .panel-glow {
+  background-image: linear-gradient(180deg, rgb(130 140 255 / 0.14), rgb(130 140 255 / 0.05) 140px, transparent 300px);
+}
+
+/* Attached "folder" tab: the active tab and the table block share one tint,
+   joined by inverted corner fillets. */
+.content-theme {
+  --table-tint: color-mix(in oklab, var(--color-white) 3%, transparent);
+}
+.table-block,
+.tab-attached {
+  background: var(--table-tint);
+}
+.tab-fillet-l,
+.tab-fillet-r {
+  position: absolute;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+.tab-fillet-l {
+  left: -14px;
+  background: radial-gradient(circle at 0 0, transparent 13.5px, var(--table-tint) 14px);
+}
+.tab-fillet-r {
+  right: -14px;
+  background: radial-gradient(circle at 100% 0, transparent 13.5px, var(--table-tint) 14px);
+}
+
+
+/* Frozen state: diagonal hatch (monochrome "paused" cue). Uses currentColor-free
+   white stripes so it reads on the dark card face in both themes. */
+.hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgb(255 255 255 / 0.28) 0 1.5px,
+    transparent 1.5px 5px
+  );
+}
+
+/* Orbit (Gravv AI): pop-in for the panel. */
+@keyframes orbit-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.orbit-pop {
+  transform-origin: top center;
+  animation: orbit-pop 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbit-pop {
+    animation: none;
+  }
+}
+
+/* Card detail drawer: slides in from the right over a light scrim. */
+@keyframes drawer-in {
+  from {
+    transform: translateX(calc(100% + 1rem));
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.drawer-in {
+  animation: drawer-in 320ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.scrim-in {
+  animation: scrim-in 200ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer-in,
+  .scrim-in {
+    animation: none;
+  }
+}
+
+/* Frozen badge texture: the Cards hatch, quieter. */
+.hatch-soft {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgb(255 255 255 / 0.1) 0 1px,
+    transparent 1px 4px
+  );
+}
+[data-theme="light"] .content-theme .hatch-soft {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgb(0 0 0 / 0.08) 0 1px,
+    transparent 1px 4px
+  );
+}
+
+/* "Hide amounts" (top bar): figures are pixelated — a mosaic of their own colours, via the
+   SVG filter #gravv-pixelate mounted in the top bar. Nested matches aren't filtered twice. */
+[data-hide-amounts] .amount,
+[data-hide-amounts] .content-theme main :is(.amount, .tabular-nums):not(input):not(.font-mono):not([role="radio"]):not([role="radio"] *) {
+  filter: url(#gravv-pixelate);
+  user-select: none;
+}
+[data-hide-amounts] :is(.amount, .tabular-nums) :is(.amount, .tabular-nums) {
+  filter: none;
+}
+
+/* Payment link flow: the summary panel's contents settle in after it moves (right ↔ centre) */
+.morph-in { animation: morph-in 420ms 160ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes morph-in { from { opacity: 0; filter: blur(4px); transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .morph-in { animation: none; } }
+
+/* Customize checkout: edit the pay page in place */
+.cc-spot { position: relative; cursor: pointer; border-radius: 12px; outline: 1.5px dashed transparent; outline-offset: 2px; transition: outline-color 160ms, background-color 160ms; }
+.cc-spot:hover, .cc-spot:focus-visible { outline-color: rgb(37 99 235 / 0.55); background-color: rgb(37 99 235 / 0.035); }
+.cc-spot[data-on] { outline: 1.5px solid #2563eb; background-color: rgb(37 99 235 / 0.05); }
+.cc-spot::after { content: attr(data-label); position: absolute; top: -9px; left: 10px; transform: translateY(-50%); padding: 2px 7px; border-radius: 999px; background: #2563eb; color: #fff; font-size: 10.5px; font-weight: 500; line-height: 1.4; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 140ms; z-index: 2; }
+.cc-spot:hover::after, .cc-spot:focus-visible::after, .cc-spot[data-on]::after { opacity: 1; }
+.cc-spot .cc-spot::after { display: none; }
+.cc-tool { animation: cc-tool 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes cc-tool { from { opacity: 0; transform: translateY(4px) scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { .cc-tool { animation: none; } }
+/* The stage the pay page sits on, and the page's lift — tuned per theme so it reads as a sheet, not a haze. */
+.cc-stage { background: radial-gradient(120% 80% at 50% 0%, rgb(255 255 255 / 0.05), transparent 60%); }
+.pay-sheet { box-shadow: 0 40px 120px -30px rgb(0 0 0 / 0.7); }
+[data-theme="light"] .content-theme .cc-stage,
+[data-theme="light"] .content-theme .cc-caption { background: #f1f1f0; }
+[data-theme="light"] .content-theme .pay-sheet { box-shadow: 0 0 0 1px rgb(0 0 0 / 0.05), 0 1px 2px rgb(0 0 0 / 0.04), 0 24px 48px -28px rgb(0 0 0 / 0.22); }
+
+/* ------------------------------------------------------------------
+   Cards opening sequence (app/(dashboard)/cards/_components/opening-sequence.tsx).
+   <html data-intro="out"> slides the sidebar away and lets the page take its column;
+   "in" brings it back, slower and easing out — Mercury Books' timings.
+   ------------------------------------------------------------------ */
+html[data-intro] .app-sidebar {
+  position: relative;
+  z-index: 60;
+  background: var(--background);
+}
+html[data-intro="out"] .app-sidebar {
+  transform: translateX(-100%);
+  margin-left: calc(-1 * var(--sidebar-w, 240px));
+  transition:
+    transform 600ms ease-in,
+    margin-left 600ms ease-in;
+}
+html[data-intro="in"] .app-sidebar {
+  transition:
+    transform 1200ms cubic-bezier(0.16, 1, 0.3, 1),
+    margin-left 1200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+html[data-intro="out"] .content-theme {
+  margin-left: 8px;
+}
+html[data-intro] .content-theme {
+  transition: margin-left 600ms ease-in;
+}
+
+.intro-lockup {
+  animation: intro-park 600ms ease-in both;
+}
+@keyframes intro-park {
+  from {
+    transform: translateX(var(--sidebar-w, 240px));
+  }
+  to {
+    transform: none;
+  }
+}
+.intro-status {
+  animation: intro-status 320ms ease-out both;
+}
+@keyframes intro-status {
+  from {
+    transform: translateY(3px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.intro-spin {
+  animation: intro-spin 900ms linear infinite;
+}
+@keyframes intro-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.intro-welcome {
+  animation: intro-welcome 700ms cubic-bezier(0.16, 1, 0.3, 1) 650ms both;
+}
+@keyframes intro-welcome {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* First API-issued card landing in an empty Cards table */
+.card-arrived {
+  animation: card-arrived 1600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes card-arrived {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+    background-color: color-mix(in oklab, var(--brand) 14%, transparent);
+  }
+  30% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.intro-form {
+  animation: intro-welcome 600ms cubic-bezier(0.16, 1, 0.3, 1) 250ms both;
 }
