@@ -1,5 +1,6 @@
-import { PagePlaceholder } from "@/app/_components/page-placeholder";
+import { BillingOverview } from "./_components/billing-overview";
+import { CURRENT_PLAN, fees } from "./_data";
 
 export default function Page() {
-  return <PagePlaceholder title="Billing" />;
+  return <BillingOverview fees={fees} plan={CURRENT_PLAN} />;
 }
