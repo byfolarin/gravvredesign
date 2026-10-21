@@ -960,7 +960,8 @@ function RequestsTable({
                 <td className="py-3 tabular-nums">
                   {left !== null ? (
                     <span className="text-white">
-                      {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}
+                      {Math.floor(left / 60)}:
+                      {String(left % 60).padStart(2, "0")}
                     </span>
                   ) : (
                     <span className="text-neutral-600">—</span>

@@ -38,7 +38,9 @@ export function useDiscardGuard(close: () => void) {
         '[role="radio"],[role="switch"],[role="checkbox"],[role="option"],[aria-pressed]',
       )
     )
-      setDirty(true);
+      // After the keystroke lands: updating state mid-event made controlled inputs drop the
+      // first character typed into a clean form.
+      setTimeout(() => setDirty(true), 0);
   }, []);
   return {
     asking,

@@ -1,52 +1,29 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   Archive,
-  ArrowUpRight,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
+  ChevronDown,
   Download,
-  Ellipsis,
-  EllipsisVertical,
   Pencil,
   Search,
+  Send,
   X,
 } from "lucide-react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
 import { SEND_EVENT } from "@/app/_components/top-bar";
+import { RowMenu } from "@/app/(dashboard)/trade-desk/_components/order-extras";
 import { RecipientAvatar } from "./recipient-avatar";
-import { SendMoneyFlow } from "./send-money";
+import { SendMoneyFlow, arrival } from "./send-money";
+import { AskForDetails, COUNTRIES, RecipientFlow } from "./recipient-flow";
 import type { FundingSource } from "../../cards/_data";
-import type {
-  Rail,
-  Recipient,
-  RecipientPayment,
-  RecipientStatus,
-  VerificationStep,
-} from "../_data";
-import { dateFmt, fullDateFmt, timeFmt } from "../../cards/_lib/format";
+import type { Recipient, RecipientPayment, VerificationStep } from "../_data";
+import { dateFmt, fullDateFmt } from "../../cards/_lib/format";
 
-type Tab = "All" | RecipientStatus;
-const TABS: Tab[] = ["All", "Active", "Pending"];
-const RAILS: ("All" | Rail)[] = [
-  "All",
-  "ACH",
-  "Wire",
-  "Swift",
-  "Local transfer",
-];
-const PAGE_SIZES = [10, 25, 50];
-
-/** Data snapshot time, so "last 30 days" agrees on server and client. */
-const AS_OF = Date.UTC(2026, 9, 20, 9, 0, 0);
-const DAY = 24 * 60 * 60 * 1000;
-// Indicative rates into USD for the prototype's totals.
-const TO_USD: Record<string, number> = { USD: 1, MAD: 1 / 9.18 };
+type Tab = "All" | "Ready to pay" | "Needs attention";
+const TABS: Tab[] = ["All", "Ready to pay", "Needs attention"];
 
 const amount = (v: number, currency: string) =>
   new Intl.NumberFormat("en-US", {
@@ -54,14 +31,8 @@ const amount = (v: number, currency: string) =>
     currency,
     currencyDisplay: "narrowSymbol",
   }).format(v);
-const usd = (v: number) =>
-  new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(v);
-
-const compact = (v: number) =>
-  v >= 1000 ? `${Number((v / 1000).toFixed(1))}k` : String(Math.round(v));
+const flagOf = (country: string) =>
+  COUNTRIES.find((c) => c.name === country)?.flag ?? "";
 
 const lastPayment = (r: Recipient) =>
   r.payments.reduce<RecipientPayment | undefined>(
@@ -72,10 +43,79 @@ const totalPaid = (r: Recipient) =>
   r.payments
     .filter((p) => p.status === "Completed")
     .reduce((sum, p) => sum + p.amount, 0);
-const inWindow = (iso: string, from: number, to: number) => {
-  const t = Date.parse(iso);
-  return t > from && t <= to;
+
+type Problem = {
+  label: string;
+  detail: string;
+  tone: "bad" | "warn" | "wait";
+  fix?: "bank" | "archive" | "copy-link";
+  fixLabel?: string;
 };
+
+/** The one thing stopping you paying someone, in words — or null if they're ready. */
+function problemOf(r: Recipient, all: Recipient[]): Problem | null {
+  const last = lastPayment(r);
+  if (last?.failure)
+    return {
+      label: "Account closed",
+      detail: last.failure,
+      tone: "bad",
+      fix: "bank",
+      fixLabel: "Update bank details",
+    };
+  if (r.invite)
+    return {
+      label: "Waiting for their details",
+      detail: `We emailed ${r.invite.email} a secure link on ${dateFmt.format(new Date(r.invite.sentAt))}. It expires in 7 days.`,
+      tone: "wait",
+      fix: "copy-link",
+      fixLabel: "Copy link",
+    };
+  const twin =
+    all.find((x) => x.id === r.duplicateOf) ??
+    all.find((x) => x.duplicateOf === r.id);
+  if (twin)
+    return {
+      label: "Duplicate",
+      detail: `Same bank details as the ${twin.name} added on ${dateFmt.format(new Date(twin.createdAt))}. Keep one and archive the other.`,
+      tone: "warn",
+      fix: "archive",
+      fixLabel: "Archive this one",
+    };
+  const step = r.verification?.find((v) => v.state === "current");
+  if (r.status === "Pending" && step?.note?.includes("too short"))
+    return {
+      label: "Check account number",
+      detail: step.note,
+      tone: "warn",
+      fix: "bank",
+      fixLabel: "Update bank details",
+    };
+  if (r.status === "Pending")
+    return {
+      label: "Verifying bank",
+      detail: step?.note ?? "Gravv is checking the account with the bank.",
+      tone: "wait",
+    };
+  return null;
+}
+
+/** Status only when something's wrong: words, one chip size. */
+function ProblemChip({ p }: { p: Problem }) {
+  const tone =
+    p.tone === "bad"
+      ? "border-transparent bg-rose-400/10 text-rose-300"
+      : p.tone === "warn"
+        ? "border-transparent bg-amber-300/10 text-amber-200"
+        : "border-dashed border-white/20 text-neutral-300";
+  return (
+    <span
+      className={`inline-flex h-6 items-center rounded-full border px-2.5 text-xs leading-none font-medium whitespace-nowrap ${tone}`}
+    >
+      {p.label}
+    </span>
+  );
+}
 
 export function RecipientsWorkspace({
   initialRecipients,
@@ -88,16 +128,19 @@ export function RecipientsWorkspace({
   const [list, setList] = useState(initialRecipients);
   const [tab, setTab] = useState<Tab>("All");
   const [currency, setCurrency] = useState("All");
-  const [rail, setRail] = useState<"All" | Rail>("All");
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [sheetId, setSheetId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
-  // null = closed; "" = open on the recipient picker; an id = open on that recipient's amount step.
+  // null = closed; "" = open on the recipient picker; an id = open on that recipient.
   const [sending, setSending] = useState<string | null>(null);
+  const [flow, setFlow] = useState<
+    | { mode: "add" }
+    | { mode: "edit"; id: string; focus?: "bank" }
+    | { mode: "ask" }
+    | null
+  >(null);
+  const [addMenu, setAddMenu] = useState(false);
 
   useEffect(() => {
     const open = () => setSending("");
@@ -109,87 +152,20 @@ export function RecipientsWorkspace({
     const t = setTimeout(() => setToast(null), 3200);
     return () => clearTimeout(t);
   }, [toast]);
+  useEffect(() => {
+    if (!addMenu) return;
+    const close = () => setAddMenu(false);
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [addMenu]);
 
-  // ——— Facts ———
-  const payments = list.flatMap((r) => r.payments.map((p) => ({ ...p, r })));
-  const paidIn = (from: number, to: number) =>
-    payments
-      .filter((p) => p.status === "Completed" && inWindow(p.date, from, to))
-      .reduce((s, p) => s + p.amount * (TO_USD[p.currency] ?? 1), 0);
-  const paidNow = paidIn(AS_OF - 30 * DAY, AS_OF);
-  const paidBefore = paidIn(AS_OF - 60 * DAY, AS_OF - 30 * DAY);
-  const recent = payments.filter((p) =>
-    inWindow(p.date, AS_OF - 30 * DAY, AS_OF),
-  );
-  const usdOf = (p: RecipientPayment) => p.amount * (TO_USD[p.currency] ?? 1);
-  // Who the money went to this month, ranked.
-  const top = [
-    ...recent
-      .filter((p) => p.status === "Completed")
-      .reduce(
-        (m, p) => m.set(p.r, (m.get(p.r) ?? 0) + usdOf(p)),
-        new Map<Recipient, number>(),
-      ),
-  ]
-    .sort((x, y) => y[1] - x[1])
-    .slice(0, 4);
-  // Where it goes: one corridor per country, currency and rail.
-  const corridors = [
-    ...list
-      .reduce((m, r) => {
-        const key = `${r.country}|${r.currency}|${r.rail}`;
-        const c = m.get(key) ?? {
-          country: r.country,
-          currency: r.currency,
-          rail: r.rail,
-          count: 0,
-          paid: 0,
-        };
-        c.count += 1;
-        c.paid += r.payments
-          .filter((p) => p.status === "Completed")
-          .reduce((t, p) => t + usdOf(p), 0);
-        return m.set(key, c);
-      }, new Map<string, { country: string; currency: string; rail: Rail; count: number; paid: number }>())
-      .values(),
-  ].sort((x, y) => y.paid - x.paid || y.count - x.count);
-  // Everyone who can't be paid cleanly right now, with the reason.
-  const attention = [
-    ...list
-      .filter((r) => lastPayment(r)?.status === "Failed")
-      .map((r) => ({
-        r,
-        reason:
-          lastPayment(r)!.failure ??
-          `Last payment failed · ${lastPayment(r)!.reference}`,
-        // Retry only helps when the bank didn't reject the details themselves.
-        action: lastPayment(r)!.failure
-          ? ("Review" as const)
-          : ("Retry" as const),
-        failed: true,
-      })),
-    ...list
-      // A duplicate is reported once, on the copy to archive.
-      .filter(
-        (r) =>
-          r.status === "Pending" && !list.some((x) => x.duplicateOf === r.id),
-      )
-      .map((r) => ({
-        r,
-        reason: r.duplicateOf
-          ? "Two recipients have these exact bank details, and the account number looks too short. Fix it on one, archive the other."
-          : (r.verification?.find((v) => v.state === "current")?.note ??
-            "Verifying bank details"),
-        action: "Review" as const,
-        failed: false,
-      })),
-  ];
+  const problems = new Map(list.map((r) => [r.id, problemOf(r, list)]));
+  const ready = (r: Recipient) => !problems.get(r.id);
+  const nextId = `rcp_new${(list.length + 1).toString(36)}${list.length * 7919}`;
 
-  // ——— Rows ———
   const q = query.trim().toLowerCase();
   const scoped = list
     .filter((r) => currency === "All" || r.currency === currency)
-    .filter((r) => rail === "All" || r.rail === rail)
     .filter(
       (r) =>
         !q ||
@@ -197,50 +173,57 @@ export function RecipientsWorkspace({
           (v) => v.toLowerCase().includes(q),
         ),
     );
-  // Most recently paid first; never-paid recipients follow, newest first.
+  const inTab = (r: Recipient, t: Tab) =>
+    t === "All" ? true : t === "Ready to pay" ? ready(r) : !ready(r);
+  // Most recently paid first; never-paid follow, newest first.
   const rows = scoped
-    .filter((r) => tab === "All" || r.status === tab)
+    .filter((r) => inTab(r, tab))
     .sort((a, b) => {
       const la = lastPayment(a)?.date ?? "";
       const lb = lastPayment(b)?.date ?? "";
       return lb.localeCompare(la) || b.createdAt.localeCompare(a.createdAt);
     });
-  const count = (t: Tab) =>
-    scoped.filter((r) => t === "All" || r.status === t).length;
   const currencies = ["All", ...new Set(list.map((r) => r.currency))];
-  const pages = Math.max(1, Math.ceil(rows.length / perPage));
-  const current = Math.min(page, pages);
-  const visible = rows.slice((current - 1) * perPage, current * perPage);
-  const reset = () => setPage(1);
-  const sheet = list.find((r) => r.id === sheetId) ?? null;
-
-  // ——— Selection ———
-  const pageIds = visible.map((r) => r.id);
-  const pageAll = pageIds.length > 0 && pageIds.every((id) => checked.has(id));
-  const pageSome = !pageAll && pageIds.some((id) => checked.has(id));
+  const selected = list.find((r) => r.id === selectedId) ?? null;
+  const allChecked = rows.length > 0 && rows.every((r) => checked.has(r.id));
   const picked = list.filter((r) => checked.has(r.id));
-  const toggle = (id: string) =>
-    setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+
   const archive = (ids: string[]) => {
     const names = list.filter((r) => ids.includes(r.id)).map((r) => r.name);
-    setList((l) => l.filter((r) => !ids.includes(r.id)));
+    setList((l) =>
+      l
+        .filter((r) => !ids.includes(r.id))
+        // The twin left behind is no longer a duplicate.
+        .map((r) =>
+          r.duplicateOf && ids.includes(r.duplicateOf)
+            ? { ...r, duplicateOf: undefined }
+            : r,
+        ),
+    );
     setChecked(new Set());
-    setOpenId(null);
+    if (selectedId && ids.includes(selectedId)) setSelectedId(null);
     setToast(
       names.length === 1
         ? `${names[0]} archived`
         : `${names.length} recipients archived`,
     );
   };
+  const fix = (r: Recipient, p: Problem) => {
+    if (p.fix === "bank") setFlow({ mode: "edit", id: r.id, focus: "bank" });
+    if (p.fix === "archive") archive([r.id]);
+    if (p.fix === "copy-link" && r.invite) {
+      navigator.clipboard?.writeText(r.invite.link).catch(() => {});
+      setToast(
+        "Link copied — send it to them yourself if the email didn't land",
+      );
+    }
+  };
+  const editing =
+    flow?.mode === "edit" ? list.find((r) => r.id === flow.id) : undefined;
 
   return (
     <div className="sidebar-scroll h-full overflow-y-auto">
-      <div className="mx-auto max-w-[1180px] px-8 pt-12 pb-16">
+      <div className="mx-auto max-w-[1180px] px-8 pt-12 pb-24">
         {/* Heading */}
         <div className="flex items-start justify-between gap-6">
           <div>
@@ -251,169 +234,68 @@ export function RecipientsWorkspace({
               The people and businesses you pay out to.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setToast("Add recipient flow is next")}
-            className="h-9 rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-neutral-200"
-          >
-            Add recipient
-          </button>
-        </div>
-
-        {/* Who you pay, where it goes, and who's blocked */}
-        <div className="mt-10 grid gap-3 lg:grid-cols-[1.25fr_1fr_1fr]">
-          <Panel
-            title="Paid out · 30 days"
-            meta={
-              paidBefore > 0 ? (
-                <span className="text-neutral-300">
-                  {paidNow >= paidBefore ? "Up" : "Down"} from{" "}
-                  <span className="amount">{compact(paidBefore)}</span>
-                  <span className="text-neutral-500"> the 30 days before</span>
-                </span>
-              ) : undefined
-            }
-          >
-            <div className="amount text-[30px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
-              <Roll value={usd(paidNow).split(".")[0]} />
-              <sup className="ml-px align-[0.55em] text-[0.5em] font-normal tracking-normal text-neutral-500">
-                <Roll value={`.${usd(paidNow).split(".")[1]}`} />
-              </sup>
-              <span className="ml-1.5 text-[12px] font-normal tracking-normal text-neutral-500">
-                USD eq.
-              </span>
+          <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
+            <div className="flex">
+              <button
+                type="button"
+                onClick={() => setFlow({ mode: "add" })}
+                className="h-9 rounded-l-full bg-white pr-3 pl-4 text-[13px] font-medium text-black transition-colors hover:bg-neutral-200"
+              >
+                Add recipient
+              </button>
+              <button
+                type="button"
+                aria-label="More ways to add"
+                aria-haspopup="menu"
+                aria-expanded={addMenu}
+                onClick={() => setAddMenu((v) => !v)}
+                className="flex h-9 w-8 items-center justify-center rounded-r-full border-l border-black/10 bg-white text-black transition-colors hover:bg-neutral-200"
+              >
+                <ChevronDown size={14} strokeWidth={2} />
+              </button>
             </div>
-            <ul className="mt-5 space-y-2.5">
-              {top.map(([r, v]) => (
-                <li key={r.id}>
+            {addMenu && (
+              <div
+                role="menu"
+                className="orbit-pop absolute top-full right-0 z-30 mt-2 w-64 rounded-xl border border-white/10 bg-raised p-1.5 shadow-2xl"
+              >
+                {[
+                  {
+                    label: "Enter their details",
+                    sub: "You have their bank account",
+                    run: () => setFlow({ mode: "add" }),
+                  },
+                  {
+                    label: "Ask them for their details",
+                    sub: "They add it through a secure link",
+                    run: () => setFlow({ mode: "ask" }),
+                  },
+                ].map((i) => (
                   <button
+                    key={i.label}
                     type="button"
-                    onClick={() => setSheetId(r.id)}
-                    className="group flex w-full items-center gap-2.5 text-left"
-                  >
-                    <RecipientAvatar recipient={r} size={22} />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-baseline justify-between gap-3 text-[13px]">
-                        <span className="truncate text-neutral-200 group-hover:text-white">
-                          {r.name}
-                        </span>
-                        <span className="amount shrink-0 text-neutral-400 tabular-nums">
-                          {compact(v)}
-                        </span>
-                      </span>
-                      <span className="mt-1 block h-1 rounded-full bg-white/[0.06]">
-                        <span
-                          className="block h-full rounded-full bg-white/30"
-                          style={{
-                            width: `${Math.max(4, (v / (top[0]?.[1] || 1)) * 100)}%`,
-                          }}
-                        />
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-              {top.length === 0 && (
-                <li className="text-[13px] text-neutral-500">
-                  Nothing paid out this month.
-                </li>
-              )}
-            </ul>
-          </Panel>
-
-          <Panel
-            title="Corridors"
-            meta={
-              <span className="text-neutral-500 tabular-nums">
-                {corridors.length}
-              </span>
-            }
-          >
-            <ul className="-mx-2">
-              {corridors.slice(0, 5).map((c) => (
-                <li key={`${c.country}${c.currency}${c.rail}`}>
-                  <button
-                    type="button"
+                    role="menuitem"
                     onClick={() => {
-                      setCurrency(c.currency);
-                      setRail(c.rail);
-                      reset();
+                      setAddMenu(false);
+                      i.run();
                     }}
-                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/[0.04]"
+                    className="block w-full rounded-lg px-2.5 py-2 text-left hover:bg-white/[0.06]"
                   >
-                    <Flag country={c.country} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] text-neutral-100">
-                        {c.country}
-                      </span>
-                      <span className="block truncate text-[11px] text-neutral-500">
-                        {c.currency} · {c.rail}
-                      </span>
+                    <span className="block text-[13px] text-neutral-100">
+                      {i.label}
                     </span>
-                    <span className="text-right tabular-nums">
-                      <span className="amount block text-[13px] text-neutral-200">
-                        {c.paid ? compact(c.paid) : "—"}
-                      </span>
-                      <span className="block text-[11px] text-neutral-500">
-                        {c.count} {c.count === 1 ? "recipient" : "recipients"}
-                      </span>
+                    <span className="block text-[11px] text-neutral-500">
+                      {i.sub}
                     </span>
                   </button>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-
-          <Panel
-            title="Needs attention"
-            meta={
-              attention.length ? (
-                <span className="rounded-full bg-white/[0.08] px-1.5 py-px text-[11px] text-neutral-200 tabular-nums">
-                  {attention.length}
-                </span>
-              ) : undefined
-            }
-          >
-            <ul className="-mx-2">
-              {attention.map(({ r, reason, action, failed }) => (
-                <li
-                  key={`${r.id}${action}`}
-                  className="flex items-start gap-3 rounded-lg px-2 py-2"
-                >
-                  <RecipientAvatar recipient={r} size={26} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] text-neutral-100">
-                      {r.name}
-                    </span>
-                    <span
-                      title={reason}
-                      className={`line-clamp-2 block text-[11px] leading-snug ${failed ? "text-rose-300" : "text-neutral-500"}`}
-                    >
-                      {reason}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      action === "Retry" ? setSending(r.id) : setSheetId(r.id)
-                    }
-                    className="h-7 shrink-0 rounded-full border border-white/12 px-2.5 text-xs text-neutral-200 transition-colors hover:border-white/30 hover:text-white"
-                  >
-                    {action}
-                  </button>
-                </li>
-              ))}
-              {attention.length === 0 && (
-                <li className="px-2 py-2 text-[13px] text-neutral-500">
-                  Everyone can be paid.
-                </li>
-              )}
-            </ul>
-          </Panel>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Tabs + tools */}
-        <div className="mt-12 flex flex-wrap items-center justify-between gap-4">
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-4">
           <div role="tablist" className="flex items-center gap-1">
             {TABS.map((t) => (
               <button
@@ -421,10 +303,7 @@ export function RecipientsWorkspace({
                 type="button"
                 role="tab"
                 aria-selected={tab === t}
-                onClick={() => {
-                  setTab(t);
-                  reset();
-                }}
+                onClick={() => setTab(t)}
                 className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors ${
                   tab === t
                     ? "bg-white/[0.08] font-medium text-white"
@@ -433,43 +312,38 @@ export function RecipientsWorkspace({
               >
                 {t}
                 <span
-                  className={`text-xs tabular-nums ${tab === t ? "text-neutral-400" : "text-neutral-600"}`}
+                  className={`text-xs tabular-nums ${
+                    t === "Needs attention" &&
+                    scoped.some((r) => !ready(r)) &&
+                    tab !== t
+                      ? "text-neutral-300"
+                      : tab === t
+                        ? "text-neutral-400"
+                        : "text-neutral-600"
+                  }`}
                 >
-                  <Roll value={String(count(t))} />
+                  <Roll
+                    value={String(scoped.filter((r) => inTab(r, t)).length)}
+                  />
                 </span>
               </button>
             ))}
           </div>
           <div className="flex items-center gap-2">
-            <Dropdown
-              label="Currency"
-              value={currency}
-              active={currency !== "All"}
-              align="right"
-              options={currencies.map((c) => ({
-                value: c,
-                label: c === "All" ? "All currencies" : c,
-              }))}
-              onChange={(v) => {
-                setCurrency(v);
-                reset();
-              }}
-            />
-            <Dropdown
-              label="Rail"
-              value={rail}
-              active={rail !== "All"}
-              align="right"
-              options={RAILS.map((r) => ({
-                value: r,
-                label: r === "All" ? "All rails" : r,
-              }))}
-              onChange={(v) => {
-                setRail(v);
-                reset();
-              }}
-            />
-            <label className="flex h-9 w-[240px] shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 transition-colors hover:border-white/20 focus-within:border-white/35 focus-within:bg-transparent">
+            {currencies.length > 2 && (
+              <Dropdown
+                label="Currency"
+                value={currency}
+                active={currency !== "All"}
+                align="right"
+                options={currencies.map((c) => ({
+                  value: c,
+                  label: c === "All" ? "All currencies" : c,
+                }))}
+                onChange={setCurrency}
+              />
+            )}
+            <label className="flex h-9 w-[240px] shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 transition-colors focus-within:border-white/35 focus-within:bg-transparent hover:border-white/20">
               <Search
                 size={14}
                 strokeWidth={1.75}
@@ -477,11 +351,8 @@ export function RecipientsWorkspace({
               />
               <input
                 value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  reset();
-                }}
-                placeholder="Name, bank, account or ID…"
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Name, bank or account…"
                 aria-label="Search recipients"
                 className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-neutral-500"
               />
@@ -492,253 +363,219 @@ export function RecipientsWorkspace({
                 exportCsv(rows);
                 setToast(`${rows.length} recipients exported`);
               }}
-              className="ml-1 flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] text-neutral-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+              className="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] text-neutral-300 transition-colors hover:bg-white/[0.06] hover:text-white"
             >
               <Download size={14} strokeWidth={1.75} />
-              Export {rows.length}
+              Export
             </button>
           </div>
         </div>
 
-        {/* Table */}
-        <table className="mt-3 w-full table-fixed border-t border-white/15 text-[13px]">
-          <colgroup>
-            <col className="w-12" />
-            <col />
-            <col className="w-[230px]" />
-            <col className="w-[170px]" />
-            <col className="w-[120px]" />
-            <col className="w-[104px]" />
-          </colgroup>
-          <thead>
-            <tr className="text-left text-xs text-neutral-500">
-              <th className="py-2.5 pl-4 font-normal">
-                <Checkbox
-                  checked={pageAll}
-                  mixed={pageSome}
-                  label={
-                    pageAll
-                      ? "Deselect all on this page"
-                      : "Select all on this page"
-                  }
-                  onChange={() =>
-                    setChecked((prev) => {
-                      const next = new Set(prev);
-                      for (const id of pageIds) {
-                        if (pageAll) next.delete(id);
-                        else next.add(id);
-                      }
-                      return next;
-                    })
-                  }
-                />
-              </th>
-              <th className="py-2.5 font-normal">Recipient</th>
-              <th className="py-2.5 font-normal">Bank</th>
-              <th className="py-2.5 pr-8 text-right font-normal">
-                Paid to date
-              </th>
-              <th className="py-2.5 font-normal">Status</th>
-              <th className="py-2.5 font-normal">
-                <span className="sr-only">Actions</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((r) => {
-              const open = openId === r.id;
-              const last = lastPayment(r);
-              const total = totalPaid(r);
-              const pending = r.status === "Pending";
-              return (
-                <Fragment key={r.id}>
-                  <tr
-                    onClick={() => setOpenId(open ? null : r.id)}
-                    aria-expanded={open}
-                    className={`group cursor-pointer border-t border-white/6 transition-colors ${
-                      open || checked.has(r.id)
-                        ? "bg-white/[0.04]"
-                        : "hover:bg-white/[0.03]"
-                    }`}
-                  >
-                    <td
-                      className="py-3 pl-4"
-                      onClick={(e) => e.stopPropagation()}
+        {/* List + docked recipient panel */}
+        <div
+          className={`mt-3 grid items-start gap-6 ${selected ? "grid-cols-[minmax(0,1fr)_380px]" : "grid-cols-1"}`}
+        >
+          <table className="w-full table-fixed border-t border-white/15 text-[13px]">
+            <colgroup>
+              <col className="w-10" />
+              <col />
+              {!selected && <col className="w-[250px]" />}
+              <col className="w-[130px]" />
+              <col className="w-[128px]" />
+              <col className={selected ? "w-[150px]" : "w-[190px]"} />
+              <col className="w-[76px]" />
+            </colgroup>
+            <thead>
+              <tr className="text-left text-xs text-neutral-500">
+                <th className="py-2.5 pl-3 font-normal">
+                  <Checkbox
+                    checked={allChecked}
+                    label={allChecked ? "Deselect all" : "Select all"}
+                    onChange={() =>
+                      setChecked(
+                        allChecked ? new Set() : new Set(rows.map((r) => r.id)),
+                      )
+                    }
+                  />
+                </th>
+                <th className="py-2.5 font-normal">Name</th>
+                {!selected && <th className="py-2.5 font-normal">Pays to</th>}
+                <th className="py-2.5 pr-6 text-right font-normal">
+                  Total paid
+                </th>
+                <th className="py-2.5 font-normal">Last paid</th>
+                <th className="py-2.5 font-normal">
+                  <span className="sr-only">Status</span>
+                </th>
+                <th className="py-2.5 font-normal">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const p = problems.get(r.id);
+                const last = lastPayment(r);
+                const total = totalPaid(r);
+                const on = selectedId === r.id;
+                return (
+                  <Fragment key={r.id}>
+                    <tr
+                      onClick={() => setSelectedId(on ? null : r.id)}
+                      aria-selected={on}
+                      className={`group cursor-pointer border-t border-white/6 transition-colors ${on || checked.has(r.id) ? "bg-white/[0.05]" : "hover:bg-white/[0.03]"}`}
                     >
-                      <Checkbox
-                        checked={checked.has(r.id)}
-                        onChange={() => toggle(r.id)}
-                        label={`Select ${r.name}`}
-                      />
-                    </td>
-                    <td className="py-3 pr-4">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <RecipientAvatar recipient={r} size={30} />
-                        <div className="min-w-0">
-                          <div className="truncate font-medium text-white">
-                            {r.name}
-                          </div>
-                          <div className="flex items-center gap-1 truncate text-[11px] text-neutral-500">
-                            <span aria-hidden>{FLAGS[r.country]}</span>
-                            {r.kind} · {r.country}
-                            {(r.duplicateOf ||
-                              list.some((x) => x.duplicateOf === r.id)) && (
-                              <span className="text-amber-300">
-                                {" "}
-                                · Same details as another recipient
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <div className="truncate text-neutral-200">
-                        {r.institution}
-                      </div>
-                      <div className="truncate text-[11px] text-neutral-500 tabular-nums">
-                        {r.account
-                          ? `••${r.account.slice(-4)}`
-                          : "No account yet"}{" "}
-                        · {r.currency} {r.rail}
-                      </div>
-                    </td>
-                    <td className="amount py-3 pr-8 text-right tabular-nums">
-                      <div
-                        className={
-                          total ? "font-medium text-white" : "text-neutral-600"
-                        }
+                      <td
+                        className="py-3 pl-3"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        {total ? amount(total, r.currency) : "—"}
-                      </div>
-                      <div className="text-[11px] text-neutral-500">
-                        {last ? (
-                          <>
-                            {last.status === "Failed" && (
-                              <span className="text-rose-300">Failed · </span>
-                            )}
-                            {last.status === "Processing" && (
-                              <span className="text-neutral-300">
-                                Sending ·{" "}
-                              </span>
-                            )}
-                            {dateFmt.format(new Date(last.date))}
-                          </>
-                        ) : (
-                          "Never paid"
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3">
-                      <Status status={r.status} />
-                    </td>
-                    <td
-                      className="py-3 pr-3"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center justify-end gap-1">
-                        {!pending && (
-                          <button
-                            type="button"
-                            onClick={() => setSending(r.id)}
-                            className="h-7 rounded-full bg-white px-3 text-xs font-medium text-black opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                          >
-                            Pay
-                          </button>
-                        )}
-                        <RowMenu
-                          recipient={r}
-                          onPay={() => setSending(r.id)}
-                          onEdit={() => setToast("Edit recipient flow is next")}
-                          onCopyId={() => {
-                            navigator.clipboard
-                              ?.writeText(r.id)
-                              .catch(() => {});
-                            setToast("Recipient ID copied");
-                          }}
-                          onArchive={() => archive([r.id])}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                  {open && (
-                    <tr className="bg-white/[0.04]">
-                      <td colSpan={6} className="px-4 pb-4">
-                        <Preview
-                          recipient={r}
-                          onClose={() => setOpenId(null)}
-                          onPay={() => setSending(r.id)}
-                          onViewAll={() => setSheetId(r.id)}
+                        <Checkbox
+                          checked={checked.has(r.id)}
+                          label={`Select ${r.name}`}
+                          onChange={() =>
+                            setChecked((s) => {
+                              const n = new Set(s);
+                              if (n.has(r.id)) n.delete(r.id);
+                              else n.add(r.id);
+                              return n;
+                            })
+                          }
                         />
                       </td>
+                      <td className="py-3 pr-4">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <RecipientAvatar recipient={r} size={28} />
+                          <div className="min-w-0">
+                            <div className="truncate text-white">{r.name}</div>
+                            <div className="truncate text-[11px] text-neutral-500">
+                              {flagOf(r.country)} {r.kind} · {r.country}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      {!selected && (
+                        <td className="py-3 pr-4">
+                          {r.account ? (
+                            <>
+                              <div className="truncate text-neutral-200">
+                                {r.institution}
+                              </div>
+                              <div className="truncate text-[11px] text-neutral-500 tabular-nums">
+                                ••{r.account.slice(-4)} · {r.rail}
+                                {r.currency !== "USD" && ` · ${r.currency}`}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-neutral-600">
+                              Not added yet
+                            </span>
+                          )}
+                        </td>
+                      )}
+                      <td className="amount py-3 pr-6 text-right tabular-nums">
+                        {total ? (
+                          <span className="text-white">
+                            {amount(total, r.currency)}
+                          </span>
+                        ) : (
+                          <span className="text-neutral-600">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 text-neutral-400 tabular-nums">
+                        {last
+                          ? last.status === "Processing"
+                            ? "Sending"
+                            : last.status === "Failed"
+                              ? `Came back ${dateFmt.format(new Date(last.date))}`
+                              : dateFmt.format(new Date(last.date))
+                          : "Never"}
+                      </td>
+                      <td className="py-3 pr-2">
+                        {p && <ProblemChip p={p} />}
+                      </td>
+                      <td
+                        className="py-3 pr-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-end gap-0.5">
+                          {!p && (
+                            <button
+                              type="button"
+                              aria-label={`Pay ${r.name}`}
+                              title="Pay"
+                              onClick={() => setSending(r.id)}
+                              className="flex size-7 items-center justify-center rounded-md text-neutral-500 opacity-0 transition-all group-hover:opacity-100 hover:bg-white/8 hover:text-white focus-visible:opacity-100"
+                            >
+                              <Send size={14} strokeWidth={1.75} />
+                            </button>
+                          )}
+                          <RowMenu
+                            label={`${r.name} actions`}
+                            items={[
+                              ...(!p
+                                ? [
+                                    {
+                                      label: "Pay",
+                                      run: () => setSending(r.id),
+                                    },
+                                  ]
+                                : []),
+                              ...(p?.fix && p.fixLabel
+                                ? [{ label: p.fixLabel, run: () => fix(r, p) }]
+                                : []),
+                              {
+                                label: "Edit details",
+                                run: () => setFlow({ mode: "edit", id: r.id }),
+                              },
+                              {
+                                label: "Copy recipient ID",
+                                run: () => {
+                                  navigator.clipboard
+                                    ?.writeText(r.id)
+                                    .catch(() => {});
+                                  setToast("Recipient ID copied");
+                                },
+                              },
+                              {
+                                label: "Archive",
+                                run: () => archive([r.id]),
+                                danger: true,
+                              },
+                            ]}
+                          />
+                        </div>
+                      </td>
                     </tr>
-                  )}
-                </Fragment>
-              );
-            })}
-            {visible.length === 0 && (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="border-t border-white/6 py-16 text-center text-neutral-500"
-                >
-                  No recipients match.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  </Fragment>
+                );
+              })}
+              {rows.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="border-t border-white/6 py-16 text-center text-neutral-500"
+                  >
+                    {tab === "Needs attention"
+                      ? "Everyone can be paid."
+                      : "No recipients match."}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
 
-        {/* Pagination */}
-        <div className="mt-2 flex items-center justify-between border-t border-white/6 pt-4 text-[13px] text-neutral-500">
-          <span className="tabular-nums">
-            {rows.length === 0
-              ? "No results"
-              : `Showing ${(current - 1) * perPage + 1} to ${Math.min(current * perPage, rows.length)} of ${rows.length}`}
-          </span>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <PageButton
-                label="Previous page"
-                disabled={current === 1}
-                onClick={() => setPage(current - 1)}
-              >
-                <ChevronLeft size={14} strokeWidth={1.75} />
-              </PageButton>
-              {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-                <PageButton
-                  key={p}
-                  label={`Page ${p}`}
-                  active={p === current}
-                  onClick={() => setPage(p)}
-                >
-                  {p}
-                </PageButton>
-              ))}
-              <PageButton
-                label="Next page"
-                disabled={current === pages}
-                onClick={() => setPage(current + 1)}
-              >
-                <ChevronRight size={14} strokeWidth={1.75} />
-              </PageButton>
-            </div>
-            <Dropdown
-              label="Rows per page"
-              variant="compact"
-              placement="top"
-              align="right"
-              value={perPage}
-              options={PAGE_SIZES.map((n) => ({
-                value: n,
-                label: `${n} per page`,
-              }))}
-              onChange={(v) => {
-                setPerPage(v);
-                reset();
-              }}
+          {selected && (
+            <RecipientPanel
+              key={selected.id}
+              r={selected}
+              problem={problems.get(selected.id) ?? null}
+              onClose={() => setSelectedId(null)}
+              onPay={() => setSending(selected.id)}
+              onEdit={() => setFlow({ mode: "edit", id: selected.id })}
+              onFix={(p) => fix(selected, p)}
+              onArchive={() => archive([selected.id])}
             />
-          </div>
+          )}
         </div>
       </div>
 
@@ -750,49 +587,111 @@ export function RecipientsWorkspace({
           className="theme-lock-dark orbit-pop fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/10 bg-[#0b0b0c] py-1.5 pr-1.5 pl-4 text-[13px] text-white shadow-[0_20px_60px_-12px_rgb(0_0_0/0.6)]"
         >
           <span className="mr-2 tabular-nums">{checked.size} selected</span>
-          <BulkButton
-            icon={Download}
-            label="Export"
+          <button
+            type="button"
             onClick={() => {
               exportCsv(picked);
               setToast(`${picked.length} recipients exported`);
             }}
-          />
-          <BulkButton
-            icon={Archive}
-            label="Archive"
+            className="flex h-8 items-center gap-1.5 rounded-full px-3 text-neutral-200 hover:bg-white/8 hover:text-white"
+          >
+            <Download size={13} strokeWidth={1.75} /> Export
+          </button>
+          <button
+            type="button"
             onClick={() => archive(picked.map((r) => r.id))}
-          />
+            className="flex h-8 items-center gap-1.5 rounded-full px-3 text-neutral-200 hover:bg-white/8 hover:text-white"
+          >
+            <Archive size={13} strokeWidth={1.75} /> Archive
+          </button>
           <span className="mx-1 h-5 w-px bg-white/10" aria-hidden />
           <button
             type="button"
             aria-label="Clear selection"
             onClick={() => setChecked(new Set())}
-            className="flex size-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-white/8 hover:text-white"
+            className="flex size-8 items-center justify-center rounded-full text-neutral-400 hover:bg-white/8 hover:text-white"
           >
             <X size={14} strokeWidth={1.75} />
           </button>
         </div>
       )}
 
-      {sheet && (
-        <RecipientDrawer
-          recipient={sheet}
-          onClose={() => setSheetId(null)}
-          onPay={() => {
-            setSheetId(null);
-            setSending(sheet.id);
+      {(flow?.mode === "add" || (flow?.mode === "edit" && editing)) && (
+        <RecipientFlow
+          key={flow.mode === "edit" ? flow.id : "add"}
+          editing={editing}
+          focus={flow.mode === "edit" ? flow.focus : undefined}
+          nextId={nextId}
+          onClose={() => setFlow(null)}
+          onSave={(r, bankChanged) => {
+            // Prototype: the bank confirms the account name a few seconds later.
+            if (bankChanged)
+              setTimeout(() => {
+                setList((l) =>
+                  l.map((x) =>
+                    x.id === r.id
+                      ? {
+                          ...x,
+                          status: "Active",
+                          verification: x.verification?.map((v) => ({
+                            ...v,
+                            state: "done" as const,
+                            note: undefined,
+                          })),
+                        }
+                      : x,
+                  ),
+                );
+                setToast(
+                  `${r.institution} confirmed ${r.name}'s account — ready to pay`,
+                );
+              }, 7000);
+            if (editing) {
+              setList((l) =>
+                l.map((x) =>
+                  x.id === r.id
+                    ? {
+                        ...r,
+                        // New details: the old failure no longer applies.
+                        payments: bankChanged
+                          ? r.payments.map((p) =>
+                              p.failure ? { ...p, failure: undefined } : p,
+                            )
+                          : r.payments,
+                      }
+                    : x,
+                ),
+              );
+              setToast(
+                bankChanged
+                  ? `Saved — Gravv is checking ${r.name}'s new account`
+                  : `${r.name} updated`,
+              );
+            } else {
+              setList((l) => [r, ...l]);
+              setSelectedId(r.id);
+              setToast(`${r.name} added — Gravv is checking the account`);
+            }
           }}
-          onArchive={() => {
-            setSheetId(null);
-            archive([sheet.id]);
+        />
+      )}
+
+      {flow?.mode === "ask" && (
+        <AskForDetails
+          nextId={nextId}
+          onClose={() => setFlow(null)}
+          onSend={(r) => {
+            setList((l) => [r, ...l]);
+            setFlow(null);
+            setSelectedId(r.id);
+            setToast(`Request sent to ${r.invite?.email}`);
           }}
         />
       )}
 
       {sending !== null && (
         <SendMoneyFlow
-          recipients={list}
+          recipients={list.filter(ready)}
           sources={sources}
           initialRecipientId={sending || undefined}
           onClose={() => setSending(null)}
@@ -821,7 +720,7 @@ export function RecipientsWorkspace({
       {toast && (
         <div
           role="status"
-          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-white/10 bg-neutral-900 px-4 py-2.5 text-[13px] text-white shadow-2xl"
+          className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-white/10 bg-neutral-900 px-4 py-2.5 text-[13px] text-white shadow-2xl"
         >
           {toast}
         </div>
@@ -830,653 +729,225 @@ export function RecipientsWorkspace({
   );
 }
 
-/** Same chip system as Transactions: soft green when good, dashed while waiting. */
-function Status({ status }: { status: RecipientStatus }) {
-  const tone =
-    status === "Active"
-      ? "border-transparent bg-[var(--ok-bg)] text-[var(--ok-fg)]"
-      : "border-dashed border-white/20 text-neutral-300";
-  return (
-    <span
-      className={`inline-flex h-6 items-center rounded-full border px-2.5 text-xs leading-none font-medium ${tone}`}
-    >
-      {status}
-    </span>
-  );
-}
-
-/** The few facts people open a row for; everything else is in the side sheet. */
-function Preview({
-  recipient: r,
+/** Mercury-style docked panel: who they are, what's wrong, where money goes, what you've sent. */
+function RecipientPanel({
+  r,
+  problem: p,
   onClose,
-  onPay,
-  onViewAll,
-}: {
-  recipient: Recipient;
-  onClose: () => void;
-  onPay: () => void;
-  onViewAll: () => void;
-}) {
-  const pending = r.status === "Pending";
-  const sent = r.payments.filter((p) => p.status === "Completed");
-  const last = lastPayment(r);
-  const step = r.verification?.find((s) => s.state === "current");
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div className="orbit-pop rounded-xl border border-white/8 bg-surface">
-      <div className="grid gap-x-8 gap-y-4 px-5 py-4 sm:grid-cols-2 lg:grid-cols-[1.3fr_1.3fr_1fr_1.2fr]">
-        <Fact2 label="Recipient ID" value={r.id} mono copy />
-        <Fact2
-          label={r.rail === "Swift" ? "IBAN / Account" : "Account number"}
-          value={r.account ?? "Not provided"}
-          mono={!!r.account}
-          copy={!!r.account}
-        />
-        {r.routing ? (
-          <Fact2 label={r.routing.label} value={r.routing.value} mono copy />
-        ) : (
-          <Fact2 label="Rail" value={r.rail} />
-        )}
-        <Fact2 label="Email" value={r.email ?? "—"} copy={!!r.email} />
-      </div>
-      <div className="flex items-center justify-between gap-4 border-t border-white/6 px-5 py-2.5">
-        <span
-          className={`text-[12px] whitespace-normal ${last?.failure && !pending ? "text-rose-300" : "text-neutral-500"}`}
-        >
-          {pending && step
-            ? `${step.label} · ${step.note ?? "In progress"}`
-            : last?.failure
-              ? last.failure
-              : last
-                ? `${sent.length} ${sent.length === 1 ? "payment" : "payments"} · last “${last.reference}” on ${fullDateFmt.format(new Date(last.date))}`
-                : "Nothing sent to this recipient yet"}
-        </span>
-        <div className="flex shrink-0 items-center gap-2">
-          {!pending && (
-            <button
-              type="button"
-              onClick={onPay}
-              className="flex h-8 items-center gap-1 rounded-full bg-white px-3 text-[13px] font-medium text-black transition-colors hover:bg-neutral-200"
-            >
-              Pay
-              <ArrowUpRight size={13} strokeWidth={2} />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onViewAll}
-            className="flex h-8 items-center gap-1 rounded-full border border-white/12 pr-2.5 pl-3 text-[13px] text-neutral-200 transition-colors hover:border-white/30 hover:text-white"
-          >
-            View all details
-            <ChevronRight size={13} strokeWidth={1.75} />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Fact2({
-  label,
-  value,
-  mono = false,
-  copy = false,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-  copy?: boolean;
-}) {
-  return (
-    <div className="min-w-0">
-      <div className="text-[11px] text-neutral-500">{label}</div>
-      <div className="mt-1 flex min-w-0 items-center gap-0.5">
-        <span
-          title={value}
-          className={`truncate ${mono ? "font-mono text-[12px] text-neutral-200" : "text-[13px] text-neutral-100"}`}
-        >
-          {value}
-        </span>
-        {copy && (
-          <CopyButton value={value} label={`Copy ${label.toLowerCase()}`} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Panel({
-  title,
-  meta,
-  children,
-}: {
-  title: string;
-  meta?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="flex min-w-0 flex-col rounded-2xl bg-white/[0.02] p-5">
-      <div className="mb-4 flex items-center justify-between gap-3 text-[13px]">
-        <h2 className="text-neutral-400">{title}</h2>
-        {meta && <span className="text-xs tabular-nums">{meta}</span>}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-const FLAGS: Record<string, string> = {
-  "United States": "🇺🇸",
-  "United Kingdom": "🇬🇧",
-  Nigeria: "🇳🇬",
-  Morocco: "🇲🇦",
-  Luxembourg: "🇱🇺",
-};
-
-/** Country flag in a small round frame; falls back to the country's initial. */
-function Flag({ country, size = 26 }: { country: string; size?: number }) {
-  return (
-    <span
-      aria-hidden
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/[0.06] ring-1 ring-white/10"
-      style={{ width: size, height: size, fontSize: size * 0.62 }}
-    >
-      {FLAGS[country] ?? country[0]}
-    </span>
-  );
-}
-
-function Checkbox({
-  checked,
-  mixed = false,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  mixed?: boolean;
-  onChange: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={mixed ? "mixed" : checked}
-      aria-label={label}
-      onClick={onChange}
-      className={`flex size-4 items-center justify-center rounded-[4px] border transition-colors ${
-        checked || mixed
-          ? "border-white bg-white text-black"
-          : "border-white/25 hover:border-white/50"
-      }`}
-    >
-      {checked ? (
-        <Check size={11} strokeWidth={3} />
-      ) : mixed ? (
-        <span className="h-[2px] w-2 rounded-full bg-black" />
-      ) : null}
-    </button>
-  );
-}
-
-function BulkButton({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: typeof Download;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex h-8 items-center gap-1.5 rounded-full px-3 text-neutral-200 transition-colors hover:bg-white/8 hover:text-white"
-    >
-      <Icon size={13} strokeWidth={1.75} />
-      {label}
-    </button>
-  );
-}
-
-function RowMenu({
-  recipient: r,
   onPay,
   onEdit,
-  onCopyId,
+  onFix,
   onArchive,
 }: {
-  recipient: Recipient;
-  onPay: () => void;
-  onEdit: () => void;
-  onCopyId: () => void;
-  onArchive: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        setOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", onDown);
-    document.addEventListener("keydown", onKey, true);
-    return () => {
-      document.removeEventListener("pointerdown", onDown);
-      document.removeEventListener("keydown", onKey, true);
-    };
-  }, [open]);
-  const run = (fn: () => void) => () => {
-    setOpen(false);
-    fn();
-  };
-  const items = [
-    ...(r.status === "Active"
-      ? [{ label: "Send payment", icon: ArrowUpRight, onClick: onPay }]
-      : []),
-    { label: "Edit details", icon: Pencil, onClick: onEdit },
-    { label: "Copy recipient ID", icon: Copy, onClick: onCopyId },
-  ];
-  return (
-    <div ref={root} className="relative">
-      <button
-        type="button"
-        aria-label="More actions"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className={`flex size-8 items-center justify-center rounded-full transition-colors hover:bg-white/8 hover:text-white ${
-          open ? "bg-white/8 text-white" : "text-neutral-500"
-        }`}
-      >
-        <EllipsisVertical size={15} strokeWidth={1.75} />
-      </button>
-      {open && (
-        <div
-          role="menu"
-          className="orbit-pop absolute top-full right-0 z-50 mt-2 w-52 rounded-xl border border-white/10 bg-raised p-1.5 shadow-2xl"
-        >
-          {items.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              role="menuitem"
-              onClick={run(item.onClick)}
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-neutral-200 transition-colors hover:bg-white/[0.06] hover:text-white"
-            >
-              <item.icon
-                size={14}
-                strokeWidth={1.75}
-                className="text-neutral-400"
-              />
-              {item.label}
-            </button>
-          ))}
-          <div className="mt-1 border-t border-white/8 pt-1">
-            <button
-              type="button"
-              role="menuitem"
-              onClick={run(onArchive)}
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-neutral-400 transition-colors hover:bg-white/[0.06] hover:text-white"
-            >
-              <Archive size={14} strokeWidth={1.75} />
-              Archive
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PageButton({
-  label,
-  active = false,
-  disabled = false,
-  onClick,
-  children,
-}: {
-  label: string;
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-current={active ? "page" : undefined}
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex size-8 items-center justify-center rounded-full text-[13px] tabular-nums transition-colors disabled:opacity-30 ${
-        active
-          ? "bg-white/10 text-white"
-          : "text-neutral-400 enabled:hover:bg-white/6 enabled:hover:text-white"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function exportCsv(rows: Recipient[]) {
-  const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  const header = [
-    "Recipient ID",
-    "Name",
-    "Kind",
-    "Country",
-    "Bank",
-    "Account",
-    "Currency",
-    "Rail",
-    "Status",
-    "Paid to date",
-  ];
-  const lines = rows.map((r) =>
-    [
-      r.id,
-      esc(r.name),
-      r.kind,
-      esc(r.country),
-      esc(r.institution),
-      r.account ?? "",
-      r.currency,
-      r.rail,
-      r.status,
-      totalPaid(r).toFixed(2),
-    ].join(","),
-  );
-  const url = URL.createObjectURL(
-    new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv" }),
-  );
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "recipients.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function RecipientDrawer({
-  recipient: r,
-  onClose,
-  onPay,
-  onArchive,
-}: {
-  recipient: Recipient;
+  r: Recipient;
+  problem: Problem | null;
   onClose: () => void;
   onPay: () => void;
+  onEdit: () => void;
+  onFix: (p: Problem) => void;
   onArchive: () => void;
 }) {
-  const pending = r.status === "Pending";
-  const sent = r.payments.filter((p) => p.status === "Completed");
-  const totalSent = sent.reduce((sum, p) => sum + p.amount, 0);
-  const lastPaid = r.payments[0];
-
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || document.querySelector('[role="dialog"]'))
+        return;
+      onClose();
+    };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+  const paid = r.payments.filter((x) => x.status === "Completed");
+  const total = totalPaid(r);
+  const showSteps =
+    r.status === "Pending" && r.verification && p?.tone !== "bad";
 
   return (
-    <>
-      <div
-        className="scrim-in fixed inset-0 z-40 bg-[rgb(0_0_0/0.25)]"
-        onClick={onClose}
-        aria-hidden
-      />
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${r.name} recipient details`}
-        className="drawer-in sidebar-scroll fixed top-2 right-2 bottom-2 z-40 flex w-[400px] max-w-[calc(100vw-1rem)] flex-col overflow-y-auto rounded-xl border border-white/8 bg-surface-2 shadow-[0_24px_80px_-12px_rgb(0_0_0/0.45)]"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-end gap-1 px-4 pt-4">
-          <IconButton label="More actions">
-            <Ellipsis size={16} strokeWidth={1.75} />
-          </IconButton>
-          <IconButton label="Close" onClick={onClose}>
-            <X size={16} strokeWidth={1.75} />
-          </IconButton>
-        </div>
-
-        {/* Identity + primary action */}
-        <div className="px-6 pt-1">
-          <RecipientAvatar recipient={r} size={44} />
-          <h2 className="mt-4 text-[20px] font-medium tracking-[-0.015em] text-white">
+    <aside className="orbit-pop sidebar-scroll sticky top-6 max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-2xl border border-white/8 bg-surface">
+      <div className="flex items-start gap-3 px-5 pt-5">
+        <RecipientAvatar recipient={r} size={40} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[15px] font-medium text-white">
             {r.name}
-          </h2>
-          <p className="mt-1 flex items-center gap-2 text-[13px] text-neutral-500">
-            {r.kind} · {r.country}
-            <Status status={r.status} />
+          </div>
+          <div className="truncate text-[12px] text-neutral-500">
+            {flagOf(r.country)} {r.kind} · {r.country}
+          </div>
+          {r.email && (
+            <div className="mt-0.5 flex items-center gap-0.5 text-[12px] text-neutral-400">
+              <span className="truncate">{r.email}</span>
+              <CopyButton value={r.email} label="Copy email" />
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="flex size-7 shrink-0 items-center justify-center rounded-full text-neutral-500 hover:bg-white/8 hover:text-white"
+        >
+          <X size={14} strokeWidth={1.75} />
+        </button>
+      </div>
+
+      <div className="mt-4 flex items-center gap-2 px-5">
+        <button
+          type="button"
+          disabled={!!p}
+          onClick={onPay}
+          title={p ? `Can't pay yet: ${p.label.toLowerCase()}` : undefined}
+          className="flex h-8 items-center gap-1.5 rounded-full bg-white px-3.5 text-[13px] font-medium text-black hover:bg-neutral-200 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-neutral-500"
+        >
+          <Send size={13} strokeWidth={1.75} />
+          Pay
+        </button>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex h-8 items-center gap-1.5 rounded-full border border-white/12 px-3 text-[13px] text-neutral-200 hover:border-white/30 hover:text-white"
+        >
+          <Pencil size={12} strokeWidth={1.75} />
+          Edit
+        </button>
+        <span className="ml-auto">
+          <RowMenu
+            label="More"
+            items={[
+              {
+                label: "Copy recipient ID",
+                run: () => navigator.clipboard?.writeText(r.id).catch(() => {}),
+              },
+              { label: "Archive", run: onArchive, danger: true },
+            ]}
+          />
+        </span>
+      </div>
+
+      {p && (
+        <div className="mx-5 mt-5 border-t border-white/8 pt-4">
+          <div
+            className={`text-[13px] ${p.tone === "bad" ? "text-rose-300" : p.tone === "warn" ? "text-amber-200" : "text-neutral-200"}`}
+          >
+            {p.label}
+          </div>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-neutral-400">
+            {p.detail}
           </p>
-
-          <div className="mt-5 flex gap-2">
+          {p.fix && p.fixLabel && (
             <button
               type="button"
-              disabled={pending}
-              onClick={onPay}
-              title={
-                pending ? "Available once verification is complete" : undefined
-              }
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full bg-white text-[13px] font-medium text-black transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-neutral-500"
+              onClick={() => onFix(p)}
+              className="mt-3 h-8 rounded-full border border-white/12 px-3.5 text-[12.5px] text-neutral-100 hover:border-white/30"
             >
-              Send payment
-              <ArrowUpRight size={14} strokeWidth={2} />
+              {p.fixLabel}
             </button>
-            <button
-              type="button"
-              className="flex h-9 items-center gap-1.5 rounded-full border border-white/12 px-4 text-[13px] text-neutral-200 transition-colors hover:border-white/30"
-            >
-              <Pencil size={13} strokeWidth={1.75} />
-              Edit
-            </button>
-          </div>
-        </div>
-
-        {/* Pending: why it can't be paid yet. Active: how much has gone to them. */}
-        {pending && r.verification ? (
-          <Section title="Verification" className="mt-6">
-            <Stepper steps={r.verification} />
-          </Section>
-        ) : (
-          <Section title="Paid to date" className="mt-6">
-            <div className="text-[26px] leading-none font-medium tracking-[-0.02em] text-white tabular-nums">
-              <Roll value={amount(totalSent, r.currency)} />
+          )}
+          {showSteps && (
+            <div className="mt-4">
+              <Stepper steps={r.verification!} />
             </div>
-            <p className="mt-2 text-xs text-neutral-500 tabular-nums">
-              {sent.length === 0
-                ? "No payments yet"
-                : `${sent.length} ${sent.length === 1 ? "payment" : "payments"} · last on ${fullDateFmt.format(new Date(lastPaid.date))}`}
-            </p>
-          </Section>
-        )}
-
-        {/* Bank details */}
-        <Section title="Bank details" flush>
-          <DetailRow label="Account name" value={r.name} />
-          <DetailRow label="Bank" value={r.institution} />
-          <DetailRow
-            label={r.rail === "Swift" ? "IBAN / Account" : "Account number"}
-            value={r.account ?? "Not provided"}
-            copy={!!r.account}
-            mono
-          />
-          {r.routing && (
-            <DetailRow
-              label={r.routing.label}
-              value={r.routing.value}
-              copy
-              mono
-            />
           )}
-          <DetailRow
-            label="Currency · Rail"
-            value={`${r.currency} · ${r.rail}`}
-          />
-        </Section>
-
-        {/* Payments */}
-        {!pending && (
-          <Section
-            title="Payments"
-            action={r.payments.length ? "View all" : undefined}
-            flush
-          >
-            {r.payments.length === 0 && (
-              <p className="py-2 text-[13px] text-neutral-500">
-                Nothing sent to this recipient yet.
-              </p>
-            )}
-            {r.payments.slice(0, 5).map((p) => (
-              <PaymentRow key={p.id} payment={p} />
-            ))}
-          </Section>
-        )}
-
-        {/* Details */}
-        <Section title="Details" flush>
-          <DetailRow label="Recipient ID" value={r.id} copy mono />
-          {r.email && <DetailRow label="Email" value={r.email} copy />}
-          <DetailRow
-            label="Added"
-            value={`${fullDateFmt.format(new Date(r.createdAt))}, ${timeFmt.format(new Date(r.createdAt))} UTC`}
-          />
-        </Section>
-
-        <div className="mx-6 border-t border-white/7 pt-4 pb-6">
-          <button
-            type="button"
-            onClick={onArchive}
-            className="-mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-neutral-400 transition-colors hover:bg-white/4 hover:text-white"
-          >
-            <Archive size={14} strokeWidth={1.75} />
-            Archive recipient
-          </button>
         </div>
-      </aside>
-    </>
-  );
-}
+      )}
 
-function Stepper({ steps }: { steps: VerificationStep[] }) {
-  return (
-    <ol className="space-y-0">
-      {steps.map((s, i) => (
-        <li key={s.label} className="relative flex gap-3 pb-4 last:pb-0">
-          {i < steps.length - 1 && (
-            <span
-              aria-hidden
-              className={`absolute top-5 bottom-0 left-[9px] w-px ${s.state === "done" ? "bg-white/30" : "bg-white/8"}`}
-            />
-          )}
-          <span
-            aria-hidden
-            className={`relative z-10 mt-px flex size-[19px] shrink-0 items-center justify-center rounded-full ${
-              s.state === "done"
-                ? "bg-white text-black"
-                : s.state === "current"
-                  ? "border border-white/60 bg-surface-2"
-                  : "border border-white/12 bg-surface-2"
-            }`}
-          >
-            {s.state === "done" && <Check size={11} strokeWidth={3} />}
-          </span>
-          <div className="min-w-0">
-            <div
-              className={`text-[13px] ${s.state === "upcoming" ? "text-neutral-500" : "text-white"}`}
-            >
-              {s.label}
-              {s.state === "current" && (
-                <span className="ml-2 text-xs text-neutral-500">
-                  In progress
-                </span>
-              )}
-            </div>
-            {s.note && (
-              <p className="mt-1 text-xs leading-relaxed text-neutral-400">
-                {s.note}
-              </p>
-            )}
-          </div>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function PaymentRow({ payment: p }: { payment: RecipientPayment }) {
-  const d = new Date(p.date);
-  const failed = p.status === "Failed";
-  return (
-    <div className="flex items-center gap-3 py-2.5">
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] text-neutral-100">
-          {p.reference}
-        </span>
-        <span className="block truncate text-xs text-neutral-500 tabular-nums">
-          {dateFmt.format(d)} · {p.source}
-          {p.status === "Processing" && (
-            <span className="text-neutral-300"> · Processing</span>
-          )}
-          {failed && (
-            <span className="font-medium text-neutral-300"> · Failed</span>
-          )}
-        </span>
-        {p.failure && (
-          <span className="mt-1 block text-xs leading-relaxed whitespace-normal text-rose-300">
-            {p.failure}
-          </span>
-        )}
-      </span>
-      <span
-        className={`text-[13px] tabular-nums ${failed ? "text-neutral-600 line-through" : "text-neutral-100"}`}
+      <Section
+        title="Pays to"
+        action={r.account ? "Edit" : undefined}
+        onAction={onEdit}
       >
-        {amount(p.amount, p.currency)}
-      </span>
-    </div>
+        {r.account ? (
+          <dl className="space-y-2">
+            <Detail label="Bank" value={r.institution} />
+            <Detail
+              label={
+                r.rail === "Swift"
+                  ? "IBAN / account"
+                  : r.rail === "Local transfer"
+                    ? "RIB"
+                    : "Account"
+              }
+              value={r.account}
+              mono
+              copy
+            />
+            {r.routing && (
+              <Detail
+                label={r.routing.label}
+                value={r.routing.value}
+                mono
+                copy
+              />
+            )}
+            <Detail
+              label="Send by"
+              value={`${r.rail} · ${r.currency}`}
+              sub={`Arrives ${arrival[r.rail].toLowerCase()}`}
+            />
+          </dl>
+        ) : (
+          <p className="text-[12.5px] text-neutral-500">
+            No bank account yet
+            {r.invite ? " — they'll add it from the link." : "."}
+          </p>
+        )}
+      </Section>
+
+      <Section title="Payments">
+        {r.payments.length ? (
+          <>
+            <div className="mb-1 flex items-baseline justify-between text-[12px] text-neutral-500 tabular-nums">
+              <span>
+                {paid.length} {paid.length === 1 ? "payment" : "payments"}
+              </span>
+              <span className="amount text-neutral-200">
+                {amount(total, r.currency)} paid
+              </span>
+            </div>
+            <div className="divide-y divide-white/6">
+              {r.payments.slice(0, 6).map((x) => (
+                <PaymentRow key={x.id} payment={x} />
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="text-[12.5px] text-neutral-500">
+            Nothing sent yet{!p ? "." : ` — you can pay once this is sorted.`}
+          </p>
+        )}
+      </Section>
+
+      <div className="mx-5 flex items-center justify-between gap-3 border-t border-white/8 py-3.5 text-[11px] text-neutral-500">
+        <span className="flex min-w-0 items-center gap-0.5">
+          <span className="truncate font-mono">{r.id}</span>
+          <CopyButton value={r.id} label="Copy recipient ID" />
+        </span>
+        <span className="shrink-0">
+          Added {fullDateFmt.format(new Date(r.createdAt))}
+        </span>
+      </div>
+    </aside>
   );
 }
 
 function Section({
   title,
   action,
-  flush = false,
-  className = "",
+  onAction,
   children,
 }: {
   title: string;
   action?: string;
-  flush?: boolean;
-  className?: string;
+  onAction?: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <section className={`mx-6 border-t border-white/7 pt-5 pb-5 ${className}`}>
-      <div
-        className={`flex items-center justify-between ${flush ? "mb-1" : "mb-3"}`}
-      >
-        <h3 className="text-xs text-neutral-500">{title}</h3>
+    <section className="mx-5 mt-5 border-t border-white/8 pt-4 pb-1">
+      <div className="mb-2.5 flex items-center justify-between">
+        <h3 className="text-[12px] text-neutral-500">{title}</h3>
         {action && (
           <button
             type="button"
-            className="text-xs text-neutral-400 transition-colors hover:text-white"
+            onClick={onAction}
+            className="text-[12px] text-neutral-400 hover:text-white"
           >
             {action}
           </button>
@@ -1487,49 +958,177 @@ function Section({
   );
 }
 
-function IconButton({
+function Detail({
   label,
-  onClick,
-  children,
+  value,
+  sub,
+  mono = false,
+  copy = false,
 }: {
   label: string;
-  onClick?: () => void;
-  children: React.ReactNode;
+  value: string;
+  sub?: string;
+  mono?: boolean;
+  copy?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <dt className="shrink-0 pt-px text-[12px] text-neutral-500">{label}</dt>
+      <dd className="min-w-0 text-right">
+        <span className="flex min-w-0 items-center justify-end gap-0.5">
+          <span
+            title={value}
+            className={`truncate ${mono ? "font-mono text-[12px] text-neutral-200" : "text-[13px] text-neutral-100"}`}
+          >
+            {value}
+          </span>
+          {copy && (
+            <CopyButton value={value} label={`Copy ${label.toLowerCase()}`} />
+          )}
+        </span>
+        {sub && (
+          <span className="block text-[11px] text-neutral-500">{sub}</span>
+        )}
+      </dd>
+    </div>
+  );
+}
+
+function Stepper({ steps }: { steps: VerificationStep[] }) {
+  return (
+    <ol>
+      {steps.map((s, i) => (
+        <li key={s.label} className="relative flex gap-3 pb-3 last:pb-0">
+          {i < steps.length - 1 && (
+            <span
+              aria-hidden
+              className={`absolute top-5 bottom-0 left-[8px] w-px ${s.state === "done" ? "bg-white/30" : "bg-white/8"}`}
+            />
+          )}
+          <span
+            aria-hidden
+            className={`relative z-10 mt-px flex size-[17px] shrink-0 items-center justify-center rounded-full text-[10px] ${
+              s.state === "done"
+                ? "bg-white text-black"
+                : s.state === "current"
+                  ? "border border-white/60 bg-surface"
+                  : "border border-white/12 bg-surface"
+            }`}
+          >
+            {s.state === "done" ? "✓" : ""}
+          </span>
+          <span
+            className={`text-[12.5px] ${s.state === "upcoming" ? "text-neutral-500" : "text-neutral-100"}`}
+          >
+            {s.label}
+            {s.state === "current" && (
+              <span className="ml-1.5 text-neutral-500">· in progress</span>
+            )}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function PaymentRow({ payment: p }: { payment: RecipientPayment }) {
+  const failed = p.status === "Failed";
+  return (
+    <div className="py-2.5">
+      <div className="flex items-baseline gap-3">
+        <span className="min-w-0 flex-1 truncate text-[13px] text-neutral-100">
+          {p.reference}
+        </span>
+        <span
+          className={`amount shrink-0 text-[13px] tabular-nums ${failed ? "text-neutral-600 line-through" : "text-neutral-100"}`}
+        >
+          {amount(p.amount, p.currency)}
+        </span>
+      </div>
+      <div className="mt-0.5 truncate text-[11px] text-neutral-500 tabular-nums">
+        {dateFmt.format(new Date(p.date))} · {p.source}
+        {p.status === "Processing" && (
+          <span className="text-neutral-300"> · Sending</span>
+        )}
+        {failed && <span className="text-rose-300"> · Came back</span>}
+      </div>
+    </div>
+  );
+}
+
+function Checkbox({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
 }) {
   return (
     <button
       type="button"
+      role="checkbox"
+      aria-checked={checked}
       aria-label={label}
-      onClick={onClick}
-      className="flex size-7 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-white/6 hover:text-white"
+      onClick={onChange}
+      className={`flex size-4 items-center justify-center rounded-[4px] border transition-colors ${
+        checked
+          ? "border-white bg-white text-black"
+          : "border-white/25 hover:border-white/50"
+      }`}
     >
-      {children}
+      {checked && (
+        <svg viewBox="0 0 12 12" className="size-2.5" aria-hidden>
+          <path
+            d="M2.5 6.2 5 8.5l4.5-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      )}
     </button>
   );
 }
 
-function DetailRow({
-  label,
-  value,
-  copy = false,
-  mono = false,
-}: {
-  label: string;
-  value: string;
-  copy?: boolean;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-3 py-2">
-      <span className="w-28 shrink-0 text-xs text-neutral-500">{label}</span>
-      <span
-        className={`min-w-0 flex-1 truncate text-neutral-200 ${mono ? "font-mono text-[12px]" : "text-[13px]"}`}
-      >
-        {value}
-      </span>
-      {copy && (
-        <CopyButton value={value} label={`Copy ${label.toLowerCase()}`} />
-      )}
-    </div>
-  );
+function exportCsv(rows: Recipient[]) {
+  const head = [
+    "Name",
+    "Type",
+    "Country",
+    "Bank",
+    "Account",
+    "Routing / SWIFT",
+    "Currency",
+    "Rail",
+    "Total paid",
+    "Added",
+  ];
+  const cell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  const csv = [
+    head,
+    ...rows.map((r) => [
+      r.name,
+      r.kind,
+      r.country,
+      r.institution,
+      r.account ?? "",
+      r.routing?.value ?? "",
+      r.currency,
+      r.rail,
+      totalPaid(r),
+      r.createdAt,
+    ]),
+  ]
+    .map((r) => r.map(cell).join(","))
+    .join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "gravv-recipients.csv";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

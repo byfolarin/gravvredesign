@@ -39,10 +39,12 @@ export type Recipient = {
   verification?: VerificationStep[];
   /** Set when these bank details match another recipient. */
   duplicateOf?: string;
+  /** Asked to add their own bank details through a link. */
+  invite?: { email: string; link: string; sentAt: string };
   payments: RecipientPayment[];
 };
 
-const pendingSteps = (bank: string): VerificationStep[] => [
+export const pendingSteps = (bank: string): VerificationStep[] => [
   { label: "Details submitted", state: "done" },
   {
     label: "Bank account check",

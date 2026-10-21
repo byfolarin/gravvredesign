@@ -199,8 +199,8 @@ export function SettlementSheet({
         )}
         {draft ? (
           <div
-            onInputCapture={() => setTouched(true)}
-            onChangeCapture={() => setTouched(true)}
+            onInputCapture={() => setTimeout(() => setTouched(true), 0)}
+            onChangeCapture={() => setTimeout(() => setTouched(true), 0)}
           >
             <SsiForm
               draft={draft}

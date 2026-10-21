@@ -1407,7 +1407,8 @@ export function CreateFlow({
         '[role="radio"],[role="switch"],[role="checkbox"],[role="option"]',
       )
     )
-      setDirty(true);
+      // After the keystroke lands, or the first character typed is dropped.
+      setTimeout(() => setDirty(true), 0);
   };
   const props = {
     ...rest,

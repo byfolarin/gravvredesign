@@ -24,7 +24,7 @@ type Step = "recipient" | "amount" | "review" | "sent";
 // Indicative USD → payout currency rates for the prototype.
 const fx: Record<string, number> = { USD: 1, MAD: 9.18 };
 
-const arrival: Record<Rail, string> = {
+export const arrival: Record<Rail, string> = {
   ACH: "In 1–2 business days",
   Wire: "Today, if sent before 4pm ET",
   Swift: "In 1–2 business days",
