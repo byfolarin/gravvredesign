@@ -2,9 +2,6 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
-  ArrowDownLeft,
-  ArrowLeftRight,
-  ArrowUpRight,
   ChevronDown,
   ArrowUpDown,
   Check,
@@ -31,7 +28,6 @@ import {
   type TxnType,
 } from "../_data";
 import { Roll } from "@/app/_components/roll";
-import { toneClass, type Tone } from "@/app/_components/tone";
 
 type Tab = "All" | TxnStatus;
 const TABS: Tab[] = ["All", "Completed", "Pending", "Failed"];
@@ -445,8 +441,7 @@ export function TransactionsTable({ initial }: { initial: Transaction[] }) {
                       )}
                     </td>
                     <td className={`${cell} pr-4`}>
-                      <div className="flex min-w-0 items-center gap-3">
-                        <KindMark type={t.type} />
+                      <div className="flex min-w-0 items-center">
                         <div className="min-w-0">
                           <div className="truncate font-medium text-white">
                             {t.type}
@@ -790,28 +785,6 @@ function Status({ status }: { status: TxnStatus }) {
       className={`inline-flex h-6 items-center rounded-full border px-2.5 text-xs leading-none font-medium ${tone}`}
     >
       {status}
-    </span>
-  );
-}
-
-/** What kind of movement it is, at a glance: money in mint, out blue, conversions violet, crypto by network colour. */
-const KIND: Record<
-  Transaction["type"],
-  { tone: Tone; Icon: typeof ArrowDownLeft }
-> = {
-  "Account Funding": { tone: "mint", Icon: ArrowDownLeft },
-  Payout: { tone: "blue", Icon: ArrowUpRight },
-  Offramp: { tone: "sky", Icon: ArrowUpRight },
-  "Crypto Transfer": { tone: "violet", Icon: ArrowLeftRight },
-};
-function KindMark({ type }: { type: Transaction["type"] }) {
-  const k = KIND[type] ?? { tone: "grey" as Tone, Icon: ArrowLeftRight };
-  return (
-    <span
-      aria-hidden
-      className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${toneClass(k.tone)}`}
-    >
-      <k.Icon size={15} strokeWidth={1.9} />
     </span>
   );
 }

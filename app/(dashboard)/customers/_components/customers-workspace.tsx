@@ -1,6 +1,7 @@
 "use client";
 
 import { toneClass, toneFor } from "@/app/_components/tone";
+import { photoOf } from "@/app/_components/person-avatar";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -763,11 +764,25 @@ export function Avatar({
     .map((w) => w[0])
     .join("")
     .toUpperCase();
+  // People get a real face; businesses keep their initials on their own tint.
+  if (kind !== "Business")
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- remote placeholder portraits
+      <img
+        src={photoOf(name)}
+        alt=""
+        width={size}
+        height={size}
+        loading="lazy"
+        className="shrink-0 rounded-full bg-white/[0.06] object-cover"
+        style={{ width: size, height: size }}
+      />
+    );
   return (
     <span
       aria-hidden
       style={{ width: size, height: size, fontSize: Math.round(size * 0.34) }}
-      className={`flex shrink-0 items-center justify-center font-medium ${toneClass(toneFor(name))} ${kind === "Business" ? (size > 36 ? "rounded-xl" : "rounded-lg") : "rounded-full"}`}
+      className={`flex shrink-0 items-center justify-center font-medium ${toneClass(toneFor(name))} ${size > 36 ? "rounded-xl" : "rounded-lg"}`}
     >
       {initials}
     </span>

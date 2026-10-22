@@ -20,10 +20,54 @@ const PHOTOS: Record<string, string> = {
   "Hannah Kim": "women/57",
 };
 
-export const photoOf = (name: string) =>
-  PHOTOS[name]
-    ? `https://randomuser.me/api/portraits/${PHOTOS[name]}.jpg`
-    : undefined;
+// First names in the prototype's data that belong to women, so each portrait matches.
+const FEMALE = new Set([
+  "Ada",
+  "Grace",
+  "Sarah",
+  "Amara",
+  "Zainab",
+  "Fatima",
+  "Funke",
+  "Aisha",
+  "Hannah",
+  "Lola",
+  "Esther",
+  "Nadia",
+  "Mariam",
+  "Rita",
+  "Ifeoma",
+  "Jacinta",
+  "Ngozi",
+  "Chioma",
+  "Priya",
+  "Lena",
+  "Sofia",
+  "Amaka",
+  "Bisi",
+  "Kemi",
+  "Yetunde",
+  "Adaeze",
+  "Wanjiku",
+  "Ama",
+  "Efua",
+  "Nneka",
+  "Halima",
+  "Maryam",
+  "Mei",
+  "Ivy",
+  "Nia",
+]);
+
+/** A real face for every person: their set photo, or a stable one picked from their name. */
+export const photoOf = (name: string) => {
+  if (PHOTOS[name])
+    return `https://randomuser.me/api/portraits/${PHOTOS[name]}.jpg`;
+  let h = 2166136261;
+  for (const ch of name) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  const set = FEMALE.has(name.split(" ")[0]) ? "women" : "men";
+  return `https://randomuser.me/api/portraits/${set}/${h % 96}.jpg`;
+};
 
 const initials = (name: string) =>
   name
