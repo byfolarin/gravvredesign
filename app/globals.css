@@ -508,7 +508,7 @@ html { zoom: var(--app-zoom); }
 
 /* Every table's heading sits on a grey band, so it reads apart from the body. */
 .content-theme thead > tr {
-  background: color-mix(in oklab, var(--color-white) 5.5%, transparent);
+  background: color-mix(in oklab, var(--color-white) 3%, transparent);
 }
 .content-theme thead th {
   font-weight: 500;
