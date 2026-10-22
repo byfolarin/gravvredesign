@@ -479,7 +479,6 @@ export function AccountsWorkspace() {
               <div className="grid gap-3">
                 <SideFact
                   label="Active accounts"
-                  tone={active ? "mint" : undefined}
                   value={
                     <>
                       <Roll value={active.toLocaleString("en-US")} />
@@ -504,7 +503,6 @@ export function AccountsWorkspace() {
                 />
                 <SideFact
                   label="Being provisioned"
-                  tone={count("Needs action") ? "amber" : "blue"}
                   value={<Roll value={String(pending.length)} />}
                   note={
                     count("Needs action")
