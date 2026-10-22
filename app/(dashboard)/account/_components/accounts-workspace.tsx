@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -9,6 +10,8 @@ import {
   Copy,
   Download,
   EllipsisVertical,
+  Eye,
+  FileText,
   Pencil,
   Plus,
   Search,
@@ -150,6 +153,7 @@ function Money({
 }
 
 export function AccountsWorkspace() {
+  const router = useRouter();
   const [list, setList] = useState(ALL);
   // Prototype: show the page as a new account, with problems, or loading.
   const [view, setView] = useState<View>("filled");
@@ -463,7 +467,7 @@ export function AccountsWorkspace() {
                     },
                     {
                       tab: "Pending",
-                      label: "Provisioning",
+                      label: "Pending",
                       n: count("Pending"),
                       color: "var(--color-blue-400)",
                     },
@@ -723,6 +727,18 @@ export function AccountsWorkspace() {
                               update(a.id, { status: "Closed", balance: 0 });
                               setToast("Account closed");
                             }}
+                            onDetails={() => setSheetId(a.id)}
+                            onApplication={() => {
+                              setSection("applications");
+                              setToast(
+                                `Application for ${a.label} · ${a.customer.name}`,
+                              );
+                            }}
+                            onTransactions={() =>
+                              router.push(
+                                `/transactions?q=${encodeURIComponent(a.customer.name)}`,
+                              )
+                            }
                           />
                         </td>
                       </tr>
@@ -808,7 +824,7 @@ export function AccountsWorkspace() {
   );
 }
 
-/** Same chip system as the rest of the platform. Pending reads as "Provisioning" — that's what's happening. */
+/** Same chip system as the rest of the platform. */
 function Status({ account: a }: { account: Account }) {
   if (a.problem?.kind === "needs-info" || a.problem?.kind === "rejected")
     return (
@@ -822,7 +838,7 @@ function Status({ account: a }: { account: Account }) {
         {a.problem.kind === "rejected" ? "Declined" : "Needs info"}
       </span>
     );
-  const label = a.status === "Pending" ? "Provisioning" : a.status;
+  const label = a.status;
   const tone =
     a.status === "Active"
       ? "border-transparent bg-[var(--ok-bg)] text-[var(--ok-fg)]"
@@ -1880,6 +1896,9 @@ function RowMenu({
   onRename,
   onFreeze,
   onClose,
+  onDetails,
+  onApplication,
+  onTransactions,
 }: {
   account: Account;
   onCopy: () => void;
@@ -1887,6 +1906,9 @@ function RowMenu({
   onRename: () => void;
   onFreeze: () => void;
   onClose: () => void;
+  onDetails: () => void;
+  onApplication: () => void;
+  onTransactions: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -1908,24 +1930,34 @@ function RowMenu({
     fn();
   };
   const live = a.status === "Active" || a.status === "Frozen";
-  const items = [
-    ...(a.status !== "Pending"
-      ? [{ label: "Copy account details", icon: Copy, onClick: onCopy }]
-      : []),
-    ...(a.status === "Active"
-      ? [{ label: "Transfer", icon: ArrowLeftRight, onClick: onTransfer }]
-      : []),
-    { label: "Rename", icon: Pencil, onClick: onRename },
-    ...(live
+  // While the bank is still opening it: look, don't act.
+  const items =
+    a.status === "Pending"
       ? [
+          { label: "View details", icon: Eye, onClick: onDetails },
+          { label: "View application", icon: FileText, onClick: onApplication },
           {
-            label: a.status === "Frozen" ? "Unfreeze" : "Freeze",
-            icon: Snowflake,
-            onClick: onFreeze,
+            label: "View transactions",
+            icon: ArrowLeftRight,
+            onClick: onTransactions,
           },
         ]
-      : []),
-  ];
+      : [
+          { label: "Copy account details", icon: Copy, onClick: onCopy },
+          ...(a.status === "Active"
+            ? [{ label: "Transfer", icon: ArrowLeftRight, onClick: onTransfer }]
+            : []),
+          { label: "Rename", icon: Pencil, onClick: onRename },
+          ...(live
+            ? [
+                {
+                  label: a.status === "Frozen" ? "Unfreeze" : "Freeze",
+                  icon: Snowflake,
+                  onClick: onFreeze,
+                },
+              ]
+            : []),
+        ];
   return (
     <div ref={root} className="relative">
       <button
@@ -1959,7 +1991,7 @@ function RowMenu({
               {it.label}
             </button>
           ))}
-          {a.status !== "Closed" && (
+          {a.status !== "Closed" && a.status !== "Pending" && (
             <div className="mt-1 border-t border-white/8 pt-1">
               <button
                 type="button"

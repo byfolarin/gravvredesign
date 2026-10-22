@@ -88,6 +88,17 @@ export function TransactionsTable({ initial }: { initial: Transaction[] }) {
   const [type, setType] = useState<"All" | TxnType>("All");
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<Scope>("Customer ID");
+  // Arriving from another page with ?q= (e.g. an account's "View transactions"): search for it.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const q = new URLSearchParams(window.location.search).get("q");
+      if (q) {
+        setScope("Customer ID");
+        setQuery(q);
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
   const [openId, setOpenId] = useState<string | null>(null);
   // "View all details" opens the full record in a side sheet.
   const [sheetId, setSheetId] = useState<string | null>(null);
