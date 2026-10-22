@@ -413,7 +413,7 @@ export function CardsWorkspace({
                 <span
                   className={`text-xs tabular-nums ${filter === f ? "text-neutral-400" : "text-neutral-600"}`}
                 >
-                  <Roll value={String(count(f))} />
+                  {String(count(f))}
                 </span>
               </button>
             ))}

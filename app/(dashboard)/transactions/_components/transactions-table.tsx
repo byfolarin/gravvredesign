@@ -292,7 +292,7 @@ export function TransactionsTable({ initial }: { initial: Transaction[] }) {
                 <span
                   className={`text-xs tabular-nums ${tab === s ? "text-neutral-400" : "text-neutral-600"}`}
                 >
-                  <Roll value={String(count(s))} />
+                  {String(count(s))}
                 </span>
               </button>
             ))}

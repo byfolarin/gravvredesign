@@ -337,7 +337,7 @@ export function CustomersWorkspace() {
                 <span
                   className={`text-xs tabular-nums ${tab === t ? "text-neutral-400" : "text-neutral-600"}`}
                 >
-                  <Roll value={compact(tabCount(t))} />
+                  {compact(tabCount(t))}
                 </span>
               </button>
             ))}

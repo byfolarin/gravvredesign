@@ -480,7 +480,7 @@ export function LinksWorkspace() {
                   <span
                     className={`text-xs tabular-nums ${status === t ? "text-neutral-400" : "text-neutral-600"}`}
                   >
-                    <Roll value={String(count(t))} />
+                    {String(count(t))}
                   </span>
                 </button>
               ),

@@ -388,7 +388,7 @@ export function AccountsWorkspace() {
               {label}
               {view !== "loading" && (
                 <span className="text-xs text-neutral-500 tabular-nums">
-                  <Roll value={n.toLocaleString("en-US")} />
+                  {n.toLocaleString("en-US")}
                 </span>
               )}
             </button>
@@ -562,7 +562,7 @@ export function AccountsWorkspace() {
                     <span
                       className={`text-xs tabular-nums ${tab === t ? "text-neutral-400" : "text-neutral-600"}`}
                     >
-                      <Roll value={count(t).toLocaleString("en-US")} />
+                      {count(t).toLocaleString("en-US")}
                     </span>
                   </button>
                 ))}

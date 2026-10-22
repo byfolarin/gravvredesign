@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
-import { Roll } from "@/app/_components/roll";
 import { SEND_EVENT } from "@/app/_components/top-bar";
 import { RowMenu } from "@/app/(dashboard)/trade-desk/_components/order-extras";
 import { RecipientAvatar } from "./recipient-avatar";
@@ -332,9 +331,7 @@ export function RecipientsWorkspace({
                         : "text-neutral-600"
                   }`}
                 >
-                  <Roll
-                    value={String(scoped.filter((r) => inTab(r, t)).length)}
-                  />
+                  {scoped.filter((r) => inTab(r, t)).length}
                 </span>
               </button>
             ))}

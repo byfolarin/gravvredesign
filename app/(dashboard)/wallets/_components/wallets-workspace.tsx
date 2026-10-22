@@ -1060,7 +1060,7 @@ export function WalletsWorkspace({
                   <span
                     className={`text-xs tabular-nums ${segment === s ? "text-neutral-400" : "text-neutral-600"}`}
                   >
-                    <Roll value={String(count(s))} />
+                    {String(count(s))}
                   </span>
                 </button>
               ),
