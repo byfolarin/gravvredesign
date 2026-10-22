@@ -18,17 +18,6 @@ export type Update = {
 
 export const UPDATES: Update[] = [
   {
-    id: "u-overview",
-    date: "2026-10-22",
-    area: "Overview",
-    title: "Overview now starts with what needs you",
-    body: "Approvals, disputes, stuck settlements and blocked recipients sit at the top, with the money and the risk attached — act without hunting for them.",
-    image: "/updates/needs-you.png",
-    href: "/",
-    cta: "See your overview",
-    glow: ["#00ffb4", "#3b82f6"],
-  },
-  {
     id: "u-funnel",
     date: "2026-10-20",
     area: "Card collection",
