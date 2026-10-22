@@ -5,11 +5,13 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Copy,
   Download,
   EllipsisVertical,
+  Layers,
   Pencil,
   Plus,
   Search,
@@ -289,10 +291,12 @@ export function AccountsWorkspace() {
 
   // ——— Facts ———
   // Balance in the selected currency (USD when "All"), across the accounts in scope.
-  const balanceCurrency: Currency = currency === "All" ? shown[0] : currency;
+  // "All" shows the total across every currency; a currency shows just that one.
+  const isAll = currency === "All";
+  const balanceCurrency: Currency = isAll ? shown[0] : currency;
   const funded = scoped.filter(
     (a) =>
-      a.currency === balanceCurrency &&
+      (isAll || a.currency === balanceCurrency) &&
       (a.status === "Active" || a.status === "Frozen"),
   );
   const total = funded.reduce((s, a) => s + a.balance, 0);
@@ -456,9 +460,8 @@ export function AccountsWorkspace() {
               <BalancePanel
                 total={total}
                 totals={totals}
+                all={isAll}
                 currency={balanceCurrency}
-                currencies={shown}
-                onCurrencies={saveShown}
                 counts={
                   Object.fromEntries(
                     ALL_CURRENCIES.map((c) => [
@@ -1353,25 +1356,25 @@ const compactMoney = (v: number) =>
  * line, and a strip of daily net change gives the shape its reasons.
  */
 function BalancePanel({
-  total,
+  total: oneTotal,
   totals,
-  currency,
-  currencies,
+  all,
+  currency: oneCurrency,
   onCurrency,
-  onCurrencies,
   counts,
   onOpenAccount,
   funded,
   waiting,
   accountsNote,
 }: {
+  /** Balance in `currency` (used when one currency is picked). */
   total: number;
-  /** Balance per currency, for the row of balances. */
+  /** Balance per currency, across every account. */
   totals: Record<Currency, number>;
+  /** Show the total across all currencies, converted to one. */
+  all: boolean;
   currency: Currency;
-  currencies: Currency[];
-  onCurrency: (c: Currency) => void;
-  onCurrencies: (next: Currency[]) => void;
+  onCurrency: (c: Currency | "All") => void;
   counts: Record<Currency, number>;
   onOpenAccount: (c: Currency) => void;
   /** Accounts holding a balance in this currency; 0 shows the empty state. */
@@ -1393,6 +1396,18 @@ function BalancePanel({
     return () => clearTimeout(t);
   }, []);
 
+  // The total, in the display currency the user picks (at today's rates).
+  const [showIn, setShowIn] = useState<"USD" | "EUR" | "GBP">("USD");
+  const usdOf = (c: Currency, v: number) => v * TO_USD[c];
+  const grandUsd = ALL_CURRENCIES.reduce(
+    (sum, c) => sum + usdOf(c, totals[c]),
+    0,
+  );
+  const held = ALL_CURRENCIES.filter((c) => totals[c] > 0).sort(
+    (a, b) => usdOf(b, totals[b]) - usdOf(a, totals[a]),
+  );
+  const currency: Currency = all ? showIn : oneCurrency;
+  const total = all ? grandUsd / TO_USD[showIn] : oneTotal;
   const { current, previous } = balanceHistory(total, currency, period);
   const n = current.length;
   const i = hover ?? n - 1;
@@ -1420,36 +1435,39 @@ function BalancePanel({
 
   return (
     <section className="min-w-0 pt-1 pr-4">
-      <BalanceRow
-        currencies={currencies}
-        currency={currency}
-        totals={totals}
-        counts={counts}
-        period={period}
-        onCurrency={onCurrency}
-        editor={
-          <CurrencyEditor
-            value={currencies}
-            counts={counts}
-            onChange={onCurrencies}
-            onOpenAccount={onOpenAccount}
-          />
-        }
-      />
-      <div className="mt-7 flex items-end justify-between gap-6">
+      <div className="flex items-end justify-between gap-6">
         <div className="min-w-0">
-          <div className="text-[13px] text-neutral-500">
-            {NAMES[currency]} balance
-          </div>
-          <div className="amount mt-1.5 text-[34px] leading-none font-medium tracking-[-0.035em] text-white tabular-nums">
-            {SYMBOL[currency]}
-            {whole}
-            {cents && (
-              <sup className="ml-px align-[0.55em] text-[0.5em] font-normal tracking-normal text-neutral-500">
-                .{cents}
-              </sup>
+          <div className="flex items-center gap-2 text-[13px] text-neutral-500">
+            <span>{all ? "Total balance" : `${NAMES[currency]} balance`}</span>
+            {all && (
+              <Dropdown
+                label="Show total in"
+                variant="compact"
+                value={showIn}
+                options={(["USD", "EUR", "GBP"] as const).map((c) => ({
+                  value: c,
+                  label: `in ${c}`,
+                  icon: (
+                    <span className="text-[12px] leading-none">{FLAGS[c]}</span>
+                  ),
+                }))}
+                onChange={setShowIn}
+              />
             )}
           </div>
+          <BalancePicker
+            all={all}
+            currency={currency}
+            whole={whole}
+            cents={cents}
+            held={held}
+            totals={totals}
+            counts={counts}
+            grand={grandUsd / TO_USD[showIn]}
+            showIn={showIn}
+            shareOf={(c) => (grandUsd ? usdOf(c, totals[c]) / grandUsd : 0)}
+            onPick={onCurrency}
+          />
           <div className="mt-2.5 flex h-5 items-center gap-2 text-[12px] text-neutral-500 tabular-nums">
             {funded === 0 ? (
               <span>
@@ -1470,7 +1488,10 @@ function BalancePanel({
                   {Math.abs(vsPrev * 100).toFixed(1)}%
                 </span>
                 <span>
-                  vs previous {period} days · {accountsNote}
+                  vs previous {period} days ·{" "}
+                  {all
+                    ? `${held.length} currencies at today's rates`
+                    : accountsNote}
                 </span>
               </>
             ) : (
@@ -1705,194 +1726,53 @@ function BalancePanel({
   );
 }
 
+/** Today's rates to USD, for the total (indicative — the prototype has no live FX). */
+const TO_USD: Record<Currency, number> = {
+  USD: 1,
+  EUR: 1.08,
+  GBP: 1.27,
+  NGN: 1 / 1610,
+  JPY: 1 / 151,
+  CAD: 0.73,
+  AUD: 0.66,
+  CHF: 1.12,
+  KES: 1 / 129,
+  GHS: 1 / 15.6,
+  ZAR: 1 / 18.2,
+  AED: 0.272,
+};
+
 /**
- * Balances up front, like Gravv's own page — but only the chosen few (max 4). Each is the
- * switch for the chart below. Everything else you hold sits behind "+N more", largest
- * first; picking one shows it in the row until you pick another.
+ * The big number, with the switch built into it (Revolut Business pattern): ▾ lists All
+ * currencies and each currency held — balance, accounts, share of the total, largest first.
+ * Twelve currencies fit as easily as three.
  */
-function BalanceRow({
-  currencies,
+function BalancePicker({
+  all,
   currency,
+  whole,
+  cents,
+  held,
   totals,
   counts,
-  period,
-  onCurrency,
-  editor,
+  grand,
+  showIn,
+  shareOf,
+  onPick,
 }: {
-  currencies: Currency[];
+  all: boolean;
   currency: Currency;
+  whole: string;
+  cents?: string;
+  held: Currency[];
   totals: Record<Currency, number>;
   counts: Record<Currency, number>;
-  period: Period;
-  onCurrency: (c: Currency) => void;
-  editor: React.ReactNode;
-}) {
-  const [more, setMore] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!more) return;
-    const down = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setMore(false);
-    };
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setMore(false);
-    document.addEventListener("mousedown", down);
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("mousedown", down);
-      document.removeEventListener("keydown", key);
-    };
-  }, [more]);
-
-  // The row: the chosen currencies, plus the one being looked at if it came from "more".
-  const row = currencies.includes(currency)
-    ? currencies
-    : [...currencies, currency];
-  const rest = ALL_CURRENCIES.filter(
-    (c) => !row.includes(c) && counts[c] > 0,
-  ).sort((a, b) => counts[b] - counts[a]);
-  const change = (c: Currency) => {
-    const { previous } = balanceHistory(totals[c], c, period);
-    const before = previous[previous.length - 1];
-    return before ? (totals[c] - before) / before : 0;
-  };
-
-  return (
-    <div className="flex items-stretch border-y border-white/8">
-      <div
-        role="tablist"
-        aria-label="Balances"
-        className="grid min-w-0 flex-1"
-        style={{ gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))` }}
-      >
-        {row.map((c, i) => {
-          const on = c === currency;
-          const d = change(c);
-          return (
-            <button
-              key={c}
-              type="button"
-              role="tab"
-              aria-selected={on}
-              onClick={() => onCurrency(c)}
-              className={`relative min-w-0 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.02] ${i ? "border-l border-white/8" : "pl-0"}`}
-            >
-              <span className="flex items-center gap-1.5 text-[12px] text-neutral-500">
-                <span className="text-[13px] leading-none">{FLAGS[c]}</span>
-                {c}
-              </span>
-              <span
-                className={`amount mt-1.5 block truncate text-[18px] font-medium tracking-[-0.015em] tabular-nums ${on ? "text-white" : "text-neutral-400"}`}
-              >
-                {totals[c] ? compactIn(c, totals[c]) : "—"}
-              </span>
-              <span
-                className={`mt-0.5 block text-[11.5px] tabular-nums ${
-                  !totals[c]
-                    ? "text-neutral-600"
-                    : d >= 0
-                      ? "text-[var(--ok-fg)]"
-                      : "text-neutral-500"
-                }`}
-              >
-                {totals[c]
-                  ? `${d >= 0 ? "+" : "−"}${Math.abs(d * 100).toFixed(1)}%`
-                  : "No balance"}
-              </span>
-              {/* The one the chart shows: an ink line along the bottom, like our tabs */}
-              {on && (
-                <span
-                  aria-hidden
-                  className="absolute inset-x-4 -bottom-px h-[2px] rounded-full bg-white"
-                  style={i ? undefined : { left: 0 }}
-                />
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      <div
-        ref={ref}
-        className="relative flex shrink-0 items-center border-l border-white/8 pl-4"
-      >
-        {rest.length > 0 && (
-          <button
-            type="button"
-            aria-expanded={more}
-            onClick={() => setMore((v) => !v)}
-            className="flex items-center gap-2 rounded-full px-2.5 py-1.5 text-[12.5px] text-neutral-400 transition-colors hover:bg-white/[0.04] hover:text-white"
-          >
-            <span className="flex -space-x-0.5 text-[12px] leading-none">
-              {rest.slice(0, 3).map((c) => (
-                <span key={c}>{FLAGS[c]}</span>
-              ))}
-            </span>
-            +{rest.length} more
-          </button>
-        )}
-        {editor}
-        {more && (
-          <div className="orbit-pop absolute top-full right-0 z-30 mt-2 w-[280px] rounded-xl border border-white/10 bg-raised p-1.5 shadow-[0_20px_50px_-12px_rgb(0_0_0/0.5)]">
-            <div className="px-2.5 pt-1.5 pb-2 text-[11.5px] text-neutral-500">
-              Other balances · most accounts first
-            </div>
-            {rest.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => {
-                  onCurrency(c);
-                  setMore(false);
-                }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-white/[0.06]"
-              >
-                <span className="text-[15px] leading-none">{FLAGS[c]}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] text-white">{c}</span>
-                  <span className="block truncate text-[11.5px] text-neutral-500">
-                    {NAMES[c]} · {counts[c]}{" "}
-                    {counts[c] === 1 ? "account" : "accounts"}
-                  </span>
-                </span>
-                <span className="amount text-[13px] text-neutral-200 tabular-nums">
-                  {totals[c] ? compactIn(c, totals[c]) : "—"}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Short money for the strip: $32.18M, ₦2.51B, £940K. */
-function compactIn(c: Currency, v: number) {
-  return `${SYMBOL[c]}${new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: 2,
-  }).format(v)}`;
-}
-
-/**
- * Choose which currencies the balance can switch between — up to four, in the order
- * picked. Opens from a quiet button beside the switch; at the limit, the rest wait
- * until one is removed.
- */
-function CurrencyEditor({
-  value,
-  counts,
-  onChange,
-  onOpenAccount,
-}: {
-  value: Currency[];
-  counts: Record<Currency, number>;
-  onChange: (next: Currency[]) => void;
-  /** Currencies with no account go through opening one first. */
-  onOpenAccount: (c: Currency) => void;
+  grand: number;
+  showIn: Currency;
+  shareOf: (c: Currency) => number;
+  onPick: (c: Currency | "All") => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -1907,140 +1787,120 @@ function CurrencyEditor({
       document.removeEventListener("keydown", key);
     };
   }, [open]);
-
-  const full = value.length >= MAX_SHOWN;
-  const needle = q.trim().toLowerCase();
-  const match = (c: Currency) =>
-    !needle ||
-    c.toLowerCase().includes(needle) ||
-    NAMES[c].toLowerCase().includes(needle);
-  const rest = ALL_CURRENCIES.filter((c) => !value.includes(c) && match(c));
-  const toggle = (c: Currency) => {
-    if (value.includes(c)) {
-      if (value.length > 1) onChange(value.filter((x) => x !== c));
-    } else if (!full) {
-      if (counts[c] === 0) {
-        setOpen(false);
-        onOpenAccount(c);
-      } else onChange([...value, c]);
-    }
+  const pick = (c: Currency | "All") => {
+    onPick(c);
+    setOpen(false);
   };
-
-  const row = (c: Currency, on: boolean) => {
-    const locked = on ? value.length === 1 : full;
-    return (
+  return (
+    <div ref={ref} className="relative mt-1.5">
       <button
-        key={c}
         type="button"
-        role="menuitemcheckbox"
-        aria-checked={on}
-        aria-disabled={locked}
-        onClick={() => toggle(c)}
-        title={
-          on && locked
-            ? "Keep at least one currency"
-            : !on && locked
-              ? `Remove one to add ${c}`
-              : !on && counts[c] === 0
-                ? `Open a ${c} account to add it`
-                : undefined
-        }
-        className={`group flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors ${
-          locked && !on ? "cursor-default opacity-40" : "hover:bg-white/[0.06]"
-        }`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="group -mx-2 flex items-center gap-2.5 rounded-xl px-2 py-1 text-left transition-colors hover:bg-white/[0.04]"
       >
-        <span className="text-[15px] leading-none">{FLAGS[c]}</span>
-        <span className="w-9 font-medium text-white">{c}</span>
-        <span className="min-w-0 flex-1 truncate text-neutral-500">
-          {NAMES[c]}
-        </span>
-        <span className="text-[11px] text-neutral-500 tabular-nums">
-          {counts[c] ? counts[c].toLocaleString("en-US") : "No account"}
-        </span>
-        <span className="flex size-4 items-center justify-center">
-          {on ? (
-            <Check size={14} strokeWidth={2} className="text-white" />
-          ) : counts[c] === 0 ? (
-            <ChevronRight
-              size={13}
-              strokeWidth={1.75}
-              className="text-neutral-500 opacity-0 group-hover:opacity-100"
-            />
-          ) : (
-            <Plus
-              size={13}
-              strokeWidth={1.75}
-              className="text-neutral-500 opacity-0 group-hover:opacity-100"
-            />
+        {!all && (
+          <span className="text-[26px] leading-none">{FLAGS[currency]}</span>
+        )}
+        <span className="amount text-[34px] leading-none font-medium tracking-[-0.035em] text-white tabular-nums">
+          {SYMBOL[currency]}
+          {whole}
+          {cents && (
+            <sup className="ml-px align-[0.55em] text-[0.5em] font-normal tracking-normal text-neutral-500">
+              .{cents}
+            </sup>
           )}
         </span>
-      </button>
-    );
-  };
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        aria-label="Edit currencies"
-        aria-expanded={open}
-        title="Edit currencies"
-        onClick={() => {
-          setOpen((o) => !o);
-          setQ("");
-        }}
-        className={`flex size-6 items-center justify-center rounded-full transition-colors ${
-          open
-            ? "bg-white/[0.08] text-white"
-            : "text-neutral-500 hover:bg-white/[0.06] hover:text-white"
-        }`}
-      >
-        <Pencil size={11} strokeWidth={1.75} />
+        <ChevronDown
+          size={20}
+          strokeWidth={1.75}
+          className={`text-neutral-500 transition-transform group-hover:text-white ${open ? "rotate-180" : ""}`}
+        />
       </button>
       {open && (
         <div
-          role="menu"
-          className="absolute top-full left-0 z-30 mt-2 w-[300px] rounded-xl border border-white/10 bg-surface p-1.5 shadow-[0_12px_32px_-8px_rgb(0_0_0/0.35)]"
+          role="listbox"
+          aria-label="Balance"
+          className="orbit-pop absolute top-full left-0 z-30 mt-2 w-[340px] rounded-xl border border-white/10 bg-raised p-1.5 shadow-[0_20px_50px_-12px_rgb(0_0_0/0.5)]"
         >
-          <div className="flex items-baseline justify-between px-2 pt-1.5 pb-2">
-            <span className="text-[13px] font-medium text-white">
-              Currencies on balance
+          <button
+            type="button"
+            role="option"
+            aria-selected={all}
+            onClick={() => pick("All")}
+            className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left hover:bg-white/[0.06]"
+          >
+            <span className="flex size-7 items-center justify-center rounded-full bg-white/[0.08] text-neutral-300">
+              <Layers size={14} strokeWidth={1.75} />
             </span>
-            <span className="text-[11px] text-neutral-500 tabular-nums">
-              {value.length} of {MAX_SHOWN}
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] text-white">
+                All currencies
+              </span>
+              <span className="block text-[11.5px] text-neutral-500">
+                {held.length} currencies · total in {showIn}
+              </span>
             </span>
-          </div>
-          {value.map((c) => row(c, true))}
-          <div className="mx-2 my-1.5 h-px bg-white/[0.07]" />
-          <label className="mx-1 mb-1 flex h-8 items-center gap-2 rounded-lg px-2 text-neutral-500 focus-within:bg-white/[0.04]">
-            <Search size={13} strokeWidth={1.75} />
-            <input
-              autoFocus
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Add a currency…"
-              aria-label="Find a currency"
-              className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-neutral-500"
-            />
-          </label>
-          {full && (
-            <p className="px-2 pb-1.5 text-[11px] text-neutral-500">
-              Four is the limit — remove one to add another.
-            </p>
-          )}
-          <div className="max-h-[188px] overflow-y-auto">
-            {rest.length ? (
-              rest.map((c) => row(c, false))
-            ) : (
-              <p className="px-2 py-2 text-[12px] text-neutral-500">
-                No currency matches “{q}”.
-              </p>
-            )}
+            <span className="amount text-[13px] text-neutral-200 tabular-nums">
+              {compactIn(showIn, grand)}
+            </span>
+            <span className="w-4">
+              {all && (
+                <Check size={14} strokeWidth={2} className="text-white" />
+              )}
+            </span>
+          </button>
+          <div className="mx-2.5 my-1 border-t border-white/[0.07]" />
+          <div className="sidebar-scroll max-h-[360px] overflow-y-auto">
+            {held.map((c) => {
+              const on = !all && c === currency;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  role="option"
+                  aria-selected={on}
+                  onClick={() => pick(c)}
+                  className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-white/[0.06]"
+                >
+                  <span className="flex size-7 items-center justify-center text-[18px] leading-none">
+                    {FLAGS[c]}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] text-white">
+                      {c} <span className="text-neutral-500">{NAMES[c]}</span>
+                    </span>
+                    <span className="block text-[11.5px] text-neutral-500 tabular-nums">
+                      {counts[c].toLocaleString("en-US")}{" "}
+                      {counts[c] === 1 ? "account" : "accounts"} ·{" "}
+                      {Math.round(shareOf(c) * 100) || "<1"}% of total
+                    </span>
+                  </span>
+                  <span className="amount text-[13px] text-neutral-200 tabular-nums">
+                    {compactIn(c, totals[c])}
+                  </span>
+                  <span className="w-4">
+                    {on && (
+                      <Check size={14} strokeWidth={2} className="text-white" />
+                    )}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
     </div>
   );
+}
+
+/** Short money: $32.18M, ₦2.51B, £940K. */
+function compactIn(c: Currency, v: number) {
+  return `${SYMBOL[c]}${new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(v)}`;
 }
 
 /** A compact fact card for the right column. */
