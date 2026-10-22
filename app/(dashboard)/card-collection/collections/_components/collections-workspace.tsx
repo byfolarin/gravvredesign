@@ -477,8 +477,8 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
             <col className="w-12" />
           </colgroup>
           <thead>
-            <tr className="text-left text-xs text-neutral-500">
-              <th className="py-3 pl-3 font-normal">
+            <tr className="bg-white/[0.025] text-left text-[12px] font-medium text-neutral-400">
+              <th className="py-3 pl-3 font-medium">
                 <Check
                   on={allChecked}
                   label="Select all"
@@ -489,11 +489,11 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
                   }
                 />
               </th>
-              <th className="py-3 font-normal">Customer</th>
-              <th className="py-3 pr-10 text-right font-normal">Amount</th>
-              <th className="py-3 font-normal">Status</th>
-              <th className="py-3 font-normal">Date</th>
-              <th className="py-3 font-normal">Payment ID</th>
+              <th className="py-3 font-medium">Customer</th>
+              <th className="py-3 pr-10 text-right font-medium">Amount</th>
+              <th className="py-3 font-medium">Status</th>
+              <th className="py-3 font-medium">Date</th>
+              <th className="py-3 font-medium">Payment ID</th>
               <th className="py-3 font-normal">
                 <span className="sr-only">Actions</span>
               </th>
@@ -528,7 +528,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
                       />
                     </td>
                     <td className="py-4 pr-6">
-                      <div className="truncate text-neutral-100">
+                      <div className="truncate text-[13.5px] font-semibold tracking-[-0.005em] text-white">
                         {c.customer.name}
                       </div>
                       <div className="mt-1 truncate text-[12px] text-neutral-500">
@@ -572,7 +572,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
                       )}
                     </td>
                     <td className="py-4 tabular-nums">
-                      <div className="text-neutral-200">
+                      <div className="text-neutral-400">
                         {dayFmt.format(new Date(c.createdAt))}
                       </div>
                       <div className="mt-1 text-[12px] text-neutral-500">
