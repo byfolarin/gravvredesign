@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, X } from "lucide-react";
+import { ArrowRight, ChevronUp, Layers, X } from "lucide-react";
 import { PixelField } from "./pixel-field";
 import { UPDATES, updateDate, type Update } from "./updates-data";
 
@@ -104,9 +104,17 @@ export function UpdateCard({
   );
 }
 
+const CARD_H = 74; // screenshot 72 + border
+const GAP = 8;
+const PEEK = 7;
+/** On a page: its own update first, then the newest others still showing — at most this many. */
+const MAX_STACK = 3;
+
 /**
- * The on-page "New" strip: screenshot, one line, one action, dismiss. Each page shows the update
- * that matters there; `onAction` does it on the spot, otherwise the button goes to `href`.
+ * The on-page "New" strip. One update shows as a single card; more stack behind it, peeking
+ * out underneath. Click the stack to fan them out, "Show less" to fold them back. The stack
+ * symbol on the front card opens every update on the platform in a side sheet.
+ * `onAction` (page-specific action) applies to the page's own update; the others link.
  */
 export function UpdateNotice({
   id,
@@ -123,41 +131,219 @@ export function UpdateNotice({
   className?: string;
 }) {
   const { gone, dismiss } = useDismissed(place);
-  const u = UPDATES.find((x) => x.id === id);
-  if (!u || gone.has(u.id)) return null;
+  const [open, setOpen] = useState(false);
+  const [sheet, setSheet] = useState(false);
+  const lead = UPDATES.find((x) => x.id === id);
+  const list = [
+    ...(lead && !gone.has(lead.id) ? [lead] : []),
+    ...UPDATES.filter((u) => u.id !== id && !gone.has(u.id)),
+  ].slice(0, MAX_STACK);
+  const n = list.length;
+  const fanned = open && n > 1;
+  if (!n)
+    return sheet ? <UpdatesSheet onClose={() => setSheet(false)} /> : null;
+
+  const height = fanned
+    ? n * CARD_H + (n - 1) * GAP
+    : CARD_H + PEEK * Math.min(n - 1, 2);
+
+  return (
+    <div className={className}>
+      <div
+        className={`relative transition-[height] duration-300 ease-[cubic-bezier(.2,.8,.2,1)] ${!fanned && n > 1 ? "cursor-pointer" : ""}`}
+        style={{ height }}
+        onClick={(e) => {
+          if (fanned || n < 2) return;
+          if ((e.target as HTMLElement).closest("button, a")) return;
+          setOpen(true);
+        }}
+      >
+        {list.map((u, i) => {
+          const back = !fanned && i > 0;
+          const depth = Math.min(i, 2);
+          return (
+            <div
+              key={u.id}
+              className="absolute inset-x-0 top-0 transition-[transform,opacity] duration-300 ease-[cubic-bezier(.2,.8,.2,1)]"
+              style={{
+                zIndex: n - i,
+                transformOrigin: "bottom center",
+                transform: fanned
+                  ? `translateY(${i * (CARD_H + GAP)}px)`
+                  : `translateY(${depth * PEEK}px) scale(${1 - depth * 0.035})`,
+              }}
+              inert={back}
+            >
+              <NoticeCard
+                u={u}
+                hidden={back}
+                cta={u.id === id ? cta : undefined}
+                onAction={u.id === id ? onAction : undefined}
+                onDismiss={() => {
+                  dismiss(u.id);
+                  if (n <= 2) setOpen(false);
+                }}
+                count={i === 0 ? n : 0}
+                onAll={() => setSheet(true)}
+              />
+            </div>
+          );
+        })}
+      </div>
+      {fanned && (
+        <div className="orbit-pop mt-2.5 flex items-center justify-between text-[12px] text-neutral-500">
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-1 hover:text-white"
+          >
+            <ChevronUp size={13} strokeWidth={1.75} />
+            Show less
+          </button>
+          <button
+            type="button"
+            onClick={() => setSheet(true)}
+            className="flex items-center gap-1 hover:text-white"
+          >
+            All updates
+            <ArrowRight size={12} strokeWidth={1.75} />
+          </button>
+        </div>
+      )}
+      {sheet && <UpdatesSheet onClose={() => setSheet(false)} />}
+    </div>
+  );
+}
+
+function NoticeCard({
+  u,
+  hidden,
+  cta,
+  onAction,
+  onDismiss,
+  count,
+  onAll,
+}: {
+  u: Update;
+  /** A card behind the front one: shape only, no content. */
+  hidden: boolean;
+  cta?: string;
+  onAction?: () => void;
+  onDismiss: () => void;
+  /** Non-zero on the front card, which carries the all-updates symbol. */
+  count: number;
+  onAll: () => void;
+}) {
   const button =
     "flex h-8 shrink-0 items-center rounded-full bg-white px-3.5 text-[13px] font-medium text-black hover:bg-neutral-200";
   return (
     <div
-      className={`relative isolate flex items-center gap-4 overflow-hidden rounded-xl border border-white/8 bg-surface pr-4 ${className}`}
+      className={`relative isolate flex h-[74px] items-center gap-4 overflow-hidden rounded-xl border border-white/8 bg-surface pr-4 ${
+        hidden ? "shadow-[0_2px_6px_-2px_rgb(0_0_0/0.12)]" : ""
+      }`}
     >
-      <PixelField seed={u.id} />
-      <UpdateArt u={u} className="h-[72px] w-[124px] shrink-0 max-sm:hidden" />
-      <div className="min-w-0 flex-1 py-3 max-sm:pl-4">
-        <div className="text-[13px] font-medium text-white">
-          New · {u.title}
-        </div>
-        <div className="mt-0.5 truncate text-[12.5px] text-neutral-400">
-          {u.line}
-        </div>
-      </div>
-      {onAction ? (
-        <button type="button" onClick={onAction} className={button}>
-          {cta ?? u.cta}
-        </button>
-      ) : (
-        <Link href={u.href} className={button}>
-          {cta ?? u.cta}
-        </Link>
-      )}
-      <button
-        type="button"
-        aria-label="Dismiss"
-        onClick={() => dismiss(u.id)}
-        className="flex size-7 shrink-0 items-center justify-center rounded-full bg-surface text-neutral-500 shadow-[0_0_0_1px_var(--color-white)/0.08] hover:text-white"
+      <div
+        className={`contents transition-opacity duration-200 ${hidden ? "[&>*]:opacity-0" : ""}`}
       >
-        <X size={14} strokeWidth={1.75} />
-      </button>
+        <PixelField seed={u.id} />
+        <UpdateArt
+          u={u}
+          className="h-[72px] w-[124px] shrink-0 max-sm:hidden"
+        />
+        <div className="min-w-0 flex-1 py-3 max-sm:pl-4">
+          <div className="text-[13px] font-medium text-white">
+            New · {u.title}
+          </div>
+          <div className="mt-0.5 truncate text-[12.5px] text-neutral-400">
+            {u.line}
+          </div>
+        </div>
+        {onAction ? (
+          <button type="button" onClick={onAction} className={button}>
+            {cta ?? u.cta}
+          </button>
+        ) : (
+          <Link href={u.href} className={button}>
+            {cta ?? u.cta}
+          </Link>
+        )}
+        {count > 0 && (
+          <button
+            type="button"
+            aria-label={`All updates (${UPDATES.length})`}
+            title="All updates"
+            onClick={onAll}
+            className="flex h-7 shrink-0 items-center gap-1 rounded-full bg-surface px-2 text-[12px] text-neutral-400 tabular-nums shadow-[0_0_0_1px_rgb(0_0_0/0.08)] hover:text-white"
+          >
+            <Layers size={13} strokeWidth={1.75} />
+            {UPDATES.length}
+          </button>
+        )}
+        <button
+          type="button"
+          aria-label="Dismiss"
+          onClick={onDismiss}
+          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-surface text-neutral-500 shadow-[0_0_0_1px_rgb(0_0_0/0.08)] hover:text-white"
+        >
+          <X size={14} strokeWidth={1.75} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Every update on the platform, newest first, in a right-hand sheet. Esc or the scrim closes it. */
+export function UpdatesSheet({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-[70]">
+      <div
+        aria-hidden
+        onClick={onClose}
+        className="scrim-in absolute inset-0 bg-black/40"
+      />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label="What's new"
+        className="drawer-in absolute inset-y-0 right-0 flex w-[460px] max-w-full flex-col bg-surface shadow-[-24px_0_80px_-20px_rgb(0_0_0/0.45)] ring-1 ring-white/8"
+      >
+        <div className="flex items-center justify-between border-b border-white/8 px-6 py-4">
+          <div>
+            <div className="text-[15px] font-medium text-white">
+              What&apos;s new
+            </div>
+            <div className="mt-0.5 text-[12px] text-neutral-500">
+              {UPDATES.length} updates across Gravv
+            </div>
+          </div>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            className="flex size-8 items-center justify-center rounded-full text-neutral-500 hover:bg-white/8 hover:text-white"
+          >
+            <X size={16} strokeWidth={1.75} />
+          </button>
+        </div>
+        <div className="sidebar-scroll flex-1 space-y-4 overflow-y-auto p-6">
+          {UPDATES.map((u) => (
+            <UpdateCard key={u.id} u={u} />
+          ))}
+          <Link
+            href="/whats-new"
+            onClick={onClose}
+            className="flex items-center justify-center gap-1 pt-2 text-[13px] text-neutral-400 hover:text-white"
+          >
+            Open the What&apos;s new page
+            <ArrowRight size={13} strokeWidth={1.75} />
+          </Link>
+        </div>
+      </aside>
     </div>
   );
 }
