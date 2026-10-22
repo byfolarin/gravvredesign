@@ -715,9 +715,12 @@ export function OpenAccountFlow({
               New account
             </div>
             <div className="mt-4 flex items-center gap-3">
-              <span className="text-[22px] leading-none">
-                {currency ? FLAGS[currency] : ""}
-              </span>
+              {/* The flag only once there's a currency, so the text stays aligned until then */}
+              {currency && (
+                <span className="text-[22px] leading-none">
+                  {FLAGS[currency]}
+                </span>
+              )}
               <span className="min-w-0">
                 <span className="block truncate text-[15px] text-white">
                   {currency ? `${currency} account` : "Choose a currency"}
