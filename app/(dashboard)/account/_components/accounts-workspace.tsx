@@ -39,6 +39,7 @@ import {
 import { FLAGS, NAMES, SYMBOL } from "./currency";
 import { OpenAccountFlow } from "./open-account-flow";
 import { AccountSheet } from "./account-sheet";
+import { UpdateNotice } from "@/app/_components/updates";
 
 type Section = "accounts" | "applications";
 type Tab = "All" | AccountStatus | "Needs action";
@@ -367,6 +368,8 @@ export function AccountsWorkspace() {
             </button>
           </div>
         </div>
+
+        <UpdateNotice id="u-plans" place="accounts" />
 
         {/* Section tabs */}
         <div role="tablist" className="mt-8 flex gap-6 border-b border-white/8">

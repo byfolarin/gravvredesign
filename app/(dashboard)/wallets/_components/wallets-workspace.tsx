@@ -23,6 +23,7 @@ import { Dropdown } from "@/app/_components/dropdown";
 import { NetworkLogo } from "./network-logo";
 import { Roll } from "@/app/_components/roll";
 import { AS_OF, networkNotes, type Network, type Wallet } from "../_data";
+import { UpdateNotice } from "@/app/_components/updates";
 
 const NETWORKS: Network[] = ["Polygon", "Ethereum", "Stellar", "Avalanche"];
 const PAGE_SIZES = [10, 20, 50, 100];
@@ -836,6 +837,8 @@ export function WalletsWorkspace({
             </button>
           </div>
         </div>
+
+        <UpdateNotice id="u-desk" place="wallets" />
 
         {/* Three facts, one structure: label · number + one more figure · full-width bar · one line of context */}
         <div className="mt-10 grid gap-y-10 border-t border-white/8 pt-7 lg:grid-cols-3">

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, X } from "lucide-react";
-import { updateDate, type Update } from "./updates-data";
+import { UPDATES, updateDate, type Update } from "./updates-data";
 
 export { UPDATES, updateDate, type Update } from "./updates-data";
 
@@ -100,5 +100,133 @@ export function UpdateCard({
         </button>
       )}
     </article>
+  );
+}
+
+/**
+ * The on-page "New" strip: screenshot, one line, one action, dismiss. Each page shows the update
+ * that matters there; `onAction` does it on the spot, otherwise the button goes to `href`.
+ */
+export function UpdateNotice({
+  id,
+  place,
+  cta,
+  onAction,
+  className = "mt-8",
+}: {
+  id: string;
+  /** Dismissals are remembered per place. */
+  place: string;
+  cta?: string;
+  onAction?: () => void;
+  className?: string;
+}) {
+  const { gone, dismiss } = useDismissed(place);
+  const u = UPDATES.find((x) => x.id === id);
+  if (!u || gone.has(u.id)) return null;
+  const button =
+    "flex h-8 shrink-0 items-center rounded-full bg-white px-3.5 text-[13px] font-medium text-black hover:bg-neutral-200";
+  return (
+    <div
+      className={`relative isolate flex items-center gap-4 overflow-hidden rounded-xl border border-white/8 bg-surface pr-4 ${className}`}
+    >
+      <PixelField seed={u.id} />
+      <UpdateArt u={u} className="h-[72px] w-[124px] shrink-0 max-sm:hidden" />
+      <div className="min-w-0 flex-1 py-3 max-sm:pl-4">
+        <div className="text-[13px] font-medium text-white">
+          New · {u.title}
+        </div>
+        <div className="mt-0.5 truncate text-[12.5px] text-neutral-400">
+          {u.line}
+        </div>
+      </div>
+      {onAction ? (
+        <button type="button" onClick={onAction} className={button}>
+          {cta ?? u.cta}
+        </button>
+      ) : (
+        <Link href={u.href} className={button}>
+          {cta ?? u.cta}
+        </Link>
+      )}
+      <button
+        type="button"
+        aria-label="Dismiss"
+        onClick={() => dismiss(u.id)}
+        className="flex size-7 shrink-0 items-center justify-center rounded-full bg-surface text-neutral-500 shadow-[0_0_0_1px_var(--color-white)/0.08] hover:text-white"
+      >
+        <X size={14} strokeWidth={1.75} />
+      </button>
+    </div>
+  );
+}
+
+/** Flip "hide amounts" the same way ⇧H does (the top bar owns the state). */
+export function toggleHideAmounts() {
+  document.body.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "H", shiftKey: true, bubbles: true }),
+  );
+}
+
+/**
+ * Brand-mint pixels anchored to the right edge, thinning out and fading to nothing before the
+ * text. Seeded by the update id, so each notice keeps its own pattern.
+ */
+const CELL = 6,
+  GAP = 2,
+  COLS = 46,
+  ROWS = 12;
+
+/** Which cells are lit, and how brightly: denser and brighter towards the right edge. */
+function pixelCells(seed: string) {
+  let x = [...seed].reduce(
+    (h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619),
+    2166136261,
+  );
+  const rand = () => {
+    x =
+      Math.imul(x ^ (x >>> 15), 2246822507) ^
+      Math.imul(x ^ (x >>> 13), 3266489909);
+    return ((x >>> 0) % 1000) / 1000;
+  };
+  const cells: { c: number; r: number; o: number }[] = [];
+  for (let c = 0; c < COLS; c++)
+    for (let r = 0; r < ROWS; r++) {
+      const toRight = c / (COLS - 1); // 0 at the left of the field, 1 at the edge
+      if (rand() < toRight * toRight * 0.42)
+        cells.push({ c, r, o: 0.1 + rand() * 0.42 * toRight });
+    }
+  return cells;
+}
+
+function PixelField({ seed }: { seed: string }) {
+  const cells = pixelCells(seed);
+  const W = COLS * (CELL + GAP),
+    H = ROWS * (CELL + GAP);
+  return (
+    <svg
+      aria-hidden
+      width={W}
+      height={H}
+      viewBox={`0 0 ${W} ${H}`}
+      className="pointer-events-none absolute top-1/2 right-0 -z-10 -translate-y-1/2"
+      style={{
+        maskImage: "linear-gradient(to left, #000 15%, transparent 95%)",
+        WebkitMaskImage: "linear-gradient(to left, #000 15%, transparent 95%)",
+      }}
+    >
+      {cells.map(({ c, r, o }) => (
+        <rect
+          key={`${c}-${r}`}
+          x={c * (CELL + GAP)}
+          y={r * (CELL + GAP)}
+          width={CELL}
+          height={CELL}
+          rx={1}
+          fill="var(--brand)"
+          opacity={o.toFixed(2)}
+        />
+      ))}
+    </svg>
   );
 }

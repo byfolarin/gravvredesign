@@ -1,5 +1,5 @@
 import { CardsWorkspace } from "./_components/cards-workspace";
-import { cards, fundingSources, monthlySpend } from "./_data";
+import { cards, dailySpend, fundingSources, monthlySpend } from "./_data";
 
 export default function CardsPage() {
   return (
@@ -7,6 +7,7 @@ export default function CardsPage() {
       initialCards={cards}
       sources={fundingSources}
       spend={monthlySpend}
+      daily={dailySpend}
     />
   );
 }

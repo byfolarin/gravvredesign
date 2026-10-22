@@ -34,7 +34,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
-import { UPDATES, UpdateArt, useDismissed } from "@/app/_components/updates";
+import { UpdateNotice } from "@/app/_components/updates";
 import {
   BucketBars,
   bucketStarts,
@@ -147,8 +147,6 @@ export function LinksWorkspace() {
   }, []);
   const [customizing, setCustomizing] = useState(false);
   // A feature notice on the page it belongs to: once, dismissible.
-  const notice = useDismissed("inline");
-  const checkoutNews = UPDATES.find((u) => u.id === "u-checkout")!;
 
   const [toast, setToast] = useState<string | null>(null);
   // Set alongside a toast when the change can be taken back.
@@ -264,37 +262,11 @@ export function LinksWorkspace() {
           </div>
         </div>
 
-        {!notice.gone.has(checkoutNews.id) && (
-          <div className="mt-8 flex items-center gap-4 overflow-hidden rounded-xl border border-white/8 bg-surface pr-4">
-            <UpdateArt
-              u={checkoutNews}
-              className="h-[72px] w-[124px] shrink-0"
-            />
-            <div className="min-w-0 flex-1 py-3">
-              <div className="text-[13px] font-medium text-white">
-                New · {checkoutNews.title}
-              </div>
-              <div className="mt-0.5 truncate text-[12.5px] text-neutral-400">
-                Customers pay on a checkout with your name, logo and colour.
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setCustomizing(true)}
-              className="h-8 shrink-0 rounded-full bg-white px-3.5 text-[13px] font-medium text-black hover:bg-neutral-200"
-            >
-              Customise checkout
-            </button>
-            <button
-              type="button"
-              aria-label="Dismiss"
-              onClick={() => notice.dismiss(checkoutNews.id)}
-              className="flex size-7 shrink-0 items-center justify-center rounded-full text-neutral-500 hover:bg-white/8 hover:text-white"
-            >
-              <X size={14} strokeWidth={1.75} />
-            </button>
-          </div>
-        )}
+        <UpdateNotice
+          id="u-checkout"
+          place="inline"
+          onAction={() => setCustomizing(true)}
+        />
 
         {/* Three facts: label · number + one more figure · one line of context */}
         <div className="mt-8 grid gap-y-10 border-t border-white/8 pt-7 lg:grid-cols-3">

@@ -47,6 +47,7 @@ import {
   type OrderStatus,
   type Pair,
 } from "../_data";
+import { UpdateNotice } from "@/app/_components/updates";
 
 const TWO_STEP_KEY = "gravv-trade-2fa";
 
@@ -374,6 +375,16 @@ export function TradeDesk() {
         ) : (
           // Ticket first (Binance OTC): the quote ticket leads, rates beside it, history below.
           <div key={`ticket-${revealKey}`} className="intro-status mt-8">
+            <UpdateNotice
+              id="u-candles"
+              place="trade-desk"
+              cta="Open a chart"
+              className="mb-8"
+              onAction={() => {
+                setUserHid(false);
+                setRowOpen(true);
+              }}
+            />
             <Facts
               traded={view === "empty" ? 0 : traded}
               open={open.length}

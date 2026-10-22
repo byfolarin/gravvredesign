@@ -58,11 +58,11 @@ export type Card = {
   transactions: CardTxn[];
 };
 
-export const monthlySpend = {
-  spent: 75_000,
-  limit: 1_000_000,
-  period: "Nov 1 – Nov 30",
-};
+/** Program-wide cap on card spend per month, across every card. */
+export const PROGRAM_LIMIT = 50_000;
+/** Today, for the demo: the 20th of a 31-day month. */
+export const SPEND_DAY = 20;
+export const MONTH_DAYS = 31;
 
 const address: Address = {
   line1: "1801 Main St., Kansas City",
@@ -102,7 +102,7 @@ function transactionsFor(seed: number, balance: number): CardTxn[] {
     const amount = amounts[k] * (1 + ((seed + i) % 3));
     const row: CardTxn = {
       id: `a7b2c3d4-e5f6-47${seed}${i}-9c1d-${(seed * 7919 + i * 104729).toString(16).padStart(12, "0").slice(0, 12)}`,
-      timestamp: `2025-01-${String(5 - Math.floor(i / 3)).padStart(2, "0")}T0${7 - (i % 3)}:35:17.628Z`,
+      timestamp: `2026-10-${String(20 - Math.floor(i / 3) - (seed % 3)).padStart(2, "0")}T0${7 - (i % 3)}:35:17.628Z`,
       merchant: merchants[k],
       amount,
       balanceAfter: running,
@@ -214,10 +214,45 @@ export const cards: Card[] = people.map(
     perTransactionLimit: null,
     alertAt: 0.8,
     spentThisMonth,
-    resetsOn: "2026-11-30",
+    resetsOn: "2026-10-31",
     funding,
     billing: address,
     shipping: address,
     transactions: transactionsFor(i + 1, balance),
   }),
 );
+
+/** Card spend this month, summed from the cards themselves so the headline matches the table. */
+export const monthlySpend = {
+  spent: cards.reduce((s, c) => s + c.spentThisMonth, 0),
+  limit: PROGRAM_LIMIT,
+  period: "Oct 1 – Oct 31",
+};
+
+/**
+ * Spend per day: this month up to today, and all of last month for comparison. Weekdays run
+ * heavier than weekends (subscriptions and ads renew on weekdays); this month is scaled so it
+ * sums exactly to `monthlySpend.spent`.
+ */
+function dailyShape(days: number, seed: number, firstWeekday: number) {
+  return Array.from({ length: days }, (_, i) => {
+    const weekend = (firstWeekday + i) % 7 >= 5;
+    const wobble =
+      0.65 +
+      ((((Math.sin((i + 1) * 12.9898 + seed) * 43758.5453) % 1) + 1) % 1) * 0.7;
+    return (weekend ? 0.45 : 1) * wobble * (i === 0 ? 1.8 : 1); // the 1st carries monthly renewals
+  });
+}
+const thisShape = dailyShape(SPEND_DAY, 3, 2); // Oct 1, 2026 is a Thursday
+const thisSum = thisShape.reduce((s, v) => s + v, 0);
+const lastShape = dailyShape(30, 11, 0); // Sep 1, 2026 is a Tuesday
+const lastSum = lastShape.reduce((s, v) => s + v, 0);
+const LAST_MONTH_TOTAL = 24_610;
+export const dailySpend = {
+  thisMonth: thisShape.map(
+    (v) => Math.round((v / thisSum) * monthlySpend.spent * 100) / 100,
+  ),
+  lastMonth: lastShape.map(
+    (v) => Math.round((v / lastSum) * LAST_MONTH_TOTAL * 100) / 100,
+  ),
+};

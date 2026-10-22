@@ -24,6 +24,7 @@ import {
   type Dispute,
   type DisputeStatus,
 } from "../_data";
+import { UpdateNotice } from "@/app/_components/updates";
 
 type Tab = "All" | "Needs response" | "Under review" | "Won" | "Lost";
 const inTab = (d: Dispute, t: Tab) =>
@@ -110,6 +111,8 @@ export function DisputesWorkspace({ initial }: { initial: Dispute[] }) {
           When a customer asks their bank for a card payment back. Answer before
           the deadline, or the customer keeps the money.
         </p>
+
+        <UpdateNotice id="u-funnel" place="disputes" />
 
         <div className="mt-10 grid gap-y-8 border-t border-white/8 pt-7 lg:grid-cols-3">
           <Fact

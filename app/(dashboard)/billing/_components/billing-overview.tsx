@@ -16,6 +16,7 @@ import {
   type FeeType,
   type PlanId,
 } from "../_data";
+import { UpdateNotice, toggleHideAmounts } from "@/app/_components/updates";
 
 const DAY = 24 * 60 * 60 * 1000;
 const day = new Intl.DateTimeFormat("en-US", {
@@ -161,6 +162,12 @@ export function BillingOverview({
             </button>
           </div>
         </div>
+
+        <UpdateNotice
+          id="u-hide"
+          place="billing"
+          onAction={toggleHideAmounts}
+        />
 
         {/* This cycle */}
         <section className="mt-12 border-t border-white/8 pt-7">

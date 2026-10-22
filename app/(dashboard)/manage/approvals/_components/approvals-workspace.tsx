@@ -26,6 +26,7 @@ import {
   type Rule,
   type Settings,
 } from "../_data";
+import { UpdateNotice } from "@/app/_components/updates";
 
 type Tab = "mine" | "others" | "history" | "rules";
 
@@ -264,6 +265,8 @@ export function ApprovalsWorkspace() {
           until they&apos;re approved.
         </p>
       </div>
+
+      <UpdateNotice id="u-recipients" place="approvals" />
 
       <div role="tablist" className="mt-8 flex gap-6 border-b border-white/8">
         {(

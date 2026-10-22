@@ -28,6 +28,7 @@ import {
   type TxnType,
 } from "../_data";
 import { Roll } from "@/app/_components/roll";
+import { UpdateNotice, toggleHideAmounts } from "@/app/_components/updates";
 
 type Tab = "All" | TxnStatus;
 const TABS: Tab[] = ["All", "Completed", "Pending", "Failed"];
@@ -175,6 +176,10 @@ export function TransactionsTable({ initial }: { initial: Transaction[] }) {
   const moneyOut = settled
     .filter((t) => t.direction === "Debit")
     .reduce((s, t) => s + t.amount, 0);
+  const nIn = settled.filter((t) => t.direction === "Credit").length;
+  const nOut = settled.length - nIn;
+  const plural = (n: number, word: string) =>
+    `${n.toLocaleString("en-US")} ${word}${n === 1 ? "" : "s"}`;
 
   return (
     <div className="sidebar-scroll h-full overflow-y-auto">
@@ -191,16 +196,36 @@ export function TransactionsTable({ initial }: { initial: Transaction[] }) {
           </div>
         </div>
 
+        <UpdateNotice
+          id="u-hide"
+          place="transactions"
+          onAction={toggleHideAmounts}
+        />
+
         {/* Summary for whatever is filtered */}
-        <dl className="mt-8 flex flex-wrap gap-x-12 gap-y-4">
+        {/* Same strip as the Trade desk facts: label · 26px figure · one line of context */}
+        <dl className="mt-8 grid gap-y-6 sm:grid-cols-3">
           <Summary
             label="Net change"
             value={moneyIn - moneyOut}
             signed
             tone={moneyIn - moneyOut >= 0 ? "in" : undefined}
+            note={`${plural(settled.length, "transaction")} · failed ones left out`}
           />
-          <Summary label="Money in" value={moneyIn} tone="in" />
-          <Summary label="Money out" value={-moneyOut} signed />
+          <Summary
+            label="Money in"
+            value={moneyIn}
+            tone="in"
+            note={plural(nIn, "payment")}
+            divided
+          />
+          <Summary
+            label="Money out"
+            value={-moneyOut}
+            signed
+            note={plural(nOut, "payment")}
+            divided
+          />
         </dl>
 
         {/* Money movement chart */}
@@ -728,20 +753,26 @@ function Summary({
   value,
   signed = false,
   tone,
+  note,
+  divided = false,
 }: {
   label: string;
   value: number;
   signed?: boolean;
   tone?: "in";
+  note: string;
+  divided?: boolean;
 }) {
   const [whole, cents] = money(Math.abs(value)).split(".");
   return (
-    <div>
-      <dt className="text-[13px] text-neutral-500 first-letter:uppercase">
+    <div
+      className={`pr-6 ${divided ? "sm:border-l sm:border-white/8 sm:pl-6" : ""}`}
+    >
+      <dt className="text-[13px] text-neutral-400 first-letter:uppercase">
         {label}
       </dt>
       <dd
-        className={`amount mt-1 text-[22px] font-medium tracking-[-0.02em] tabular-nums ${tone === "in" ? "text-[var(--ok-fg)]" : "text-white"}`}
+        className={`amount mt-2 text-[26px] leading-none font-medium tracking-[-0.02em] tabular-nums ${tone === "in" ? "text-[var(--ok-fg)]" : "text-white"}`}
       >
         <Roll
           value={`${signed ? (value < 0 ? "−" : value > 0 ? "+" : "") : ""}${whole}`}
@@ -749,9 +780,12 @@ function Summary({
         <sup className="ml-px align-[0.55em] text-[0.5em] font-normal">
           <Roll value={`.${cents}`} />
         </sup>
-        <span className="ml-1.5 text-[12px] font-normal tracking-normal text-neutral-500">
+        <span className="ml-1.5 text-[13px] font-normal tracking-normal text-neutral-500">
           USDC
         </span>
+      </dd>
+      <dd className="mt-2.5 text-[12px] text-neutral-500 tabular-nums">
+        {note}
       </dd>
     </div>
   );

@@ -32,6 +32,7 @@ import {
   type Lite,
   type Verification,
 } from "../_data";
+import { UpdateNotice } from "@/app/_components/updates";
 
 type Tab = "All" | "Paying" | "Owes you" | "Needs review";
 const TABS: Tab[] = ["All", "Paying", "Owes you", "Needs review"];
@@ -212,6 +213,12 @@ export function CustomersWorkspace() {
             </button>
           </div>
         </div>
+
+        <UpdateNotice
+          id="u-checkout"
+          place="customers"
+          cta="Open Payment links"
+        />
 
         {/* Three facts, same shape as Payment links */}
         <div className="mt-8 grid gap-y-10 border-t border-white/8 pt-7 lg:grid-cols-3">

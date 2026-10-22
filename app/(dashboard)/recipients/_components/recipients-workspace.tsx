@@ -21,6 +21,7 @@ import { AskForDetails, COUNTRIES, RecipientFlow } from "./recipient-flow";
 import type { FundingSource } from "../../cards/_data";
 import type { Recipient, RecipientPayment, VerificationStep } from "../_data";
 import { dateFmt, fullDateFmt } from "../../cards/_lib/format";
+import { UpdateNotice } from "@/app/_components/updates";
 
 type Tab = "All" | "Ready to pay" | "Needs attention";
 const TABS: Tab[] = ["All", "Ready to pay", "Needs attention"];
@@ -300,6 +301,8 @@ export function RecipientsWorkspace({
             )}
           </div>
         </div>
+
+        <UpdateNotice id="u-approval" place="recipients" />
 
         {/* Tabs + tools */}
         <div className="mt-10 flex flex-wrap items-center justify-between gap-4">

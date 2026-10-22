@@ -27,6 +27,7 @@ import {
   type Collection,
   type CollectionStatus,
 } from "../_data";
+import { UpdateNotice } from "@/app/_components/updates";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -304,6 +305,8 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
             <ArrowRight size={13} strokeWidth={1.75} />
           </Link>
         </div>
+
+        <UpdateNotice id="u-disputes" place="collections" />
 
         {/* Three facts: what arrived, what it cost, what's stuck */}
         <div className="mt-10 grid gap-y-8 border-t border-white/8 pt-7 lg:grid-cols-3">
