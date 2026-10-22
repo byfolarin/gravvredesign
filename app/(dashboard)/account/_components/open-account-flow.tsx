@@ -923,6 +923,7 @@ function Hint({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Same as the app's pill tabs: the chosen one in brand mint, the rest plain text. */
 function Segmented<T extends string>({
   value,
   options,
@@ -933,10 +934,7 @@ function Segmented<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div
-      role="radiogroup"
-      className="inline-flex rounded-full bg-white/[0.07] p-0.5"
-    >
+    <div role="radiogroup" className="flex flex-wrap items-center gap-1">
       {options.map((o) => (
         <button
           key={o.value}
@@ -944,10 +942,10 @@ function Segmented<T extends string>({
           role="radio"
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
-          className={`h-8 rounded-full px-3.5 text-[12px] transition-colors ${
+          className={`h-8 rounded-full px-3.5 text-[13px] transition-colors ${
             value === o.value
-              ? "bg-surface font-medium text-white shadow-[0_1px_2px_rgb(0_0_0/0.25)]"
-              : "text-neutral-500 hover:text-white"
+              ? "bg-[var(--ok-bg)] font-medium text-[var(--ok-fg)]"
+              : "text-neutral-500 hover:bg-white/[0.04] hover:text-neutral-200"
           }`}
         >
           {o.label}
