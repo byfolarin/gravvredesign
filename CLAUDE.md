@@ -8,6 +8,8 @@ nothing persists. Owner: Folarin (product designer).
 
 ## Run it
 
+- **Two builds (Oct 22, 2026):** `main` = **Current** experience, frozen — don't change product code there unless asked. `review` = **Review**, where new changes go, checked out as a git worktree at `../gravv-web-redesign-review` (own node_modules; run `npx next dev -p 4001` there). Main runs on 4000. Top bar has a **Current | Review** switch (`app/_components/experience-switch.tsx`, `HERE` differs per branch) that jumps to the same path in the other build (local 4000↔4001; live current = gravv-web-redesign.vercel.app, review = gravv-web-redesign-review.vercel.app — not deployed yet).
+
 - `npx next dev -p 4000` → http://localhost:4000
 - **Stale CSS gotcha:** Turbopack often keeps serving an old `app/globals.css`. After editing it,
   check the served chunk (`curl` the page's `/_next/static/...css` and grep for the new token);
