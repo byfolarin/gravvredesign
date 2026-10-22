@@ -40,6 +40,7 @@ import {
   type FundingSource,
 } from "../_data";
 import { Roll } from "@/app/_components/roll";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import { CardsOnboarding, type CardsRequest } from "./cards-onboarding";
 import { WaitingForFirstCard } from "./waiting-for-card";
 import {
@@ -269,6 +270,7 @@ export function CardsWorkspace({
         ? b.spentThisMonth - a.spentThisMonth
         : a.spentThisMonth - b.spentThisMonth,
     );
+  const pager = usePager(rows, "cards");
   const allChecked = rows.length > 0 && rows.every((c) => checked.has(c.id));
 
   const toggleChecked = (id: string) =>
@@ -343,6 +345,7 @@ export function CardsWorkspace({
                 setAssetFilter("All");
                 setTypeFilter("All");
                 setQuery("");
+                pager.setPage(1);
               }}
             >
               <Meter
@@ -358,7 +361,10 @@ export function CardsWorkspace({
               value={<Roll value={String(nearLimitCount)} />}
               meta="At 85% or more of their limit"
               active={onlyNearLimit}
-              onClick={() => setOnlyNearLimit((v) => !v)}
+              onClick={() => {
+                setOnlyNearLimit((v) => !v);
+                pager.setPage(1);
+              }}
             >
               <span className="flex -space-x-2">
                 {cards
@@ -382,9 +388,10 @@ export function CardsWorkspace({
               }
               meta={`${usdcCount} on stablecoin wallets · ${cards.length - usdcCount} on USD`}
               active={assetFilter === "USDC"}
-              onClick={() =>
-                setAssetFilter((a) => (a === "USDC" ? "All" : "USDC"))
-              }
+              onClick={() => {
+                setAssetFilter((a) => (a === "USDC" ? "All" : "USDC"));
+                pager.setPage(1);
+              }}
             />
           </div>
         </div>
@@ -402,7 +409,10 @@ export function CardsWorkspace({
                 type="button"
                 role="tab"
                 aria-selected={filter === f}
-                onClick={() => setFilter(f)}
+                onClick={() => {
+                  setFilter(f);
+                  pager.setPage(1);
+                }}
                 className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors ${
                   filter === f
                     ? "bg-white/[0.08] font-medium text-white"
@@ -429,7 +439,10 @@ export function CardsWorkspace({
                 { value: "Virtual", label: "Virtual" },
                 { value: "Physical", label: "Physical" },
               ]}
-              onChange={(v) => setTypeFilter(v as typeof typeFilter)}
+              onChange={(v) => {
+                setTypeFilter(v as typeof typeFilter);
+                pager.setPage(1);
+              }}
             />
             <label className="flex h-9 w-[240px] shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 transition-colors hover:border-white/20 focus-within:border-white/35 focus-within:bg-transparent">
               <Search
@@ -439,7 +452,10 @@ export function CardsWorkspace({
               />
               <input
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  pager.setPage(1);
+                }}
                 placeholder="Name, card or customer ID…"
                 aria-label="Search cards"
                 className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-neutral-500"
@@ -540,7 +556,7 @@ export function CardsWorkspace({
             </tr>
           </thead>
           <tbody>
-            {rows.map((c) => {
+            {pager.visible.map((c) => {
               const ratio = c.spentThisMonth / c.monthlyLimit;
               const open = c.id === openId;
               return (
@@ -684,11 +700,7 @@ export function CardsWorkspace({
             )}
           </tbody>
         </table>
-        {rows.length > 0 && (
-          <div className="mt-4 text-xs text-neutral-500 tabular-nums">
-            {rows.length} {rows.length === 1 ? "card" : "cards"}
-          </div>
-        )}
+        {rows.length > 0 && <TablePager pager={pager} noun="cards" />}
 
         {/* Full card: the existing detail drawer, until cards get their own page */}
         {selected && (

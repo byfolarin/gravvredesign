@@ -20,6 +20,7 @@ import {
   useDiscardGuard,
 } from "@/app/_components/discard-guard";
 import { Dropdown } from "@/app/_components/dropdown";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import { PersonAvatar } from "@/app/_components/person-avatar";
 import { ME } from "../../roles/_data";
 import { Roll } from "@/app/_components/roll";
@@ -1282,7 +1283,6 @@ function CopyRow({ label, value }: { label: string; value: string }) {
 
 /** Every call your systems made, newest first. Errors open to say why, in plain words. */
 const PREVIEW = 8;
-const PER_PAGE = 20;
 
 /**
  * The request log. On Configure it's a short preview that links to the full log;
@@ -1308,7 +1308,6 @@ export function RequestLog({
   env?: Env;
 }) {
   const [open, setOpen] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
   const [keyFilter, setKeyFilter] = useState("all");
   const q = query.trim().toLowerCase();
@@ -1322,11 +1321,8 @@ export function RequestLog({
           .toLowerCase()
           .includes(q)),
   );
-  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
-  const current = Math.min(page, pages);
-  const visible = full
-    ? rows.slice((current - 1) * PER_PAGE, current * PER_PAGE)
-    : rows.slice(0, PREVIEW);
+  const pager = usePager(rows, "api-request-log");
+  const visible = full ? pager.visible : rows.slice(0, PREVIEW);
   const usedKeys = [...new Set(requests.map((r) => r.keyId))];
   const keyName = (id: string) =>
     id === "revoked"
@@ -1367,7 +1363,7 @@ export function RequestLog({
                   value={query}
                   onChange={(e) => {
                     setQuery(e.target.value);
-                    setPage(1);
+                    pager.setPage(1);
                   }}
                   placeholder="Path, IP, status or ID…"
                   aria-label="Search requests"
@@ -1386,7 +1382,7 @@ export function RequestLog({
                 ]}
                 onChange={(v) => {
                   setKeyFilter(v);
-                  setPage(1);
+                  pager.setPage(1);
                 }}
               />
             </>
@@ -1397,7 +1393,7 @@ export function RequestLog({
               type="button"
               onClick={() => {
                 onFilter(f);
-                setPage(1);
+                pager.setPage(1);
               }}
               className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] capitalize transition-colors ${
                 filter === f
@@ -1516,34 +1512,7 @@ export function RequestLog({
         </p>
       )}
       {full ? (
-        <div className="mt-3 flex items-center justify-between text-[13px] text-neutral-500">
-          <span className="tabular-nums">
-            {rows.length
-              ? `Showing ${(current - 1) * PER_PAGE + 1}–${Math.min(current * PER_PAGE, rows.length)} of ${rows.length}`
-              : "No results"}
-          </span>
-          <span className="flex items-center gap-1">
-            <button
-              type="button"
-              disabled={current === 1}
-              onClick={() => setPage(current - 1)}
-              className="h-8 rounded-full px-3 text-neutral-300 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:text-neutral-600"
-            >
-              Previous
-            </button>
-            <span className="px-1 tabular-nums">
-              {current} / {pages}
-            </span>
-            <button
-              type="button"
-              disabled={current === pages}
-              onClick={() => setPage(current + 1)}
-              className="h-8 rounded-full px-3 text-neutral-300 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:text-neutral-600"
-            >
-              Next
-            </button>
-          </span>
-        </div>
+        <TablePager pager={pager} noun="requests" className="mt-3" />
       ) : (
         rows.length > PREVIEW && (
           <Link

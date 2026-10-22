@@ -34,6 +34,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import { UpdateNotice } from "@/app/_components/updates";
 import {
   BucketBars,
@@ -231,6 +232,7 @@ export function LinksWorkspace() {
     .filter((l) => status === "All" || l.status === status)
     .filter(paidIn)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const pager = usePager(rows, "payment-links");
   const count = (t: StatusFilter) =>
     scoped.filter((l) => t === "All" || l.status === t).length;
 
@@ -431,9 +433,10 @@ export function LinksWorkspace() {
             setBucket(null);
           }}
           selected={bucket?.start ?? null}
-          onSelect={(start, size) =>
-            setBucket(start === null ? null : { start, size })
-          }
+          onSelect={(start, size) => {
+            setBucket(start === null ? null : { start, size });
+            pager.setPage(1);
+          }}
         />
 
         {bucket && (
@@ -469,7 +472,10 @@ export function LinksWorkspace() {
                   type="button"
                   role="tab"
                   aria-selected={status === t}
-                  onClick={() => setStatus(t)}
+                  onClick={() => {
+                    setStatus(t);
+                    pager.setPage(1);
+                  }}
                   className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors ${
                     status === t
                       ? "bg-white/[0.08] font-medium text-white"
@@ -496,7 +502,10 @@ export function LinksWorkspace() {
                 value: c,
                 label: c === "All" ? "All currencies" : c,
               }))}
-              onChange={setCurrency}
+              onChange={(v) => {
+                setCurrency(v);
+                pager.setPage(1);
+              }}
             />
             <label className="flex h-9 w-[240px] shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 transition-colors hover:border-white/20 focus-within:border-white/35 focus-within:bg-transparent">
               <Search
@@ -506,7 +515,10 @@ export function LinksWorkspace() {
               />
               <input
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  pager.setPage(1);
+                }}
                 placeholder="Name, link or ID…"
                 aria-label="Search payment links"
                 className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-neutral-500"
@@ -550,7 +562,7 @@ export function LinksWorkspace() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((l) => {
+              {pager.visible.map((l) => {
                 const selected = l.id === openId;
                 const ends =
                   l.status === "Active" && l.expiresAt
@@ -675,6 +687,7 @@ export function LinksWorkspace() {
               )}
             </tbody>
           </table>
+          <TablePager pager={pager} noun="links" />
         </div>
       </div>
 

@@ -7,7 +7,6 @@ import {
   ArrowUpRight,
   Check,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   Copy,
   Download,
@@ -19,14 +18,13 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { CopyButton } from "@/app/_components/copy-button";
-import { Dropdown } from "@/app/_components/dropdown";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import { NetworkLogo } from "./network-logo";
 import { Roll } from "@/app/_components/roll";
 import { AS_OF, networkNotes, type Network, type Wallet } from "../_data";
 import { UpdateNotice } from "@/app/_components/updates";
 
 const NETWORKS: Network[] = ["Polygon", "Ethereum", "Stellar", "Avalanche"];
-const PAGE_SIZES = [10, 20, 50, 100];
 type Tab = "Address" | "Activity" | "Details";
 
 const usdc = (v: number) =>
@@ -645,8 +643,6 @@ export function WalletsWorkspace({
   const [day, setDay] = useState<number | null>(null);
   const [network, setNetwork] = useState<Network | null>(null);
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(50);
   // The row whose details are open inline, and the row being renamed.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -727,12 +723,11 @@ export function WalletsWorkspace({
     .sort(
       (a, b) => b.balance - a.balance || b.createdAt.localeCompare(a.createdAt),
     );
-  const pages = Math.max(1, Math.ceil(rows.length / perPage));
-  const current = Math.min(page, pages);
-  const visible = rows.slice((current - 1) * perPage, current * perPage);
+  const pager = usePager(rows, "wallets");
+  const visible = pager.visible;
   const go = (s: Segment) => {
     setSegment(s);
-    setPage(1);
+    pager.setPage(1);
   };
 
   const toggleChecked = (id: string) =>
@@ -895,7 +890,7 @@ export function WalletsWorkspace({
                           title={`${n.name} ${pct}%`}
                           onClick={() => {
                             setNetwork(network === n.name ? null : n.name);
-                            setPage(1);
+                            pager.setPage(1);
                           }}
                           className={`rounded-full ring-2 ring-[var(--surface)] transition-[opacity,transform] hover:z-10 hover:-translate-y-px ${
                             network && network !== n.name ? "opacity-40" : ""
@@ -1032,7 +1027,7 @@ export function WalletsWorkspace({
             selectedDay={day}
             onSelectDay={(d) => {
               setDay(d);
-              setPage(1);
+              pager.setPage(1);
               // A day can include wallets outside the current tab (e.g. a withdrawal that emptied one).
               if (d !== null) setSegment("All");
             }}
@@ -1087,7 +1082,7 @@ export function WalletsWorkspace({
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
-                  setPage(1);
+                  pager.setPage(1);
                 }}
                 placeholder="Search wallet, address or customer"
                 aria-label="Search wallets"
@@ -1326,57 +1321,7 @@ export function WalletsWorkspace({
           </tbody>
         </table>
 
-        {/* Pagination */}
-        <div className="mt-2 flex items-center justify-between border-t border-white/6 pt-4 text-[13px] text-neutral-500">
-          <span className="tabular-nums">
-            {rows.length === 0
-              ? "No results"
-              : `Showing ${(current - 1) * perPage + 1} to ${Math.min(current * perPage, rows.length)} of ${rows.length}`}
-          </span>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <PageButton
-                label="Previous page"
-                disabled={current === 1}
-                onClick={() => setPage(current - 1)}
-              >
-                <ChevronLeft size={14} strokeWidth={1.75} />
-              </PageButton>
-              {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-                <PageButton
-                  key={p}
-                  label={`Page ${p}`}
-                  active={p === current}
-                  onClick={() => setPage(p)}
-                >
-                  {p}
-                </PageButton>
-              ))}
-              <PageButton
-                label="Next page"
-                disabled={current === pages}
-                onClick={() => setPage(current + 1)}
-              >
-                <ChevronRight size={14} strokeWidth={1.75} />
-              </PageButton>
-            </div>
-            <Dropdown
-              label="Rows per page"
-              variant="compact"
-              placement="top"
-              align="right"
-              value={perPage}
-              options={PAGE_SIZES.map((n) => ({
-                value: n,
-                label: `${n} per page`,
-              }))}
-              onChange={(v) => {
-                setPerPage(v);
-                setPage(1);
-              }}
-            />
-          </div>
-        </div>
+        <TablePager pager={pager} noun="wallets" />
       </div>
 
       {/* Bulk actions */}
@@ -1612,37 +1557,6 @@ function HoverCopy({
         <CopyButton value={value} label={label} />
       </span>
     </span>
-  );
-}
-
-function PageButton({
-  label,
-  active = false,
-  disabled = false,
-  onClick,
-  children,
-}: {
-  label: string;
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-current={active ? "page" : undefined}
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex size-8 items-center justify-center rounded-full text-[13px] tabular-nums transition-colors disabled:opacity-30 ${
-        active
-          ? "bg-white/10 text-white"
-          : "text-neutral-400 enabled:hover:bg-white/6 enabled:hover:text-white"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

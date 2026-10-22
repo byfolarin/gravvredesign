@@ -4,6 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check as CheckIcon, Paperclip, Search, X } from "lucide-react";
 import { Roll } from "@/app/_components/roll";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import {
   DiscardConfirm,
   useDiscardGuard,
@@ -93,6 +94,7 @@ export function DisputesWorkspace({ initial }: { initial: Dispute[] }) {
             ? 1
             : b.openedAt.localeCompare(a.openedAt),
     );
+  const pager = usePager(rows, "disputes");
 
   const responding = list.find((d) => d.id === respondId) ?? null;
   const accepting = list.find((d) => d.id === acceptId) ?? null;
@@ -185,7 +187,10 @@ export function DisputesWorkspace({ initial }: { initial: Dispute[] }) {
                 type="button"
                 role="tab"
                 aria-selected={tab === t}
-                onClick={() => setTab(t)}
+                onClick={() => {
+                  setTab(t);
+                  pager.setPage(1);
+                }}
                 className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors ${
                   tab === t
                     ? "bg-white/[0.08] font-medium text-white"
@@ -205,7 +210,10 @@ export function DisputesWorkspace({ initial }: { initial: Dispute[] }) {
             <Search size={14} strokeWidth={1.75} className="text-neutral-500" />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                pager.setPage(1);
+              }}
               placeholder="Customer, payment ID or reason…"
               aria-label="Search disputes"
               className="min-w-0 flex-1 bg-transparent px-2 text-[13px] text-white outline-none placeholder:text-neutral-500"
@@ -237,7 +245,7 @@ export function DisputesWorkspace({ initial }: { initial: Dispute[] }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((d) => {
+            {pager.visible.map((d) => {
               const open = openId === d.id;
               const r = REASONS[d.reason];
               const days = daysUntil(d.dueAt);
@@ -379,6 +387,7 @@ export function DisputesWorkspace({ initial }: { initial: Dispute[] }) {
             )}
           </tbody>
         </table>
+        <TablePager pager={pager} noun="disputes" />
       </div>
 
       {responding && (

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Dropdown } from "@/app/_components/dropdown";
 import { CopyButton } from "@/app/_components/copy-button";
 import { Roll } from "@/app/_components/roll";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import { QuoteTicket } from "./quote-ticket";
 import { TwoFactorGate } from "./two-factor-gate";
 import { PairMark } from "./asset-mark";
@@ -741,12 +742,18 @@ function Activity({
       (status === "all" || requestStatus(r) === status) &&
       matchQ(r.id, `${r.sell}/${r.get}`, `${r.sell} ${r.get}`, r.orderId ?? ""),
   );
-  const orderRows = (tab === "open" ? open : history).filter(
-    (o) =>
-      matchPair(o.pairId) &&
-      (status === "all" || o.status === status) &&
-      matchQ(o.id, `${o.sell}/${o.get}`, `${o.sell} ${o.get}`),
-  );
+  const matchOrder = (o: Order) =>
+    matchPair(o.pairId) &&
+    (status === "all" || o.status === status) &&
+    matchQ(o.id, `${o.sell}/${o.get}`, `${o.sell} ${o.get}`);
+  const openRows = open.filter(matchOrder);
+  const historyRows = history.filter(matchOrder);
+  const orderRows = tab === "open" ? openRows : historyRows;
+  const reqPager = usePager(reqRows, "trade-requests");
+  const openPager = usePager(openRows, "trade-open-orders");
+  const historyPager = usePager(historyRows, "trade-order-history");
+  const pager =
+    tab === "requests" ? reqPager : tab === "open" ? openPager : historyPager;
 
   const statusOptions =
     tab === "requests"
@@ -790,6 +797,7 @@ function Activity({
               onClick={() => {
                 onTab(id);
                 setStatus("all");
+                pager.setPage(1);
               }}
               className={`-mb-px flex items-center gap-1.5 border-b pb-3 text-[14px] transition-colors ${
                 tab === id
@@ -809,7 +817,10 @@ function Activity({
             <Search size={13} strokeWidth={1.75} className="text-neutral-500" />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                pager.setPage(1);
+              }}
               placeholder={
                 tab === "requests"
                   ? "Request ID, pair or order"
@@ -833,7 +844,10 @@ function Activity({
                 icon: <PairMark sell={p.sell} get={p.get} size={14} />,
               })),
             ]}
-            onChange={setPairFilter}
+            onChange={(v) => {
+              setPairFilter(v);
+              pager.setPage(1);
+            }}
           />
           <button
             type="button"
@@ -859,7 +873,10 @@ function Activity({
               { value: "all", label: "All statuses" },
               ...statusOptions.map((s) => ({ value: s, label: s })),
             ]}
-            onChange={setStatus}
+            onChange={(v) => {
+              setStatus(v);
+              pager.setPage(1);
+            }}
           />
         </div>
       </div>
@@ -870,7 +887,7 @@ function Activity({
         ) : tab === "requests" ? (
           <RequestsTable
             acts={acts}
-            rows={reqRows}
+            rows={reqPager.visible}
             pairs={pairs}
             now={now}
             statusOf={requestStatus}
@@ -879,7 +896,7 @@ function Activity({
         ) : (
           <OrdersTable
             acts={acts}
-            orders={orderRows}
+            orders={(tab === "open" ? openPager : historyPager).visible}
             pairs={pairs}
             ssis={ssis}
             onMarkSent={onMarkSent}
@@ -896,6 +913,12 @@ function Activity({
               neverTraded={requests.length === 0}
             />
           )}
+        {view !== "loading" && pager.total > 0 && (
+          <TablePager
+            pager={pager}
+            noun={tab === "requests" ? "requests" : "orders"}
+          />
+        )}
       </div>
     </section>
   );

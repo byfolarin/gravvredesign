@@ -14,6 +14,7 @@ import {
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import { readOpen, writeOpen } from "@/app/_components/bucket-bars";
 import {
   DiscardConfirm,
@@ -138,7 +139,6 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const [period, setPeriod] = useState<30 | 90>(90);
-  const [shown, setShown] = useState(50);
 
   useEffect(() => {
     if (!toast) return;
@@ -253,6 +253,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
     "Didn't finish",
   ];
   const count = (t: Tab) => scoped.filter((c) => inTab(c, t)).length;
+  const pager = usePager(rows, "collections");
   const allChecked = rows.length > 0 && rows.every((c) => checked.has(c.id));
   const picked = list.filter((c) => checked.has(c.id));
   const pickedStuck = picked.filter(isStuck);
@@ -383,6 +384,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
           onOpen={(t) => {
             setTab(t);
             setRange(String(period) as Range);
+            pager.setPage(1);
             document
               .getElementById("collections-table")
               ?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -398,7 +400,10 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
                 type="button"
                 role="tab"
                 aria-selected={tab === t}
-                onClick={() => setTab(t)}
+                onClick={() => {
+                  setTab(t);
+                  pager.setPage(1);
+                }}
                 className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors ${
                   tab === t
                     ? "bg-white/[0.08] font-medium text-white"
@@ -426,7 +431,10 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
                 { value: "90", label: "Last 90 days" },
                 { value: "all", label: "All time" },
               ]}
-              onChange={setRange}
+              onChange={(v) => {
+                setRange(v);
+                pager.setPage(1);
+              }}
             />
             <div className="flex h-9 w-[290px] shrink-0 items-center rounded-full border border-white/10 bg-white/[0.03] transition-colors focus-within:border-white/35 focus-within:bg-transparent hover:border-white/20">
               <Dropdown
@@ -446,7 +454,10 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
               />
               <input
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  pager.setPage(1);
+                }}
                 placeholder={`Enter ${scope.toLowerCase()}…`}
                 aria-label={`Search by ${scope}`}
                 className="min-w-0 flex-1 bg-transparent px-2 text-[13px] text-white outline-none placeholder:text-neutral-500"
@@ -503,7 +514,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, shown).map((c) => {
+            {pager.visible.map((c) => {
               const open = openId === c.id;
               const muted = !wasCharged(c);
               const why = reasonOf(c);
@@ -632,22 +643,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
             )}
           </tbody>
         </table>
-        <div className="flex items-center justify-between border-t border-white/6 pt-4 text-[13px] text-neutral-500 tabular-nums">
-          <span>
-            {rows.length > shown
-              ? `Showing ${shown} of ${rows.length} payments`
-              : `${rows.length} ${rows.length === 1 ? "payment" : "payments"}`}
-          </span>
-          {rows.length > shown && (
-            <button
-              type="button"
-              onClick={() => setShown((n) => n + 50)}
-              className="h-8 rounded-full border border-white/12 px-3.5 text-neutral-200 transition-colors hover:border-white/30 hover:text-white"
-            >
-              Show {Math.min(50, rows.length - shown)} more
-            </button>
-          )}
-        </div>
+        <TablePager pager={pager} noun="payments" className="" />
       </div>
 
       {/* Bulk actions */}

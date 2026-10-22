@@ -7,7 +7,6 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   Download,
   Plus,
@@ -17,6 +16,7 @@ import {
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import { dateFmt, fullDateFmt } from "../../cards/_lib/format";
 import { CreateFlow } from "../../payment-links/_components/links-workspace";
 import {
@@ -36,7 +36,6 @@ import { UpdateNotice } from "@/app/_components/updates";
 
 type Tab = "All" | "Paying" | "Owes you" | "Needs review";
 const TABS: Tab[] = ["All", "Paying", "Owes you", "Needs review"];
-const PAGE_SIZES = [25, 50, 100];
 
 /** One entry in the book: the light row used for search and counts, and how to build the full record. */
 type Entry = Lite & { full: () => Customer };
@@ -90,8 +89,6 @@ export function CustomersWorkspace() {
   const [tab, setTab] = useState<Tab>("All");
   const [kind, setKind] = useState<"All" | CustomerKind>("All");
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(0);
-  const [size, setSize] = useState(25);
   const [openId, setOpenId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   // Create link opens as a bottom sheet right here, with the customer already chosen.
@@ -167,13 +164,12 @@ export function CustomersWorkspace() {
         (!needle || e.hay.includes(needle)),
     );
   }, [tab, kind, query]);
-  const pages = Math.max(1, Math.ceil(filtered.length / size));
-  const at = Math.min(page, pages - 1);
-  const rows = filtered.slice(at * size, at * size + size).map((e) => e.full());
+  const pager = usePager(filtered, "customers");
+  const rows = pager.visible.map((e) => e.full());
 
   const go = (t: Tab) => {
     setTab(t);
-    setPage(0);
+    pager.setPage(1);
     setOpenId(null);
   };
 
@@ -355,7 +351,7 @@ export function CustomersWorkspace() {
               ]}
               onChange={(v) => {
                 setKind(v);
-                setPage(0);
+                pager.setPage(1);
               }}
             />
             <label className="flex h-9 w-[260px] shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 transition-colors hover:border-white/20 focus-within:border-white/35 focus-within:bg-transparent">
@@ -368,7 +364,7 @@ export function CustomersWorkspace() {
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
-                  setPage(0);
+                  pager.setPage(1);
                 }}
                 placeholder="Name, email or customer ID…"
                 aria-label="Search customers"
@@ -521,51 +517,7 @@ export function CustomersWorkspace() {
           </div>
         )}
 
-        {/* Pages */}
-        {rows.length > 0 && (
-          <div className="mt-4 flex items-center justify-between text-xs text-neutral-500">
-            <div className="flex items-center gap-2">
-              <span>Rows</span>
-              <Dropdown
-                label="Rows per page"
-                variant="compact"
-                placement="top"
-                value={size}
-                options={PAGE_SIZES.map((n) => ({
-                  value: n,
-                  label: String(n),
-                }))}
-                onChange={(n) => {
-                  setSize(n);
-                  setPage(0);
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="tabular-nums">
-                {count(at * size + 1)}–
-                {count(Math.min(filtered.length, at * size + size))} of{" "}
-                {count(filtered.length)}
-              </span>
-              <div className="flex items-center gap-1">
-                <PageButton
-                  label="Previous page"
-                  disabled={at === 0}
-                  onClick={() => setPage(at - 1)}
-                >
-                  <ChevronLeft size={14} strokeWidth={1.75} />
-                </PageButton>
-                <PageButton
-                  label="Next page"
-                  disabled={at >= pages - 1}
-                  onClick={() => setPage(at + 1)}
-                >
-                  <ChevronRight size={14} strokeWidth={1.75} />
-                </PageButton>
-              </div>
-            </div>
-          </div>
-        )}
+        {rows.length > 0 && <TablePager pager={pager} noun="customers" />}
       </div>
 
       {linkFor && (
@@ -841,29 +793,5 @@ function Fact({
         {footer}
       </div>
     </div>
-  );
-}
-
-function PageButton({
-  label,
-  disabled,
-  onClick,
-  children,
-}: {
-  label: string;
-  disabled: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="flex size-7 items-center justify-center rounded-full text-neutral-300 transition-colors hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:text-neutral-700 disabled:hover:bg-transparent"
-    >
-      {children}
-    </button>
   );
 }

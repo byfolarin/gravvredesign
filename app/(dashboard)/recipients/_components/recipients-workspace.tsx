@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import { SEND_EVENT } from "@/app/_components/top-bar";
 import { RowMenu } from "@/app/(dashboard)/trade-desk/_components/order-extras";
 import { RecipientAvatar } from "./recipient-avatar";
@@ -190,6 +191,7 @@ export function RecipientsWorkspace({
       const lb = lastPayment(b)?.date ?? "";
       return lb.localeCompare(la) || b.createdAt.localeCompare(a.createdAt);
     });
+  const pager = usePager(rows, "recipients");
   const currencies = ["All", ...new Set(list.map((r) => r.currency))];
   const selected = list.find((r) => r.id === selectedId) ?? null;
   const allChecked = rows.length > 0 && rows.every((r) => checked.has(r.id));
@@ -312,7 +314,10 @@ export function RecipientsWorkspace({
                 type="button"
                 role="tab"
                 aria-selected={tab === t}
-                onClick={() => setTab(t)}
+                onClick={() => {
+                  setTab(t);
+                  pager.setPage(1);
+                }}
                 className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors ${
                   tab === t
                     ? "bg-white/[0.08] font-medium text-white"
@@ -347,7 +352,10 @@ export function RecipientsWorkspace({
                   value: c,
                   label: c === "All" ? "All currencies" : c,
                 }))}
-                onChange={setCurrency}
+                onChange={(v) => {
+                  setCurrency(v);
+                  pager.setPage(1);
+                }}
               />
             )}
             <label className="flex h-9 w-[240px] shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 transition-colors focus-within:border-white/35 focus-within:bg-transparent hover:border-white/20">
@@ -358,7 +366,10 @@ export function RecipientsWorkspace({
               />
               <input
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  pager.setPage(1);
+                }}
                 placeholder="Name, bank or account…"
                 aria-label="Search recipients"
                 className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-neutral-500"
@@ -382,196 +393,207 @@ export function RecipientsWorkspace({
         <div
           className={`mt-3 grid items-start gap-6 ${selected ? "grid-cols-[minmax(0,1fr)_380px]" : "grid-cols-1"}`}
         >
-          <table className="w-full table-fixed border-t border-white/15 text-[13px]">
-            <colgroup>
-              <col className="w-10" />
-              <col />
-              {!selected && <col className="w-[250px]" />}
-              <col className="w-[130px]" />
-              <col className="w-[128px]" />
-              <col className={selected ? "w-[150px]" : "w-[190px]"} />
-              <col className="w-[76px]" />
-            </colgroup>
-            <thead>
-              <tr className="text-left text-xs text-neutral-500">
-                <th className="py-2.5 pl-3 font-normal">
-                  <Checkbox
-                    checked={allChecked}
-                    label={allChecked ? "Deselect all" : "Select all"}
-                    onChange={() =>
-                      setChecked(
-                        allChecked ? new Set() : new Set(rows.map((r) => r.id)),
-                      )
-                    }
-                  />
-                </th>
-                <th className="py-2.5 font-normal">Name</th>
-                {!selected && <th className="py-2.5 font-normal">Pays to</th>}
-                <th className="py-2.5 pr-6 text-right font-normal">
-                  Total paid
-                </th>
-                <th className="py-2.5 font-normal">Last paid</th>
-                <th className="py-2.5 font-normal">
-                  <span className="sr-only">Status</span>
-                </th>
-                <th className="py-2.5 font-normal">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const p = problems.get(r.id);
-                const last = lastPayment(r);
-                const total = totalPaid(r);
-                const on = selectedId === r.id;
-                return (
-                  <Fragment key={r.id}>
-                    <tr
-                      onClick={() => setSelectedId(on ? null : r.id)}
-                      aria-selected={on}
-                      className={`group cursor-pointer border-t border-white/6 transition-colors ${on || checked.has(r.id) ? "bg-white/[0.05]" : "hover:bg-white/[0.03]"}`}
-                    >
-                      <td
-                        className="py-3 pl-3"
-                        onClick={(e) => e.stopPropagation()}
+          <div className="min-w-0">
+            <table className="w-full table-fixed border-t border-white/15 text-[13px]">
+              <colgroup>
+                <col className="w-10" />
+                <col />
+                {!selected && <col className="w-[250px]" />}
+                <col className="w-[130px]" />
+                <col className="w-[128px]" />
+                <col className={selected ? "w-[150px]" : "w-[190px]"} />
+                <col className="w-[76px]" />
+              </colgroup>
+              <thead>
+                <tr className="text-left text-xs text-neutral-500">
+                  <th className="py-2.5 pl-3 font-normal">
+                    <Checkbox
+                      checked={allChecked}
+                      label={allChecked ? "Deselect all" : "Select all"}
+                      onChange={() =>
+                        setChecked(
+                          allChecked
+                            ? new Set()
+                            : new Set(rows.map((r) => r.id)),
+                        )
+                      }
+                    />
+                  </th>
+                  <th className="py-2.5 font-normal">Name</th>
+                  {!selected && <th className="py-2.5 font-normal">Pays to</th>}
+                  <th className="py-2.5 pr-6 text-right font-normal">
+                    Total paid
+                  </th>
+                  <th className="py-2.5 font-normal">Last paid</th>
+                  <th className="py-2.5 font-normal">
+                    <span className="sr-only">Status</span>
+                  </th>
+                  <th className="py-2.5 font-normal">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {pager.visible.map((r) => {
+                  const p = problems.get(r.id);
+                  const last = lastPayment(r);
+                  const total = totalPaid(r);
+                  const on = selectedId === r.id;
+                  return (
+                    <Fragment key={r.id}>
+                      <tr
+                        onClick={() => setSelectedId(on ? null : r.id)}
+                        aria-selected={on}
+                        className={`group cursor-pointer border-t border-white/6 transition-colors ${on || checked.has(r.id) ? "bg-white/[0.05]" : "hover:bg-white/[0.03]"}`}
                       >
-                        <Checkbox
-                          checked={checked.has(r.id)}
-                          label={`Select ${r.name}`}
-                          onChange={() =>
-                            setChecked((s) => {
-                              const n = new Set(s);
-                              if (n.has(r.id)) n.delete(r.id);
-                              else n.add(r.id);
-                              return n;
-                            })
-                          }
-                        />
-                      </td>
-                      <td className="py-3 pr-4">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <RecipientAvatar recipient={r} size={28} />
-                          <div className="min-w-0">
-                            <div className="truncate text-[13.5px] font-medium text-white">
-                              {r.name}
-                            </div>
-                            <div className="truncate text-[11px] text-neutral-500">
-                              {flagOf(r.country)} {r.kind} · {r.country}
+                        <td
+                          className="py-3 pl-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Checkbox
+                            checked={checked.has(r.id)}
+                            label={`Select ${r.name}`}
+                            onChange={() =>
+                              setChecked((s) => {
+                                const n = new Set(s);
+                                if (n.has(r.id)) n.delete(r.id);
+                                else n.add(r.id);
+                                return n;
+                              })
+                            }
+                          />
+                        </td>
+                        <td className="py-3 pr-4">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <RecipientAvatar recipient={r} size={28} />
+                            <div className="min-w-0">
+                              <div className="truncate text-[13.5px] font-medium text-white">
+                                {r.name}
+                              </div>
+                              <div className="truncate text-[11px] text-neutral-500">
+                                {flagOf(r.country)} {r.kind} · {r.country}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </td>
-                      {!selected && (
-                        <td className="py-3 pr-4">
-                          {r.account ? (
-                            <>
-                              <div className="truncate text-neutral-200">
-                                {r.institution}
-                              </div>
-                              <div className="truncate text-[11px] text-neutral-500 tabular-nums">
-                                ••{r.account.slice(-4)} · {railLabel(r)}
-                                {r.currency !== "USD" && ` · ${r.currency}`}
-                              </div>
-                            </>
-                          ) : (
-                            <span className="text-neutral-600">
-                              Not added yet
+                        </td>
+                        {!selected && (
+                          <td className="py-3 pr-4">
+                            {r.account ? (
+                              <>
+                                <div className="truncate text-neutral-200">
+                                  {r.institution}
+                                </div>
+                                <div className="truncate text-[11px] text-neutral-500 tabular-nums">
+                                  ••{r.account.slice(-4)} · {railLabel(r)}
+                                  {r.currency !== "USD" && ` · ${r.currency}`}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-neutral-600">
+                                Not added yet
+                              </span>
+                            )}
+                          </td>
+                        )}
+                        <td className="amount py-3 pr-6 text-right tabular-nums">
+                          {total ? (
+                            <span className="text-white">
+                              {amount(total, r.currency)}
                             </span>
+                          ) : (
+                            <span className="text-neutral-600">—</span>
                           )}
                         </td>
-                      )}
-                      <td className="amount py-3 pr-6 text-right tabular-nums">
-                        {total ? (
-                          <span className="text-white">
-                            {amount(total, r.currency)}
-                          </span>
-                        ) : (
-                          <span className="text-neutral-600">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 text-neutral-400 tabular-nums">
-                        {last
-                          ? last.status === "Processing"
-                            ? "Sending"
-                            : last.status === "Failed"
-                              ? `Came back ${dateFmt.format(new Date(last.date))}`
-                              : dateFmt.format(new Date(last.date))
-                          : "Never"}
-                      </td>
-                      <td className="py-3 pr-2">
-                        {p && <ProblemChip p={p} />}
-                      </td>
-                      <td
-                        className="py-3 pr-2"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex items-center justify-end gap-0.5">
-                          {!p && (
-                            <button
-                              type="button"
-                              aria-label={`Pay ${r.name}`}
-                              title="Pay"
-                              onClick={() => setSending(r.id)}
-                              className="flex size-7 items-center justify-center rounded-md text-neutral-500 opacity-0 transition-all group-hover:opacity-100 hover:bg-white/8 hover:text-white focus-visible:opacity-100"
-                            >
-                              <Send size={14} strokeWidth={1.75} />
-                            </button>
-                          )}
-                          <RowMenu
-                            label={`${r.name} actions`}
-                            items={[
-                              ...(!p
-                                ? [
-                                    {
-                                      label: "Pay",
-                                      run: () => setSending(r.id),
-                                    },
-                                  ]
-                                : []),
-                              ...(p?.fix && p.fixLabel
-                                ? [{ label: p.fixLabel, run: () => fix(r, p) }]
-                                : []),
-                              {
-                                label: "Edit details",
-                                run: () => setFlow({ mode: "edit", id: r.id }),
-                              },
-                              {
-                                label: "Copy recipient ID",
-                                run: () => {
-                                  navigator.clipboard
-                                    ?.writeText(r.id)
-                                    .catch(() => {});
-                                  setToast("Recipient ID copied");
+                        <td className="py-3 text-neutral-400 tabular-nums">
+                          {last
+                            ? last.status === "Processing"
+                              ? "Sending"
+                              : last.status === "Failed"
+                                ? `Came back ${dateFmt.format(new Date(last.date))}`
+                                : dateFmt.format(new Date(last.date))
+                            : "Never"}
+                        </td>
+                        <td className="py-3 pr-2">
+                          {p && <ProblemChip p={p} />}
+                        </td>
+                        <td
+                          className="py-3 pr-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-end gap-0.5">
+                            {!p && (
+                              <button
+                                type="button"
+                                aria-label={`Pay ${r.name}`}
+                                title="Pay"
+                                onClick={() => setSending(r.id)}
+                                className="flex size-7 items-center justify-center rounded-md text-neutral-500 opacity-0 transition-all group-hover:opacity-100 hover:bg-white/8 hover:text-white focus-visible:opacity-100"
+                              >
+                                <Send size={14} strokeWidth={1.75} />
+                              </button>
+                            )}
+                            <RowMenu
+                              label={`${r.name} actions`}
+                              items={[
+                                ...(!p
+                                  ? [
+                                      {
+                                        label: "Pay",
+                                        run: () => setSending(r.id),
+                                      },
+                                    ]
+                                  : []),
+                                ...(p?.fix && p.fixLabel
+                                  ? [
+                                      {
+                                        label: p.fixLabel,
+                                        run: () => fix(r, p),
+                                      },
+                                    ]
+                                  : []),
+                                {
+                                  label: "Edit details",
+                                  run: () =>
+                                    setFlow({ mode: "edit", id: r.id }),
                                 },
-                              },
-                              {
-                                label: "Archive",
-                                run: () => archive([r.id]),
-                                danger: true,
-                              },
-                            ]}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  </Fragment>
-                );
-              })}
-              {rows.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="border-t border-white/6 py-16 text-center text-neutral-500"
-                  >
-                    {tab === "Needs attention"
-                      ? "Everyone can be paid."
-                      : "No recipients match."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                                {
+                                  label: "Copy recipient ID",
+                                  run: () => {
+                                    navigator.clipboard
+                                      ?.writeText(r.id)
+                                      .catch(() => {});
+                                    setToast("Recipient ID copied");
+                                  },
+                                },
+                                {
+                                  label: "Archive",
+                                  run: () => archive([r.id]),
+                                  danger: true,
+                                },
+                              ]}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    </Fragment>
+                  );
+                })}
+                {rows.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="border-t border-white/6 py-16 text-center text-neutral-500"
+                    >
+                      {tab === "Needs attention"
+                        ? "Everyone can be paid."
+                        : "No recipients match."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <TablePager pager={pager} noun="recipients" />
+          </div>
 
           {selected && (
             <RecipientPanel

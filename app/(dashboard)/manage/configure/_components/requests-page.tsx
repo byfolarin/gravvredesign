@@ -6,6 +6,7 @@ import { ArrowUpRight, ChevronLeft, Search, X } from "lucide-react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import {
   ALLOWLIST,
   ENV,
@@ -17,7 +18,6 @@ import {
   type Env,
 } from "../_data";
 
-const PER_PAGE = 14;
 const METHOD_TONE: Record<ApiRequest["method"], string> = {
   GET: "text-sky-300",
   POST: "text-emerald-300",
@@ -67,7 +67,6 @@ export function RequestsPage() {
   const [path, setPath] = useState<string | null>(null);
   const [keyFilter, setKeyFilter] = useState("all");
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,11 +90,10 @@ export function RequestsPage() {
           .toLowerCase()
           .includes(q)),
   );
-  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
-  const current = Math.min(page, pages);
-  const visible = rows.slice((current - 1) * PER_PAGE, current * PER_PAGE);
+  const pager = usePager(rows, "api-requests");
+  const visible = pager.visible;
   const selected = rows.find((r) => r.id === selectedId) ?? visible[0];
-  const reset = () => setPage(1);
+  const reset = () => pager.setPage(1);
 
   // Busiest endpoints. The log is a sample, so scale to the day: calls by each path's share
   // of traffic, failures by its share of the day's errors — the numbers agree with the header.
@@ -464,34 +462,7 @@ export function RequestsPage() {
               </li>
             )}
           </ul>
-          <div className="mt-3 flex items-center justify-between text-[13px] text-neutral-500">
-            <span className="tabular-nums">
-              {rows.length
-                ? `Showing ${(current - 1) * PER_PAGE + 1}–${Math.min(current * PER_PAGE, rows.length)} of ${rows.length}`
-                : "No results"}
-            </span>
-            <span className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={current === 1}
-                onClick={() => setPage(current - 1)}
-                className="h-8 rounded-full px-3 text-neutral-300 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:text-neutral-600"
-              >
-                Previous
-              </button>
-              <span className="px-1 tabular-nums">
-                {current} / {pages}
-              </span>
-              <button
-                type="button"
-                disabled={current === pages}
-                onClick={() => setPage(current + 1)}
-                className="h-8 rounded-full px-3 text-neutral-300 hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:text-neutral-600"
-              >
-                Next
-              </button>
-            </span>
-          </div>
+          <TablePager pager={pager} noun="requests" className="mt-3" />
         </div>
 
         {selected ? <Inspector key={selected.id} r={selected} /> : <div />}

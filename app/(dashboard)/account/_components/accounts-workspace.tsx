@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   Check,
-  ChevronLeft,
   ChevronRight,
   Copy,
   Download,
@@ -19,6 +18,7 @@ import {
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import {
   LoadingState,
   type LoaderVariant,
@@ -99,9 +99,6 @@ const MAX_SHOWN = 4;
 const SHOWN_KEY = "gravv-accounts-currencies";
 const DEFAULT_SHOWN: Currency[] = ["USD", "EUR", "GBP", "NGN"];
 const CATEGORIES: ("All" | Category)[] = ["All", "Individual", "Business"];
-const PAGE_SIZES = [10, 20, 50, 100] as const;
-type PageSize = (typeof PAGE_SIZES)[number];
-const PAGE_SIZE_KEY = "gravv-accounts-page-size";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("en-US", {
@@ -156,19 +153,6 @@ function Money({
   );
 }
 
-/** Compact page list: 1 … 4 5 6 … 126. */
-function pageList(current: number, total: number): (number | "…")[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const out: (number | "…")[] = [1];
-  const from = Math.max(2, current - 1);
-  const to = Math.min(total - 1, current + 1);
-  if (from > 2) out.push("…");
-  for (let p = from; p <= to; p++) out.push(p);
-  if (to < total - 1) out.push("…");
-  out.push(total);
-  return out;
-}
-
 export function AccountsWorkspace() {
   const [list, setList] = useState(ALL);
   // Prototype: show the page as a new account, with problems, or loading.
@@ -176,24 +160,6 @@ export function AccountsWorkspace() {
   // One loader everywhere: Drive.
   const loader: LoaderVariant = "Drive";
   const [section, setSection] = useState<Section>("accounts");
-  // Rows per page: your pick, remembered in this browser.
-  const [perPage, setPerPage] = useState<PageSize>(20);
-  useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        const n = Number(localStorage.getItem(PAGE_SIZE_KEY));
-        if (PAGE_SIZES.includes(n as PageSize)) setPerPage(n as PageSize);
-      } catch {}
-    }, 0);
-    return () => clearTimeout(t);
-  }, []);
-  const choosePerPage = (n: PageSize) => {
-    setPerPage(n);
-    setPage(1);
-    try {
-      localStorage.setItem(PAGE_SIZE_KEY, String(n));
-    } catch {}
-  };
   const [tab, setTab] = useState<Tab>("All");
   const [currency, setCurrency] = useState<"All" | Currency>("All");
   const [shown, setShown] = useState<Currency[]>(DEFAULT_SHOWN);
@@ -227,7 +193,6 @@ export function AccountsWorkspace() {
   };
   const [category, setCategory] = useState<"All" | Category>("All");
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
   // "View all details" opens the full record in a side sheet.
   const [sheetId, setSheetId] = useState<string | null>(null);
@@ -299,12 +264,10 @@ export function AccountsWorkspace() {
       setToast("Stearns Bank is back — balances are current");
     }, 2500);
   };
-  const PER_PAGE = perPage;
-  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
-  const current = Math.min(page, pages);
-  const visible = rows.slice((current - 1) * PER_PAGE, current * PER_PAGE);
+  const pager = usePager(rows, "accounts");
+  const visible = pager.visible;
   const reset = () => {
-    setPage(1);
+    pager.setPage(1);
     setOpenId(null);
   };
 
@@ -823,65 +786,7 @@ export function AccountsWorkspace() {
               </tbody>
             </table>
 
-            {/* Pagination */}
-            <div className="mt-2 flex items-center justify-between border-t border-white/6 pt-4 text-[13px] text-neutral-500">
-              <span className="flex items-center gap-4 tabular-nums">
-                <span>
-                  {rows.length === 0
-                    ? "No results"
-                    : `Showing ${((current - 1) * PER_PAGE + 1).toLocaleString("en-US")}–${Math.min(current * PER_PAGE, rows.length).toLocaleString("en-US")} of ${rows.length.toLocaleString("en-US")}`}
-                </span>
-                <span className="flex items-center gap-2">
-                  <span className="text-neutral-500">Rows per page</span>
-                  <Dropdown
-                    label="Rows per page"
-                    variant="compact"
-                    placement="top"
-                    value={perPage}
-                    options={PAGE_SIZES.map((n) => ({
-                      value: n,
-                      label: String(n),
-                    }))}
-                    onChange={choosePerPage}
-                  />
-                </span>
-              </span>
-              <div className="flex items-center gap-1">
-                <PageButton
-                  label="Previous page"
-                  disabled={current === 1}
-                  onClick={() => setPage(current - 1)}
-                >
-                  <ChevronLeft size={14} strokeWidth={1.75} />
-                </PageButton>
-                {pageList(current, pages).map((p, i) =>
-                  p === "…" ? (
-                    <span
-                      key={`gap${i}`}
-                      className="w-6 text-center text-neutral-600"
-                    >
-                      …
-                    </span>
-                  ) : (
-                    <PageButton
-                      key={p}
-                      label={`Page ${p}`}
-                      active={p === current}
-                      onClick={() => setPage(p)}
-                    >
-                      {p}
-                    </PageButton>
-                  ),
-                )}
-                <PageButton
-                  label="Next page"
-                  disabled={current === pages}
-                  onClick={() => setPage(current + 1)}
-                >
-                  <ChevronRight size={14} strokeWidth={1.75} />
-                </PageButton>
-              </div>
-            </div>
+            <TablePager pager={pager} noun="accounts" />
           </>
         )}
       </div>
@@ -1244,59 +1149,63 @@ function Applications() {
     Approved: "border-transparent bg-[var(--ok-bg)] text-[var(--ok-fg)]",
     Rejected: "border-transparent bg-rose-400/10 text-rose-300",
   };
+  const pager = usePager(APPLICATIONS, "account-applications");
   return (
-    <table className="mt-8 w-full table-fixed border-t border-white/15 text-[13px]">
-      <colgroup>
-        <col />
-        <col className="w-[200px]" />
-        <col className="w-[120px]" />
-        <col className="w-[120px]" />
-        <col className="w-[130px]" />
-      </colgroup>
-      <thead>
-        <tr className="text-left text-xs text-neutral-500">
-          <th className="py-2.5 pl-4 font-normal">Applicant</th>
-          <th className="py-2.5 font-normal">Bank</th>
-          <th className="py-2.5 font-normal">Currency</th>
-          <th className="py-2.5 font-normal">Submitted</th>
-          <th className="py-2.5 font-normal">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {APPLICATIONS.map((a) => (
-          <tr
-            key={a.id}
-            className="border-t border-white/6 hover:bg-white/[0.03]"
-          >
-            <td className="py-3 pr-4 pl-4">
-              <div className="truncate text-neutral-100">{a.applicant}</div>
-              <div
-                className={`truncate text-[11px] ${a.note ? (a.status === "Rejected" ? "text-rose-300" : "text-amber-200") : "text-neutral-500"}`}
-              >
-                {a.note ?? `${a.category} · ${a.email}`}
-              </div>
-            </td>
-            <td className="py-3 text-neutral-200">{a.bank}</td>
-            <td className="py-3">
-              <span className="flex items-center gap-2 text-neutral-200">
-                <Flag currency={a.currency} />
-                {a.currency}
-              </span>
-            </td>
-            <td className="py-3 text-neutral-300 tabular-nums">
-              {dateFmt.format(new Date(a.submittedAt))}
-            </td>
-            <td className="py-3">
-              <span
-                className={`inline-flex h-6 items-center rounded-full border px-2.5 text-xs leading-none font-medium ${tone[a.status]}`}
-              >
-                {a.status}
-              </span>
-            </td>
+    <>
+      <table className="mt-8 w-full table-fixed border-t border-white/15 text-[13px]">
+        <colgroup>
+          <col />
+          <col className="w-[200px]" />
+          <col className="w-[120px]" />
+          <col className="w-[120px]" />
+          <col className="w-[130px]" />
+        </colgroup>
+        <thead>
+          <tr className="text-left text-xs text-neutral-500">
+            <th className="py-2.5 pl-4 font-normal">Applicant</th>
+            <th className="py-2.5 font-normal">Bank</th>
+            <th className="py-2.5 font-normal">Currency</th>
+            <th className="py-2.5 font-normal">Submitted</th>
+            <th className="py-2.5 font-normal">Status</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {pager.visible.map((a) => (
+            <tr
+              key={a.id}
+              className="border-t border-white/6 hover:bg-white/[0.03]"
+            >
+              <td className="py-3 pr-4 pl-4">
+                <div className="truncate text-neutral-100">{a.applicant}</div>
+                <div
+                  className={`truncate text-[11px] ${a.note ? (a.status === "Rejected" ? "text-rose-300" : "text-amber-200") : "text-neutral-500"}`}
+                >
+                  {a.note ?? `${a.category} · ${a.email}`}
+                </div>
+              </td>
+              <td className="py-3 text-neutral-200">{a.bank}</td>
+              <td className="py-3">
+                <span className="flex items-center gap-2 text-neutral-200">
+                  <Flag currency={a.currency} />
+                  {a.currency}
+                </span>
+              </td>
+              <td className="py-3 text-neutral-300 tabular-nums">
+                {dateFmt.format(new Date(a.submittedAt))}
+              </td>
+              <td className="py-3">
+                <span
+                  className={`inline-flex h-6 items-center rounded-full border px-2.5 text-xs leading-none font-medium ${tone[a.status]}`}
+                >
+                  {a.status}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <TablePager pager={pager} noun="applications" />
+    </>
   );
 }
 
@@ -2065,37 +1974,6 @@ function RowMenu({
         </div>
       )}
     </div>
-  );
-}
-
-function PageButton({
-  label,
-  active = false,
-  disabled = false,
-  onClick,
-  children,
-}: {
-  label: string;
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-current={active ? "page" : undefined}
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex size-8 items-center justify-center rounded-full text-[13px] tabular-nums transition-colors disabled:opacity-30 ${
-        active
-          ? "bg-white/10 text-white"
-          : "text-neutral-400 enabled:hover:bg-white/6 enabled:hover:text-white"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

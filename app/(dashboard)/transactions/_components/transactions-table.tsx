@@ -5,7 +5,6 @@ import {
   ChevronDown,
   ArrowUpDown,
   Check,
-  ChevronLeft,
   ChevronRight,
   Download,
   ExternalLink,
@@ -17,6 +16,7 @@ import {
 } from "lucide-react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import { ChartExplorer } from "./charts";
 import { CategoryPicker, DEFAULT_CATEGORIES } from "./category-picker";
 import { NetworkLogo } from "../../wallets/_components/network-logo";
@@ -47,7 +47,6 @@ const SCOPES = [
   "Hash",
 ] as const;
 type Scope = (typeof SCOPES)[number];
-const PAGE_SIZES = [25, 50, 100];
 
 const money = (v: number) =>
   new Intl.NumberFormat("en-US", {
@@ -89,8 +88,6 @@ export function TransactionsTable({ initial }: { initial: Transaction[] }) {
   const [type, setType] = useState<"All" | TxnType>("All");
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<Scope>("Customer ID");
-  const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(50);
   const [openId, setOpenId] = useState<string | null>(null);
   // "View all details" opens the full record in a side sheet.
   const [sheetId, setSheetId] = useState<string | null>(null);
@@ -164,10 +161,9 @@ export function TransactionsTable({ initial }: { initial: Transaction[] }) {
     );
   const count = (s: Tab) =>
     initial.filter((t) => s === "All" || t.status === s).length;
-  const pages = Math.max(1, Math.ceil(rows.length / perPage));
-  const current = Math.min(page, pages);
-  const visible = rows.slice((current - 1) * perPage, current * perPage);
-  const reset = () => setPage(1);
+  const pager = usePager(rows, "transactions");
+  const visible = pager.visible;
+  const reset = () => pager.setPage(1);
   // Summary follows the filters, like Mercury's "Net change / Money in / Money out".
   const settled = rows.filter((t) => t.status !== "Failed");
   const moneyIn = settled
@@ -577,57 +573,7 @@ export function TransactionsTable({ initial }: { initial: Transaction[] }) {
           </tbody>
         </table>
 
-        {/* Pagination */}
-        <div className="mt-2 flex items-center justify-between border-t border-white/6 pt-4 text-[13px] text-neutral-500">
-          <span className="tabular-nums">
-            {rows.length === 0
-              ? "No results"
-              : `Showing ${(current - 1) * perPage + 1} to ${Math.min(current * perPage, rows.length)} of ${rows.length}`}
-          </span>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <PageButton
-                label="Previous page"
-                disabled={current === 1}
-                onClick={() => setPage(current - 1)}
-              >
-                <ChevronLeft size={14} strokeWidth={1.75} />
-              </PageButton>
-              {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-                <PageButton
-                  key={p}
-                  label={`Page ${p}`}
-                  active={p === current}
-                  onClick={() => setPage(p)}
-                >
-                  {p}
-                </PageButton>
-              ))}
-              <PageButton
-                label="Next page"
-                disabled={current === pages}
-                onClick={() => setPage(current + 1)}
-              >
-                <ChevronRight size={14} strokeWidth={1.75} />
-              </PageButton>
-            </div>
-            <Dropdown
-              label="Rows per page"
-              variant="compact"
-              placement="top"
-              align="right"
-              value={perPage}
-              options={PAGE_SIZES.map((n) => ({
-                value: n,
-                label: `${n} per page`,
-              }))}
-              onChange={(v) => {
-                setPerPage(v);
-                reset();
-              }}
-            />
-          </div>
-        </div>
+        <TablePager pager={pager} noun="transactions" />
       </div>
 
       {sheetTxn && (
@@ -1234,37 +1180,6 @@ function Field({
         )}
       </span>
     </div>
-  );
-}
-
-function PageButton({
-  label,
-  active = false,
-  disabled = false,
-  onClick,
-  children,
-}: {
-  label: string;
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-current={active ? "page" : undefined}
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex size-8 items-center justify-center rounded-full text-[13px] tabular-nums transition-colors disabled:opacity-30 ${
-        active
-          ? "bg-white/10 text-white"
-          : "text-neutral-400 enabled:hover:bg-white/6 enabled:hover:text-white"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

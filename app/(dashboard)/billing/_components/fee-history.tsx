@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Download, Search } from "lucide-react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import {
   FEE_TYPES,
   typeOf,
@@ -43,7 +44,6 @@ export function FeeHistory({ fees }: { fees: Fee[] }) {
   const [tab, setTab] = useState<Tab>("All");
   const [type, setType] = useState<"All" | FeeTypeId>("All");
   const [query, setQuery] = useState("");
-  const [shown, setShown] = useState(50);
   const [toast, setToast] = useState<string | null>(null);
 
   // Arriving from Billing with ?type=… narrows to that fee.
@@ -68,13 +68,14 @@ export function FeeHistory({ fees }: { fees: Fee[] }) {
     .filter((f) => type === "All" || f.type === type)
     .filter((f) => !q || f.id.includes(q) || f.txnId.includes(q));
   const rows = scoped.filter((f) => tab === "All" || f.status === tab);
+  const pager = usePager(rows, "fee-history");
   const sum = (s: FeeStatus) =>
     inMonth.filter((f) => f.status === s).reduce((t, f) => t + f.amount, 0);
   const notCharged = inMonth.filter((f) => f.status === "Not charged");
   const at = months.indexOf(month);
   const go = (i: number) => {
     setMonth(months[i]);
-    setShown(50);
+    pager.setPage(1);
   };
 
   return (
@@ -157,7 +158,10 @@ export function FeeHistory({ fees }: { fees: Fee[] }) {
                 type="button"
                 role="tab"
                 aria-selected={tab === t}
-                onClick={() => setTab(t)}
+                onClick={() => {
+                  setTab(t);
+                  pager.setPage(1);
+                }}
                 className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors ${tab === t ? "bg-white/[0.08] font-medium text-white" : "text-neutral-500 hover:bg-white/[0.04] hover:text-neutral-200"}`}
               >
                 {t}
@@ -179,7 +183,10 @@ export function FeeHistory({ fees }: { fees: Fee[] }) {
                 { value: "All" as const, label: "All fees" },
                 ...FEE_TYPES.map((t) => ({ value: t.id, label: t.label })),
               ]}
-              onChange={setType}
+              onChange={(v) => {
+                setType(v);
+                pager.setPage(1);
+              }}
             />
             <label className="flex h-9 w-[240px] items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 focus-within:border-white/35">
               <Search
@@ -189,7 +196,10 @@ export function FeeHistory({ fees }: { fees: Fee[] }) {
               />
               <input
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  pager.setPage(1);
+                }}
                 placeholder="Fee or transaction ID…"
                 aria-label="Search fees"
                 className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-neutral-500"
@@ -216,7 +226,7 @@ export function FeeHistory({ fees }: { fees: Fee[] }) {
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, shown).map((f) => {
+            {pager.visible.map((f) => {
               const t = typeOf(f.type);
               const off = f.status === "Not charged";
               return (
@@ -287,22 +297,7 @@ export function FeeHistory({ fees }: { fees: Fee[] }) {
             )}
           </tbody>
         </table>
-        <div className="flex items-center justify-between border-t border-white/6 pt-4 text-[13px] text-neutral-500 tabular-nums">
-          <span>
-            {rows.length > shown
-              ? `Showing ${shown} of ${rows.length} fees`
-              : `${rows.length} fees`}
-          </span>
-          {rows.length > shown && (
-            <button
-              type="button"
-              onClick={() => setShown((n) => n + 50)}
-              className="h-8 rounded-full border border-white/12 px-3.5 text-neutral-200 hover:border-white/30 hover:text-white"
-            >
-              Show {Math.min(50, rows.length - shown)} more
-            </button>
-          )}
-        </div>
+        <TablePager pager={pager} noun="fees" className="" />
       </div>
 
       {toast && (

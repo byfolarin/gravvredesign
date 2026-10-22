@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import { PersonAvatar } from "@/app/_components/person-avatar";
 import { ME, MEMBERS, ROLES } from "../../roles/_data";
 import {
@@ -209,6 +210,7 @@ export function ApprovalsWorkspace() {
   );
   const history = requests.filter((r) => r.state !== "pending");
   const rows = tab === "mine" ? mine : tab === "others" ? others : history;
+  const pager = usePager(rows, "approvals");
   const totalMine = mine.reduce(
     (s, r) => s + (r.currency === "NGN" ? r.amount / 900 : r.amount),
     0,
@@ -285,6 +287,7 @@ export function ApprovalsWorkspace() {
             onClick={() => {
               setTab(id);
               setSelected(new Set());
+              pager.setPage(1);
             }}
             className={`-mb-px flex items-center gap-1.5 border-b pb-3 text-[14px] transition-colors ${
               tab === id
@@ -328,166 +331,172 @@ export function ApprovalsWorkspace() {
           </p>
         </div>
       ) : (
-        <table className="mt-3 w-full table-fixed text-[13px]">
-          <colgroup>
-            {tab === "mine" && <col className="w-10" />}
-            <col className="w-[30%]" />
-            <col className="w-[18%]" />
-            <col />
-            <col className="w-[17%]" />
-            <col className={tab === "mine" ? "w-[180px]" : "w-[120px]"} />
-          </colgroup>
-          <thead>
-            <tr className="text-left text-xs text-neutral-500">
-              {tab === "mine" && (
+        <>
+          <table className="mt-3 w-full table-fixed text-[13px]">
+            <colgroup>
+              {tab === "mine" && <col className="w-10" />}
+              <col className="w-[30%]" />
+              <col className="w-[18%]" />
+              <col />
+              <col className="w-[17%]" />
+              <col className={tab === "mine" ? "w-[180px]" : "w-[120px]"} />
+            </colgroup>
+            <thead>
+              <tr className="text-left text-xs text-neutral-500">
+                {tab === "mine" && (
+                  <th className="py-2.5 font-normal">
+                    <Checkbox
+                      on={allOn}
+                      label="Select all"
+                      onChange={() =>
+                        setSelected(
+                          allOn ? new Set() : new Set(rows.map((r) => r.id)),
+                        )
+                      }
+                    />
+                  </th>
+                )}
+                <th className="py-2.5 font-normal">Payment</th>
+                <th className="py-2.5 font-normal">Requested by</th>
+                <th className="py-2.5 font-normal">Why it&apos;s here</th>
                 <th className="py-2.5 font-normal">
-                  <Checkbox
-                    on={allOn}
-                    label="Select all"
-                    onChange={() =>
-                      setSelected(
-                        allOn ? new Set() : new Set(rows.map((r) => r.id)),
-                      )
-                    }
-                  />
+                  {tab === "history" ? "Decision" : "Approvals"}
                 </th>
-              )}
-              <th className="py-2.5 font-normal">Payment</th>
-              <th className="py-2.5 font-normal">Requested by</th>
-              <th className="py-2.5 font-normal">Why it&apos;s here</th>
-              <th className="py-2.5 font-normal">
-                {tab === "history" ? "Decision" : "Approvals"}
-              </th>
-              <th className="py-2.5 font-normal" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => {
-              const n = approvedCount(r);
-              const last = r.decisions[r.decisions.length - 1];
-              return (
-                <tr
-                  key={r.id}
-                  onClick={() => setSheet({ id: r.id })}
-                  className={`cursor-pointer border-t border-white/6 transition-colors hover:bg-white/[0.02] ${selected.has(r.id) ? "bg-white/[0.03]" : ""}`}
-                >
-                  {tab === "mine" && (
-                    <td className="py-3.5" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        on={selected.has(r.id)}
-                        label={`Select payment to ${r.recipient.name}`}
-                        onChange={() => {
-                          const next = new Set(selected);
-                          if (next.has(r.id)) next.delete(r.id);
-                          else next.add(r.id);
-                          setSelected(next);
-                        }}
-                      />
-                    </td>
-                  )}
-                  <td className="py-3.5 pr-4">
-                    <div className="text-[14px] text-white">
-                      <Money r={r} />
-                    </div>
-                    <div className="truncate text-[12px] text-neutral-500">
-                      to {r.recipient.name}
-                      {r.recipient.isNew && (
-                        <span className="text-neutral-300"> · new</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3.5 pr-4">
-                    <span className="flex items-center gap-2.5">
-                      <PersonAvatar name={r.requestedBy} size={28} />
-                      <span className="min-w-0">
-                        <span className="block truncate text-neutral-100">
-                          {r.requestedBy === ME ? "You" : r.requestedBy}
-                        </span>
-                        <span className="block text-[12px] text-neutral-500">
-                          {ago(r.requestedAt)}
-                        </span>
-                      </span>
-                    </span>
-                  </td>
-                  <td className="py-3.5 pr-4">
-                    <div className="truncate text-neutral-300">
-                      {why(r, rules)}
-                    </div>
-                    {(() => {
-                      const w = signals(r).filter((x) => x.tone === "warn");
-                      return w.length && r.state === "pending" ? (
-                        <div
-                          className="truncate text-[12px] text-amber-200/90"
-                          title={w.map((x) => x.text).join("\n")}
-                        >
-                          {w.map((x) => x.short ?? x.text).join(" · ")}
-                        </div>
-                      ) : null;
-                    })()}
-                  </td>
-                  <td className="py-3.5 pr-4">
-                    {r.state === "pending" ? (
-                      <>
-                        <div className="text-neutral-100 tabular-nums">
-                          {n} of {r.needed}
-                        </div>
-                        <div className="truncate text-[12px] text-neutral-500">
-                          {r.requestedBy === ME && settings.noSelfApproval
-                            ? "You can't approve your own"
-                            : r.decisions.some((d) => d.by === ME)
-                              ? "You approved"
-                              : `From ${or(r.approvers.map(roleName))}`}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <StateChip state={r.state} />
-                        <div className="mt-1 truncate text-[12px] text-neutral-500">
-                          {last.by === ME ? "You" : last.by.split(" ")[0]} ·{" "}
-                          {ago(last.at)}
-                        </div>
-                      </>
-                    )}
-                  </td>
-                  <td
-                    className="py-3.5 text-right"
-                    onClick={(e) => e.stopPropagation()}
+                <th className="py-2.5 font-normal" />
+              </tr>
+            </thead>
+            <tbody>
+              {pager.visible.map((r) => {
+                const n = approvedCount(r);
+                const last = r.decisions[r.decisions.length - 1];
+                return (
+                  <tr
+                    key={r.id}
+                    onClick={() => setSheet({ id: r.id })}
+                    className={`cursor-pointer border-t border-white/6 transition-colors hover:bg-white/[0.02] ${selected.has(r.id) ? "bg-white/[0.03]" : ""}`}
                   >
-                    {tab === "mine" ? (
-                      <span className="flex justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSheet({ id: r.id, rejecting: true })
-                          }
-                          className="h-8 rounded-full px-3 text-[13px] text-neutral-400 transition-colors hover:bg-white/[0.06] hover:text-white"
-                        >
-                          Reject
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => decide([r.id], "approved")}
-                          className="h-8 rounded-full bg-white px-3.5 text-[13px] font-medium text-black transition-colors hover:bg-neutral-200"
-                        >
-                          Approve
-                        </button>
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setSheet({ id: r.id })}
-                        className="inline-flex items-center gap-0.5 text-[12px] text-neutral-400 hover:text-white"
+                    {tab === "mine" && (
+                      <td
+                        className="py-3.5"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        Details
-                        <ChevronRight size={13} strokeWidth={1.75} />
-                      </button>
+                        <Checkbox
+                          on={selected.has(r.id)}
+                          label={`Select payment to ${r.recipient.name}`}
+                          onChange={() => {
+                            const next = new Set(selected);
+                            if (next.has(r.id)) next.delete(r.id);
+                            else next.add(r.id);
+                            setSelected(next);
+                          }}
+                        />
+                      </td>
                     )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    <td className="py-3.5 pr-4">
+                      <div className="text-[14px] text-white">
+                        <Money r={r} />
+                      </div>
+                      <div className="truncate text-[12px] text-neutral-500">
+                        to {r.recipient.name}
+                        {r.recipient.isNew && (
+                          <span className="text-neutral-300"> · new</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3.5 pr-4">
+                      <span className="flex items-center gap-2.5">
+                        <PersonAvatar name={r.requestedBy} size={28} />
+                        <span className="min-w-0">
+                          <span className="block truncate text-neutral-100">
+                            {r.requestedBy === ME ? "You" : r.requestedBy}
+                          </span>
+                          <span className="block text-[12px] text-neutral-500">
+                            {ago(r.requestedAt)}
+                          </span>
+                        </span>
+                      </span>
+                    </td>
+                    <td className="py-3.5 pr-4">
+                      <div className="truncate text-neutral-300">
+                        {why(r, rules)}
+                      </div>
+                      {(() => {
+                        const w = signals(r).filter((x) => x.tone === "warn");
+                        return w.length && r.state === "pending" ? (
+                          <div
+                            className="truncate text-[12px] text-amber-200/90"
+                            title={w.map((x) => x.text).join("\n")}
+                          >
+                            {w.map((x) => x.short ?? x.text).join(" · ")}
+                          </div>
+                        ) : null;
+                      })()}
+                    </td>
+                    <td className="py-3.5 pr-4">
+                      {r.state === "pending" ? (
+                        <>
+                          <div className="text-neutral-100 tabular-nums">
+                            {n} of {r.needed}
+                          </div>
+                          <div className="truncate text-[12px] text-neutral-500">
+                            {r.requestedBy === ME && settings.noSelfApproval
+                              ? "You can't approve your own"
+                              : r.decisions.some((d) => d.by === ME)
+                                ? "You approved"
+                                : `From ${or(r.approvers.map(roleName))}`}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <StateChip state={r.state} />
+                          <div className="mt-1 truncate text-[12px] text-neutral-500">
+                            {last.by === ME ? "You" : last.by.split(" ")[0]} ·{" "}
+                            {ago(last.at)}
+                          </div>
+                        </>
+                      )}
+                    </td>
+                    <td
+                      className="py-3.5 text-right"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {tab === "mine" ? (
+                        <span className="flex justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSheet({ id: r.id, rejecting: true })
+                            }
+                            className="h-8 rounded-full px-3 text-[13px] text-neutral-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => decide([r.id], "approved")}
+                            className="h-8 rounded-full bg-white px-3.5 text-[13px] font-medium text-black transition-colors hover:bg-neutral-200"
+                          >
+                            Approve
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setSheet({ id: r.id })}
+                          className="inline-flex items-center gap-0.5 text-[12px] text-neutral-400 hover:text-white"
+                        >
+                          Details
+                          <ChevronRight size={13} strokeWidth={1.75} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <TablePager pager={pager} noun="requests" />
+        </>
       )}
 
       {/* Bulk: approve several at once */}

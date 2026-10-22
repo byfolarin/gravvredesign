@@ -16,6 +16,7 @@ import {
   useDiscardGuard,
 } from "@/app/_components/discard-guard";
 import { Dropdown } from "@/app/_components/dropdown";
+import { TablePager, usePager } from "@/app/_components/table-pager";
 import { PersonAvatar } from "@/app/_components/person-avatar";
 import {
   INVITES,
@@ -74,6 +75,12 @@ export function TeamWorkspace() {
       (roleFilter === "all" || i.role === roleFilter) &&
       (!q || i.email.includes(q)),
   );
+  const pager = usePager(rows, "team-members");
+  const invitePager = usePager(inviteRows, "team-invites");
+  const resetPages = () => {
+    pager.setPage(1);
+    invitePager.setPage(1);
+  };
   const noTwoStep = members.filter((m) => !m.twoFactor);
 
   const changeRole = (name: string, role: string) => {
@@ -124,7 +131,10 @@ export function TeamWorkspace() {
               type="button"
               role="tab"
               aria-selected={tab === id}
-              onClick={() => setTab(id)}
+              onClick={() => {
+                setTab(id);
+                resetPages();
+              }}
               className={`-mb-px flex items-center gap-1.5 border-b pb-3 text-[14px] transition-colors ${
                 tab === id
                   ? "border-white text-white"
@@ -143,7 +153,10 @@ export function TeamWorkspace() {
             <Search size={13} strokeWidth={1.75} className="text-neutral-500" />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                resetPages();
+              }}
               placeholder="Search people…"
               aria-label="Search people"
               className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-neutral-500"
@@ -159,7 +172,10 @@ export function TeamWorkspace() {
               { value: "all", label: "All roles" },
               ...ROLES.map((r) => ({ value: r.id, label: r.name })),
             ]}
-            onChange={setRoleFilter}
+            onChange={(v) => {
+              setRoleFilter(v);
+              resetPages();
+            }}
           />
         </div>
       </div>
@@ -190,215 +206,227 @@ export function TeamWorkspace() {
       )}
 
       {tab === "members" ? (
-        <table className="mt-3 w-full table-fixed text-[13px]">
-          <colgroup>
-            <col />
-            <col className="w-[170px]" />
-            <col className="w-[170px]" />
-            <col className="w-[130px]" />
-            <col className="w-[120px]" />
-            <col className="w-12" />
-          </colgroup>
-          <thead>
-            <tr className="text-left text-xs text-neutral-500">
-              <th className="py-2.5 font-normal">Person</th>
-              <th className="py-2.5 font-normal">Role</th>
-              <th className="py-2.5 font-normal">Can send</th>
-              <th className="py-2.5 font-normal">Two-step login</th>
-              <th className="py-2.5 font-normal">Last active</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((m) => {
-              const role = roleOf(m.role);
-              const fixed = role.owner || m.name === ME;
-              return (
-                <tr
-                  key={m.name}
-                  onClick={() => setSheet(m.name)}
-                  className="cursor-pointer border-t border-white/6 transition-colors hover:bg-white/[0.02]"
-                >
-                  <td className="py-3 pr-4">
-                    <span className="flex items-center gap-3">
-                      <Avatar name={m.name} />
-                      <span className="min-w-0">
-                        <span className="block truncate text-[13.5px] font-medium text-white">
-                          {m.name}
-                          {m.name === ME && (
-                            <span className="text-neutral-500"> (you)</span>
-                          )}
-                        </span>
-                        <span className="block truncate text-[12px] text-neutral-500">
-                          {m.email}
+        <>
+          <table className="mt-3 w-full table-fixed text-[13px]">
+            <colgroup>
+              <col />
+              <col className="w-[170px]" />
+              <col className="w-[170px]" />
+              <col className="w-[130px]" />
+              <col className="w-[120px]" />
+              <col className="w-12" />
+            </colgroup>
+            <thead>
+              <tr className="text-left text-xs text-neutral-500">
+                <th className="py-2.5 font-normal">Person</th>
+                <th className="py-2.5 font-normal">Role</th>
+                <th className="py-2.5 font-normal">Can send</th>
+                <th className="py-2.5 font-normal">Two-step login</th>
+                <th className="py-2.5 font-normal">Last active</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {pager.visible.map((m) => {
+                const role = roleOf(m.role);
+                const fixed = role.owner || m.name === ME;
+                return (
+                  <tr
+                    key={m.name}
+                    onClick={() => setSheet(m.name)}
+                    className="cursor-pointer border-t border-white/6 transition-colors hover:bg-white/[0.02]"
+                  >
+                    <td className="py-3 pr-4">
+                      <span className="flex items-center gap-3">
+                        <Avatar name={m.name} />
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13.5px] font-medium text-white">
+                            {m.name}
+                            {m.name === ME && (
+                              <span className="text-neutral-500"> (you)</span>
+                            )}
+                          </span>
+                          <span className="block truncate text-[12px] text-neutral-500">
+                            {m.email}
+                          </span>
                         </span>
                       </span>
-                    </span>
-                  </td>
-                  <td
-                    className="py-3 pr-4"
-                    onClick={(e) => !fixed && e.stopPropagation()}
-                  >
-                    {fixed ? (
-                      <span className="text-neutral-200">{role.name}</span>
-                    ) : (
-                      <Dropdown
-                        label={`${m.name}'s role`}
-                        variant="bare"
-                        className="-ml-3.5"
-                        value={m.role}
-                        options={ROLES.filter((r) => !r.owner).map((r) => ({
-                          value: r.id,
-                          label: r.name,
-                        }))}
-                        onChange={(v) => changeRole(m.name, v)}
+                    </td>
+                    <td
+                      className="py-3 pr-4"
+                      onClick={(e) => !fixed && e.stopPropagation()}
+                    >
+                      {fixed ? (
+                        <span className="text-neutral-200">{role.name}</span>
+                      ) : (
+                        <Dropdown
+                          label={`${m.name}'s role`}
+                          variant="bare"
+                          className="-ml-3.5"
+                          value={m.role}
+                          options={ROLES.filter((r) => !r.owner).map((r) => ({
+                            value: r.id,
+                            label: r.name,
+                          }))}
+                          onChange={(v) => changeRole(m.name, v)}
+                        />
+                      )}
+                    </td>
+                    <td className="py-3 pr-4 text-neutral-300 tabular-nums">
+                      {sendText(role)}
+                    </td>
+                    <td
+                      className={`py-3 pr-4 ${m.twoFactor ? "text-neutral-300" : "text-rose-300"}`}
+                    >
+                      {m.twoFactor ? "On" : "Off"}
+                    </td>
+                    <td className="py-3 pr-4 text-neutral-500">
+                      {m.lastActive}
+                    </td>
+                    <td
+                      className="py-3 text-right"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <RowMenu
+                        items={[
+                          {
+                            label: "View details",
+                            onClick: () => setSheet(m.name),
+                          },
+                          ...(!m.twoFactor
+                            ? [
+                                {
+                                  label: "Remind about two-step login",
+                                  onClick: () =>
+                                    setToast(
+                                      `Reminder sent to ${m.name.split(" ")[0]}`,
+                                    ),
+                                },
+                              ]
+                            : []),
+                          ...(!fixed
+                            ? [
+                                {
+                                  label: "Remove from team",
+                                  danger: true,
+                                  onClick: () => remove(m.name),
+                                },
+                              ]
+                            : []),
+                        ]}
                       />
-                    )}
-                  </td>
-                  <td className="py-3 pr-4 text-neutral-300 tabular-nums">
-                    {sendText(role)}
-                  </td>
+                    </td>
+                  </tr>
+                );
+              })}
+              {rows.length === 0 && (
+                <tr>
                   <td
-                    className={`py-3 pr-4 ${m.twoFactor ? "text-neutral-300" : "text-rose-300"}`}
+                    colSpan={6}
+                    className="border-t border-white/6 py-16 text-center text-neutral-500"
                   >
-                    {m.twoFactor ? "On" : "Off"}
-                  </td>
-                  <td className="py-3 pr-4 text-neutral-500">{m.lastActive}</td>
-                  <td
-                    className="py-3 text-right"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <RowMenu
-                      items={[
-                        {
-                          label: "View details",
-                          onClick: () => setSheet(m.name),
-                        },
-                        ...(!m.twoFactor
-                          ? [
-                              {
-                                label: "Remind about two-step login",
-                                onClick: () =>
-                                  setToast(
-                                    `Reminder sent to ${m.name.split(" ")[0]}`,
-                                  ),
-                              },
-                            ]
-                          : []),
-                        ...(!fixed
-                          ? [
-                              {
-                                label: "Remove from team",
-                                danger: true,
-                                onClick: () => remove(m.name),
-                              },
-                            ]
-                          : []),
-                      ]}
-                    />
+                    Nobody matches.
                   </td>
                 </tr>
-              );
-            })}
-            {rows.length === 0 && (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="border-t border-white/6 py-16 text-center text-neutral-500"
-                >
-                  Nobody matches.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+          <TablePager pager={pager} noun="people" />
+        </>
       ) : (
-        <table className="mt-3 w-full table-fixed text-[13px]">
-          <colgroup>
-            <col />
-            <col className="w-[160px]" />
-            <col className="w-[190px]" />
-            <col className="w-[130px]" />
-            <col className="w-[180px]" />
-          </colgroup>
-          <thead>
-            <tr className="text-left text-xs text-neutral-500">
-              <th className="py-2.5 font-normal">Email</th>
-              <th className="py-2.5 font-normal">Role</th>
-              <th className="py-2.5 font-normal">Invited by</th>
-              <th className="py-2.5 font-normal">Expires</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {inviteRows.map((i) => (
-              <tr key={i.email} className="border-t border-white/6">
-                <td className="py-3 pr-4">
-                  <span className="flex items-center gap-3">
-                    <Avatar name={i.email} />
-                    <span className="min-w-0">
-                      <span className="block truncate text-neutral-100">
-                        {i.email}
-                      </span>
-                      <span className="block text-[12px] text-neutral-500">
-                        Sent {i.sent}
+        <>
+          <table className="mt-3 w-full table-fixed text-[13px]">
+            <colgroup>
+              <col />
+              <col className="w-[160px]" />
+              <col className="w-[190px]" />
+              <col className="w-[130px]" />
+              <col className="w-[180px]" />
+            </colgroup>
+            <thead>
+              <tr className="text-left text-xs text-neutral-500">
+                <th className="py-2.5 font-normal">Email</th>
+                <th className="py-2.5 font-normal">Role</th>
+                <th className="py-2.5 font-normal">Invited by</th>
+                <th className="py-2.5 font-normal">Expires</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {invitePager.visible.map((i) => (
+                <tr key={i.email} className="border-t border-white/6">
+                  <td className="py-3 pr-4">
+                    <span className="flex items-center gap-3">
+                      <Avatar name={i.email} />
+                      <span className="min-w-0">
+                        <span className="block truncate text-neutral-100">
+                          {i.email}
+                        </span>
+                        <span className="block text-[12px] text-neutral-500">
+                          Sent {i.sent}
+                        </span>
                       </span>
                     </span>
-                  </span>
-                </td>
-                <td className="py-3 pr-4 text-neutral-200">
-                  {roleOf(i.role).name}
-                </td>
-                <td className="py-3 pr-4 text-neutral-300">
-                  {i.invitedBy === ME ? "You" : i.invitedBy}
-                </td>
-                <td className="py-3 pr-4 text-neutral-500">{i.expires}</td>
-                <td className="py-3 text-right">
-                  <span className="flex justify-end gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInvites((all) =>
-                          all.map((x) =>
-                            x.email === i.email
-                              ? { ...x, sent: "just now", expires: "in 7 days" }
-                              : x,
-                          ),
-                        );
-                        setToast(`Invite sent again to ${i.email}`);
-                      }}
-                      className="h-8 rounded-full px-3 text-[13px] text-neutral-300 hover:bg-white/[0.06] hover:text-white"
-                    >
-                      Resend
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInvites((all) =>
-                          all.filter((x) => x.email !== i.email),
-                        );
-                        setToast(`Invite to ${i.email} cancelled`);
-                      }}
-                      className="h-8 rounded-full px-3 text-[13px] text-neutral-500 hover:bg-white/[0.06] hover:text-white"
-                    >
-                      Cancel invite
-                    </button>
-                  </span>
-                </td>
-              </tr>
-            ))}
-            {inviteRows.length === 0 && (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="border-t border-white/6 py-16 text-center text-neutral-500"
-                >
-                  No invites waiting.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  </td>
+                  <td className="py-3 pr-4 text-neutral-200">
+                    {roleOf(i.role).name}
+                  </td>
+                  <td className="py-3 pr-4 text-neutral-300">
+                    {i.invitedBy === ME ? "You" : i.invitedBy}
+                  </td>
+                  <td className="py-3 pr-4 text-neutral-500">{i.expires}</td>
+                  <td className="py-3 text-right">
+                    <span className="flex justify-end gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInvites((all) =>
+                            all.map((x) =>
+                              x.email === i.email
+                                ? {
+                                    ...x,
+                                    sent: "just now",
+                                    expires: "in 7 days",
+                                  }
+                                : x,
+                            ),
+                          );
+                          setToast(`Invite sent again to ${i.email}`);
+                        }}
+                        className="h-8 rounded-full px-3 text-[13px] text-neutral-300 hover:bg-white/[0.06] hover:text-white"
+                      >
+                        Resend
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInvites((all) =>
+                            all.filter((x) => x.email !== i.email),
+                          );
+                          setToast(`Invite to ${i.email} cancelled`);
+                        }}
+                        className="h-8 rounded-full px-3 text-[13px] text-neutral-500 hover:bg-white/[0.06] hover:text-white"
+                      >
+                        Cancel invite
+                      </button>
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {inviteRows.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="border-t border-white/6 py-16 text-center text-neutral-500"
+                  >
+                    No invites waiting.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <TablePager pager={invitePager} noun="invites" />
+        </>
       )}
 
       {open && (
