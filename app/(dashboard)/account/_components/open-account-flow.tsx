@@ -1,13 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ArrowLeft,
-  Check,
-  ChevronRight,
-  Search,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Search, X } from "lucide-react";
 import {
   DiscardConfirm,
   useDiscardGuard,
@@ -145,9 +139,8 @@ export function OpenAccountFlow({
   const network = NETWORKS.find((n) => n.chain === chain)!;
   const label =
     nickname.trim() ||
-    (holder && currency
-      ? `${holder.category === "Business" ? holder.name : holder.name.split(" ")[0]} · ${type}`
-      : "");
+    // Gravv's convention when left blank: currency + account type, e.g. "USD Operating".
+    (currency ? `${currency} ${type}` : "");
   const settlesTo =
     walletMode === "mint"
       ? `New wallet on ${network.name}`
@@ -178,6 +171,8 @@ export function OpenAccountFlow({
       category: holder.category,
       bank: provider.bank,
       currency,
+      type,
+      tier: category === "main" ? "Main account" : "Sub account",
       balance: 0,
       status: "Pending",
       accountNumber: currency === "GBP" ? digits(8) : digits(12),

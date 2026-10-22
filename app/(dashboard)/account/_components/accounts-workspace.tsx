@@ -692,8 +692,12 @@ export function AccountsWorkspace() {
                           <div className="truncate text-[13.5px] font-medium text-white">
                             {a.label}
                           </div>
+                          {/* Who holds it, and whether it's yours or a customer's */}
                           <div className="truncate text-[11px] text-neutral-500">
-                            {a.customer.name} · {a.category}
+                            {a.customer.name} ·{" "}
+                            {a.tier === "Main account"
+                              ? "Main account"
+                              : a.category}
                           </div>
                         </td>
                         <td className="py-3 pr-4">
@@ -1196,8 +1200,6 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
     </div>
   );
 }
-
-
 
 /** Applications that become accounts: who applied, where it is, and what's blocking it. */
 function Applications() {

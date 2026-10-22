@@ -53,9 +53,16 @@ export const PROVISION_STEPS = [
   "Account active",
 ] as const;
 
+/** Gravv's account types, chosen when the account is opened. */
+export type AccountType = "Regular" | "Operating" | "Default" | "Card";
+
 export type Account = {
   id: string;
+  /** What the team calls it. Left blank when opening, it's "{currency} {type}", e.g. "USD Operating". */
   label: string;
+  type: AccountType;
+  /** Main = your own business; Sub = one of your customers. */
+  tier: "Main account" | "Sub account";
   customer: { name: string; email: string };
   category: Category;
   bank: string;
@@ -144,16 +151,6 @@ const businesses = [
   "Orchid Health",
   "Tundra Supply",
 ];
-const purposes = [
-  "Operating",
-  "Payroll",
-  "Collections",
-  "Treasury",
-  "Payouts",
-  "Savings",
-  "Escrow",
-  "Tax reserve",
-];
 export const BANKS: Record<
   Currency,
   { bank: string; routing: () => { label: string; value: string } }[]
@@ -239,32 +236,40 @@ export const BANKS: Record<
     },
   ],
 };
-const testLabels = [
-  "Testing auto fill",
-  "Testing this new",
-  "GM-733 e2e individual (No, inline upload)",
-  "Testing Tax W-8BEN-E",
-  "Test Upload tax",
+/** Names teams actually type when they don't take the suggestion. */
+const customLabels = [
+  "Payroll",
+  "Supplier payouts",
+  "Tax reserve",
+  "Lagos collections",
+  "Card float",
+  "Treasury sweep",
+  "Escrow — Q4",
+  "Marketplace payouts",
+  "Rent & utilities",
+  "Contractor payments",
 ];
 
 function make(i: number, only?: Currency): Account {
-  const business = rand() < 0.45;
-  const name = business ? pick(businesses) : pick(people);
+  // About one in eight is the workspace's own (main) account.
+  const main = rand() < 0.12;
+  const business = main || rand() < 0.45;
+  const name = main
+    ? "Kredete Ltd"
+    : business
+      ? pick(businesses)
+      : pick(people);
   const r = rand();
   const currency: Currency = only
     ? only
-    : i < testLabels.length
+    : r < 0.78
       ? "USD"
-      : r < 0.78
-        ? "USD"
-        : r < 0.88
-          ? "EUR"
-          : r < 0.95
-            ? "GBP"
-            : "NGN";
-  // The live list's test accounts all sit with Stearns Bank in USD.
-  const isTest = i < testLabels.length;
-  const { bank, routing } = isTest ? BANKS.USD[0] : pick(BANKS[currency]);
+      : r < 0.88
+        ? "EUR"
+        : r < 0.95
+          ? "GBP"
+          : "NGN";
+  const { bank, routing } = pick(BANKS[currency]);
   // The newest accounts are the ones still being provisioned, like the live list.
   const s = rand();
   const status: AccountStatus =
@@ -297,12 +302,22 @@ function make(i: number, only?: Currency): Account {
       : 0;
   const step =
     status === "Pending" ? (i < 5 ? i % 3 : Math.floor(rand() * 3)) : undefined;
+  const tr = rand();
+  const type: AccountType =
+    tr < 0.35
+      ? "Regular"
+      : tr < 0.65
+        ? "Operating"
+        : tr < 0.9
+          ? "Default"
+          : "Card";
+  // Most teams take the suggestion; some name it themselves.
+  const label = rand() < 0.62 ? `${currency} ${type}` : pick(customLabels);
   return {
     id: uuid(),
-    label:
-      i < testLabels.length
-        ? testLabels[i]
-        : `${business ? name : name.split(" ")[0]} · ${pick(purposes)}`,
+    label,
+    type,
+    tier: main ? "Main account" : "Sub account",
     customer: {
       name,
       email: `${name
@@ -401,8 +416,7 @@ export type SyncState =
 
 /** The record behind an account's details sheet, derived from its id so it never drifts. */
 export type AccountMeta = {
-  /** What it's used for — the part of the label after "·". */
-  type: string;
+  type: AccountType;
   tier: "Main account" | "Sub account";
   /** Settle: deposits move to the linked wallet. Hold: they stay in the account. */
   inflow: "Settle" | "Hold";
@@ -442,8 +456,8 @@ export function accountMeta(a: Account): AccountMeta {
             }
           : { kind: "live", at: mins(1 + Math.floor(r() * 14)) };
   return {
-    type: a.label.includes(" · ") ? a.label.split(" · ").pop()! : "Operating",
-    tier: r() < 0.2 ? "Main account" : "Sub account",
+    type: a.type,
+    tier: a.tier,
     inflow: r() < 0.7 ? "Settle" : "Hold",
     applicationRef: ref(),
     customerRef: ref(),
