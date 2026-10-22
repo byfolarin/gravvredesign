@@ -813,7 +813,7 @@ function Timeline({ at, readyIn }: { at: number; readyIn: string }) {
             <span
               className={`relative flex size-[19px] shrink-0 items-center justify-center rounded-full border text-[10px] tabular-nums ${
                 done
-                  ? "border-[var(--flow-in)] bg-[var(--flow-in)] text-black"
+                  ? "border-[var(--flow-in)] bg-[var(--flow-in)] text-[#04301c]"
                   : current
                     ? "border-dashed border-white/50 text-white"
                     : "border-white/15 text-neutral-500"

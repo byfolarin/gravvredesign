@@ -367,7 +367,7 @@ export function ConfigureWorkspace() {
                   <span
                     className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] ${
                       c.done
-                        ? "border-[var(--flow-in)] bg-[var(--flow-in)] text-black"
+                        ? "border-[var(--flow-in)] bg-[var(--flow-in)] text-[#04301c]"
                         : "border-dashed border-amber-400/70 text-amber-300"
                     }`}
                   >

@@ -101,7 +101,7 @@ export function InboxBell() {
       >
         <HugeiconsIcon icon={Notification01Icon} size={16} strokeWidth={1.6} />
         {waiting > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--brand)] px-1 text-[10px] font-medium text-black tabular-nums ring-2 ring-[var(--surface)]">
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--brand)] px-1 text-[10px] font-medium text-[#04301c] tabular-nums ring-2 ring-[var(--surface)]">
             {waiting}
           </span>
         )}

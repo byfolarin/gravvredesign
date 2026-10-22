@@ -931,7 +931,7 @@ export function CardsOnboarding({
           </fieldset>
         ) : (
           <div className="intro-status">
-            <span className="flex size-8 items-center justify-center rounded-full bg-[var(--brand)] text-black">
+            <span className="flex size-8 items-center justify-center rounded-full bg-[var(--brand)] text-[#04301c]">
               <Check size={16} strokeWidth={2.5} />
             </span>
             <h2

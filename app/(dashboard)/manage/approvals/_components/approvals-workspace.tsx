@@ -1143,7 +1143,7 @@ function Step({
           rejected
             ? "border-rose-400/50 bg-rose-400/10 text-rose-300"
             : done
-              ? "border-[var(--flow-in)] bg-[var(--flow-in)] text-black"
+              ? "border-[var(--flow-in)] bg-[var(--flow-in)] text-[#04301c]"
               : "border-dashed border-white/40"
         }`}
       >
