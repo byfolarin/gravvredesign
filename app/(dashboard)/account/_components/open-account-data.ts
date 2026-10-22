@@ -121,30 +121,30 @@ export function providersFor(c: Currency): Provider[] {
   );
 }
 
-/** Gravv's account types, said as what the account is for. */
-export const PURPOSES = [
+/** Gravv's account types, by their real names, with what each is for. */
+export const ACCOUNT_TYPES = [
+  {
+    id: "Regular",
+    hint: "General use",
+    line: "A general account for money in and out. Pick this if you're not sure.",
+  },
   {
     id: "Operating",
-    gravv: "Operating",
-    line: "Day-to-day money in and out of the business.",
+    hint: "Day-to-day running",
+    line: "For the business's day-to-day spending and payouts.",
   },
   {
-    id: "Collections",
-    gravv: "Default",
-    line: "Where payments from customers and payers land.",
+    id: "Default",
+    hint: "Where payments land",
+    line: "The holder's main account in this currency — payments to them land here first.",
   },
   {
-    id: "Card funding",
-    gravv: "Card",
+    id: "Card",
+    hint: "Funds issued cards",
     line: "Holds the money behind cards issued through the API.",
   },
-  {
-    id: "General",
-    gravv: "Regular",
-    line: "No set use yet.",
-  },
 ] as const;
-export type Purpose = (typeof PURPOSES)[number]["id"];
+export type AccountType = (typeof ACCOUNT_TYPES)[number]["id"];
 
 export type Chain =
   "Polygon" | "Base" | "Avalanche" | "Ethereum" | "Stellar" | "Solana" | "Tron";
