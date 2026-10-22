@@ -1809,7 +1809,6 @@ function StatusMix({
   const [hover, setHover] = useState<Tab | null>(null);
   const fmt = (n: number) => n.toLocaleString("en-US");
   const live = parts[0];
-  const rest = parts.slice(1);
   return (
     <section>
       <div className="text-[13px] text-neutral-500">Active accounts</div>
@@ -1837,24 +1836,39 @@ function StatusMix({
             />
           ))}
       </div>
-      {/* The rest in one line; each count filters the table */}
-      <p className="mt-3 text-[12.5px] leading-relaxed text-neutral-500">
-        {rest.map((p, i) => (
-          <span key={p.tab}>
-            {i > 0 && " · "}
-            <button
-              type="button"
-              aria-pressed={active === p.tab}
-              onClick={() => onPick(active === p.tab ? "All" : p.tab)}
-              onMouseEnter={() => setHover(p.tab)}
-              onMouseLeave={() => setHover(null)}
-              className={`tabular-nums underline-offset-4 transition-colors hover:text-white hover:underline ${active === p.tab ? "text-white underline" : ""}`}
-            >
-              {fmt(p.n)} {p.label.toLowerCase()}
-            </button>
-          </span>
-        ))}
-      </p>
+      {/* The key: what each colour in the bar is. Each row filters the table. */}
+      <ul className="mt-3">
+        {parts.map((p) => {
+          const on = active === p.tab;
+          return (
+            <li key={p.tab}>
+              <button
+                type="button"
+                aria-pressed={on}
+                onClick={() => onPick(on ? "All" : p.tab)}
+                onMouseEnter={() => setHover(p.tab)}
+                onMouseLeave={() => setHover(null)}
+                className={`-mx-2 flex w-[calc(100%+1rem)] items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors hover:bg-white/[0.04] ${on ? "bg-white/[0.05]" : ""}`}
+              >
+                <span
+                  aria-hidden
+                  className="h-2.5 w-[3px] shrink-0 rounded-full"
+                  style={{ background: p.color }}
+                />
+                <span className={on ? "text-white" : "text-neutral-300"}>
+                  {p.label}
+                </span>
+                <span className="ml-auto text-neutral-200 tabular-nums">
+                  {fmt(p.n)}
+                </span>
+                <span className="w-9 text-right text-[12px] text-neutral-500 tabular-nums">
+                  {total ? Math.round((p.n / total) * 100) : 0}%
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
