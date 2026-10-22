@@ -121,10 +121,11 @@ body {
   --px-a4: #62c69d;
   --px-a5: #8cdbbb;
   color-scheme: light;
-  --surface: #ffffff;
-  --surface-2: #fafafa;
-  --raised: #ffffff;
-  --takeover: #fafafa;
+  /* Paper white, not screen white: warm, quiet surfaces (owner's call). */
+  --surface: #fbfaf7;
+  --surface-2: #f6f5f1;
+  --raised: #fdfcfa;
+  --takeover: #f8f7f3;
   --brand: #0fb468;
   --flow-in: var(--brand);
   --flow-out: #b4b4b4;
@@ -132,7 +133,7 @@ body {
   --ok-bg: #edf6f1;
 
   --color-white: #0a0a0a;
-  --color-black: #ffffff;
+  --color-black: #fbfaf7;
   --color-neutral-100: #171717;
   --color-neutral-200: #262626;
   --color-neutral-300: #404040;
