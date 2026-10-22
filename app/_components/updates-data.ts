@@ -129,6 +129,9 @@ export const UPDATES: Update[] = [
   },
 ];
 
+// Newest first, wherever the list is shown.
+UPDATES.sort((a, b) => b.date.localeCompare(a.date));
+
 const dateFmt = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
