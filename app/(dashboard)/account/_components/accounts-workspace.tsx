@@ -396,10 +396,17 @@ export function AccountsWorkspace() {
         </div>
 
         {view === "loading" ? (
-          <AccountsSkeleton
-            applications={section === "applications"}
-            loader={loader}
-          />
+          // Loading is the Drive loader alone — no skeletons (owner's call).
+          <div className="flex min-h-[420px] items-center justify-center">
+            <LoadingState
+              variant={loader}
+              label={
+                section === "applications"
+                  ? "Loading applications"
+                  : "Loading accounts"
+              }
+            />
+          </div>
         ) : section === "applications" ? (
           view === "empty" ? (
             <p className="mt-16 text-center text-[13px] text-neutral-500">
@@ -1190,102 +1197,7 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
   );
 }
 
-function Bone({
-  w,
-  h = "h-3",
-  className = "",
-}: {
-  w: string;
-  h?: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`animate-pulse rounded bg-white/[0.07] ${w} ${h} ${className}`}
-    />
-  );
-}
 
-/** Loading: the page's own shapes, so nothing jumps when the numbers arrive. */
-function AccountsSkeleton({
-  applications,
-  loader,
-}: {
-  applications: boolean;
-  loader: LoaderVariant;
-}) {
-  const status = (
-    <div className="mt-8">
-      <LoadingState
-        variant={loader}
-        label={
-          loader === "Surfer"
-            ? undefined
-            : applications
-              ? "Loading applications"
-              : "Loading accounts"
-        }
-      />
-    </div>
-  );
-  const rows = (
-    <div
-      aria-busy="true"
-      aria-label="Loading accounts"
-      className="mt-3 border-t border-white/15"
-    >
-      {Array.from({ length: 8 }, (_, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-6 border-b border-white/6 px-4 py-4"
-        >
-          <Bone w="w-28" />
-          <Bone w="w-44" />
-          <Bone w="w-28" className="ml-auto" />
-          <Bone w="w-12" />
-          <Bone w="w-24" />
-          <Bone w="w-20" h="h-5" />
-        </div>
-      ))}
-    </div>
-  );
-  if (applications)
-    return (
-      <>
-        {status}
-        <div className="mt-6">{rows}</div>
-      </>
-    );
-  return (
-    <>
-      {status}
-      <div className="mt-6 grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div>
-          <Bone w="w-40" h="h-6" />
-          <Bone w="w-72" h="h-10" className="mt-4" />
-          <Bone w="w-56" className="mt-3" />
-          <div className="mt-6 h-[220px] animate-pulse rounded-xl bg-white/[0.04]" />
-        </div>
-        <div className="grid gap-3">
-          {[0, 1].map((i) => (
-            <div key={i} className="rounded-2xl border border-white/8 p-5">
-              <Bone w="w-28" />
-              <Bone w="w-20" h="h-8" className="mt-3" />
-              <Bone w="w-full" h="h-1.5" className="mt-5" />
-              <Bone w="w-40" className="mt-6" />
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="mt-10 flex items-center gap-2">
-        {["w-16", "w-20", "w-20", "w-16", "w-16"].map((w, i) => (
-          <Bone key={i} w={w} h="h-7" className="rounded-full" />
-        ))}
-      </div>
-      {rows}
-    </>
-  );
-}
 
 /** Applications that become accounts: who applied, where it is, and what's blocking it. */
 function Applications() {

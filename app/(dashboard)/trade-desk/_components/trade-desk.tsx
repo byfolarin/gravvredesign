@@ -373,6 +373,11 @@ export function TradeDesk() {
 
         {!ready ? null : !twoStep ? (
           <TwoFactorGate onEnabled={enableTwoStep} />
+        ) : view === "loading" ? (
+          // Loading is the Drive loader alone — no skeletons (owner's call).
+          <div className="flex min-h-[520px] items-center justify-center">
+            <LoadingState variant="Drive" label="Loading the desk" />
+          </div>
         ) : (
           // Ticket first (Binance OTC): the quote ticket leads, rates beside it, history below.
           <div key={`ticket-${revealKey}`} className="intro-status mt-8">
@@ -386,17 +391,11 @@ export function TradeDesk() {
                 setRowOpen(true);
               }}
             />
-            {view === "loading" && (
-              <div className="mb-8">
-                <LoadingState variant="Drive" label="Loading the desk" />
-              </div>
-            )}
             <Facts
               traded={view === "empty" ? 0 : traded}
               open={open.length}
               usedToday={view === "empty" ? 0 : usedToday}
               empty={view === "empty"}
-              loading={view === "loading"}
               limitRequested={limitRequested}
             />
             <div className="mt-12 grid items-start gap-12 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)]">
@@ -416,7 +415,6 @@ export function TradeDesk() {
                   note="Indicative · pick one to quote it"
                 />
                 <RatesBoard
-                  loading={view === "loading"}
                   pairs={pairs}
                   activeId={pairId}
                   onPick={(id) => {
