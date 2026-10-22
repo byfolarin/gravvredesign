@@ -472,6 +472,511 @@ const CONTEXT: Record<string, Context> = {
     expiresAt: at(60 * 60),
   },
 };
+/**
+ * A fuller queue so the page reads like a real working day: 36 more payments waiting on you,
+ * mostly routine (paid before, matching invoice), with the occasional thing to look at.
+ */
+type Seed = [
+  name: string,
+  cur: Request["currency"],
+  amount: number,
+  bank: string,
+  value: string,
+  rail: string,
+  note: string,
+  by: string,
+  flag?:
+    | "changed"
+    | "usual"
+    | "dupe"
+    | "new"
+    | "mismatch"
+    | "drain"
+    | "expiring"
+    | "screen",
+];
+const SEEDS: Seed[] = [
+  [
+    "Oakridge Supply Co",
+    "USD",
+    14_200,
+    "Lead Bank",
+    "2190 7907 1184",
+    "ACH",
+    "Packaging, October",
+    "Tolu Adeyemi",
+  ],
+  [
+    "Copperline Media",
+    "USD",
+    22_750,
+    "Cross River Bank",
+    "3431 8115 7720",
+    "Wire",
+    "Campaign media buy",
+    "Priya Nair",
+    "usual",
+  ],
+  [
+    "Halcyon Freight",
+    "EUR",
+    31_400,
+    "Banking Circle",
+    "DE89 3704 0044 0532 0130",
+    "SEPA",
+    "Rotterdam freight, invoice HF-882",
+    "Musa Bello",
+  ],
+  [
+    "Ada Okonkwo",
+    "NGN",
+    2_850_000,
+    "GTBank",
+    "0123 4567 89",
+    "Local transfer",
+    "Contractor payout, October",
+    "Daniel Okafor",
+  ],
+  [
+    "Pinewood Software",
+    "USD",
+    11_900,
+    "Stearns Bank",
+    "1000 0057 3321",
+    "ACH",
+    "Annual licences",
+    "Grace Mensah",
+  ],
+  [
+    "Bluebird Couriers",
+    "GBP",
+    15_300,
+    "Clear Junction",
+    "GB33 CLJU 0099 1182",
+    "Swift",
+    "UK last-mile, September",
+    "Chioma Eze",
+    "changed",
+  ],
+  [
+    "Sahel Agro Ltd",
+    "USDC",
+    42_000,
+    "Polygon wallet",
+    "0x4a9e2f61b0c8d37e5a1f9b2c6d4e8a0f3b7c91d2",
+    "USDC on Polygon",
+    "Cocoa forward, lot 14",
+    "Musa Bello",
+    "new",
+  ],
+  [
+    "Marlow & Finch LLP",
+    "USD",
+    18_000,
+    "Lead Bank",
+    "2190 7907 5562",
+    "Wire",
+    "Legal retainer, Q4",
+    "Tolu Adeyemi",
+  ],
+  [
+    "Kora Foods",
+    "NGN",
+    9_400_000,
+    "Access Bank",
+    "0690 0112 74",
+    "Local transfer",
+    "Distributor rebate",
+    "Priya Nair",
+    "usual",
+  ],
+  [
+    "Vantage Cloud",
+    "USD",
+    12_480,
+    "Cross River Bank",
+    "3431 8115 0045",
+    "ACH",
+    "Hosting, October",
+    "Kwame Asante",
+  ],
+  [
+    "Ember Studio",
+    "EUR",
+    13_600,
+    "Banking Circle",
+    "FR76 3000 6000 0112 3456 7890 189",
+    "SEPA",
+    "Brand refresh, milestone 2",
+    "Grace Mensah",
+    "mismatch",
+  ],
+  [
+    "Nimbus Payroll",
+    "USD",
+    96_400,
+    "Lead Bank",
+    "2190 7907 9001",
+    "Wire",
+    "Payroll funding, Oct 25",
+    "Ikenna Obi",
+    "drain",
+  ],
+  [
+    "Coastal Ports Authority",
+    "USD",
+    27_300,
+    "Stearns Bank",
+    "1000 0057 6610",
+    "Wire",
+    "Port fees, September",
+    "Musa Bello",
+  ],
+  [
+    "Zuri Textiles",
+    "USDC",
+    16_800,
+    "Ethereum wallet",
+    "0x9c3b5e7a1d2f4b6c8e0a9d7f5b3c1e2a4d6f8b07",
+    "USDC on Ethereum",
+    "Fabric order ZT-219",
+    "Daniel Okafor",
+    "dupe",
+  ],
+  [
+    "Greenfield Energy",
+    "USD",
+    33_100,
+    "Cross River Bank",
+    "3431 8115 4419",
+    "ACH",
+    "Generator diesel, Lagos office",
+    "Priya Nair",
+  ],
+  [
+    "Thames Advisory",
+    "GBP",
+    21_000,
+    "Clear Junction",
+    "GB71 CLJU 0099 4471",
+    "Swift",
+    "Board advisory, Q4",
+    "Chioma Eze",
+  ],
+  [
+    "Lagos Fleet Services",
+    "NGN",
+    6_200_000,
+    "Zenith Bank",
+    "1012 3345 67",
+    "Local transfer",
+    "Vehicle lease, October",
+    "Musa Bello",
+  ],
+  [
+    "Orchid Health",
+    "USD",
+    19_750,
+    "Lead Bank",
+    "2190 7907 3380",
+    "ACH",
+    "Staff health cover",
+    "Grace Mensah",
+  ],
+  [
+    "Polaris Data",
+    "USD",
+    28_900,
+    "Stearns Bank",
+    "1000 0057 2290",
+    "Wire",
+    "Data licence renewal",
+    "Kwame Asante",
+    "expiring",
+  ],
+  [
+    "Accra Logistics Hub",
+    "USDC",
+    24_500,
+    "Polygon wallet",
+    "0x2b8d4f6a0c1e3b5d7f9a2c4e6b8d0f1a3c5e7b93",
+    "USDC on Polygon",
+    "Ghana warehousing",
+    "Daniel Okafor",
+  ],
+  [
+    "Riverstone Partners",
+    "EUR",
+    45_000,
+    "Banking Circle",
+    "NL91 ABNA 0417 1643 00",
+    "SEPA",
+    "Fund admin fee",
+    "Tolu Adeyemi",
+    "usual",
+  ],
+  [
+    "Tunde Bakare",
+    "NGN",
+    3_100_000,
+    "Kuda MFB",
+    "2001 4456 78",
+    "Local transfer",
+    "Field sales commission",
+    "Priya Nair",
+  ],
+  [
+    "Summit Insurance",
+    "USD",
+    41_200,
+    "Lead Bank",
+    "2190 7907 6631",
+    "Wire",
+    "Cargo insurance premium",
+    "Ikenna Obi",
+  ],
+  [
+    "Nova Print House",
+    "GBP",
+    10_800,
+    "Clear Junction",
+    "GB12 CLJU 0099 8820",
+    "Swift",
+    "Catalogue print run",
+    "Chioma Eze",
+    "new",
+  ],
+  [
+    "Mosaic Research",
+    "USD",
+    15_600,
+    "Cross River Bank",
+    "3431 8115 2276",
+    "ACH",
+    "Customer study, wave 3",
+    "Grace Mensah",
+  ],
+  [
+    "Delta Customs Brokers",
+    "USD",
+    23_450,
+    "Stearns Bank",
+    "1000 0057 8812",
+    "Wire",
+    "Duty + clearance, Apapa",
+    "Musa Bello",
+    "screen",
+  ],
+  [
+    "Kestrel Security",
+    "USD",
+    12_000,
+    "Lead Bank",
+    "2190 7907 4471",
+    "ACH",
+    "Pen test, October",
+    "Kwame Asante",
+  ],
+  [
+    "Baobab Microfinance",
+    "USDC",
+    60_000,
+    "Ethereum wallet",
+    "0x7e1a3c5b9d2f4e6a8c0b1d3f5a7c9e2b4d6f8a15",
+    "USDC on Ethereum",
+    "Liquidity top-up",
+    "Tolu Adeyemi",
+  ],
+  [
+    "Alder & Co",
+    "EUR",
+    16_250,
+    "Banking Circle",
+    "IE29 AIBK 9311 5212 3456 78",
+    "SEPA",
+    "Office fit-out, Dublin",
+    "Grace Mensah",
+  ],
+  [
+    "Ifeoma Nwankwo",
+    "NGN",
+    1_950_000,
+    "GTBank",
+    "0234 5678 90",
+    "Local transfer",
+    "Translation services",
+    "Daniel Okafor",
+  ],
+  [
+    "Cobalt Telecom",
+    "USD",
+    17_300,
+    "Cross River Bank",
+    "3431 8115 6603",
+    "ACH",
+    "SMS + voice, September",
+    "Priya Nair",
+    "changed",
+  ],
+  [
+    "Westgate Property",
+    "USD",
+    38_000,
+    "Lead Bank",
+    "2190 7907 7712",
+    "Wire",
+    "Office rent, November",
+    "Ikenna Obi",
+  ],
+  [
+    "Savanna Seeds",
+    "USDC",
+    13_200,
+    "Polygon wallet",
+    "0x5d7f9b1c3e5a7d9f2b4c6e8a0d2f4b6c8e1a3d50",
+    "USDC on Polygon",
+    "Seed stock, Kano",
+    "Musa Bello",
+  ],
+  [
+    "Hartley Recruitment",
+    "GBP",
+    14_400,
+    "Clear Junction",
+    "GB54 CLJU 0099 2263",
+    "Swift",
+    "Placement fees x3",
+    "Chioma Eze",
+  ],
+  [
+    "Granite Audit Partners",
+    "USD",
+    52_000,
+    "Stearns Bank",
+    "1000 0057 1147",
+    "Wire",
+    "Year-end audit, deposit",
+    "Tolu Adeyemi",
+    "mismatch",
+  ],
+  [
+    "Lumi Events",
+    "EUR",
+    11_700,
+    "Banking Circle",
+    "ES91 2100 0418 4502 0005 1332",
+    "SEPA",
+    "Summit venue, Lisbon",
+    "Grace Mensah",
+  ],
+];
+
+const FROM: Record<Request["currency"], [string, number]> = {
+  USD: ["Operating · USD", 1_840_000],
+  USDC: ["Treasury wallet", 920_000],
+  EUR: ["Operating · EUR", 410_000],
+  GBP: ["Operating · GBP", 186_000],
+  NGN: ["Payouts · NGN", 84_000_000],
+};
+const ARRIVAL: Record<string, string> = {
+  ACH: "In 1–2 business days",
+  Wire: "Today, if approved before 4pm ET",
+  SEPA: "Usually today",
+  Swift: "In 1–2 business days",
+  "Local transfer": "In minutes",
+  "USDC on Polygon": "In about a minute",
+  "USDC on Ethereum": "In a few minutes",
+};
+const FEE: Record<string, number> = { ACH: 1, Wire: 15, Swift: 25 };
+const ROUTING: Record<string, { label: string; value: string }> = {
+  "Lead Bank": { label: "Routing", value: "101019644" },
+  "Cross River Bank": { label: "Routing", value: "021214891" },
+  "Stearns Bank": { label: "Routing", value: "091202590" },
+  "Banking Circle": { label: "BIC", value: "BCIRLULL" },
+};
+
+SEEDS.forEach(([name, cur, amount, bank, value, rail, note, by, flag], i) => {
+  const id = `apr_8${(0xd90 - i * 7).toString(16)}`;
+  const [from, balance] = FROM[cur];
+  const usd =
+    amount * { USD: 1, USDC: 1, EUR: 1.08, GBP: 1.27, NGN: 1 / 1600 }[cur];
+  const big = usd >= 50_000;
+  const usual =
+    flag === "usual" ? Math.round(amount / 2.6) : Math.round(amount * 0.92);
+  const isNew = flag === "new";
+  const invNo = `${name.replace(/[^A-Z]/g, "").slice(0, 3) || "INV"}-${1040 + i * 13}`;
+  const wallet = rail.startsWith("USDC");
+  REQUESTS.push(
+    req({
+      id,
+      amount,
+      currency: cur,
+      recipient: {
+        name,
+        detail: wallet
+          ? `${bank.replace(" wallet", "")} ${value.slice(0, 6)}…${value.slice(-4)}`
+          : `${bank} ••${value.replace(/\s/g, "").slice(-4)}`,
+        isNew,
+      },
+      from,
+      requestedBy: by,
+      requestedAt: at(170 + i * 41),
+      note,
+      reason: isNew
+        ? { kind: "rule", ruleId: "r3" }
+        : big
+          ? { kind: "rule", ruleId: "r2" }
+          : usd < 10_000
+            ? { kind: "cap", cap: 5_000 }
+            : { kind: "rule", ruleId: "r1" },
+      needed: big ? 2 : 1,
+      approvers: isNew ? ["admin"] : ["finance", "admin"],
+      decisions: big
+        ? [
+            {
+              by: by === "Chioma Eze" ? "Ikenna Obi" : "Chioma Eze",
+              at: at(150 + i * 41),
+              kind: "approved",
+            },
+          ]
+        : [],
+    }),
+  );
+  CONTEXT[id] = {
+    balance: flag === "drain" ? Math.round(amount * 1.08) : balance,
+    rail,
+    arrival: ARRIVAL[rail],
+    fee: FEE[rail] ?? 0,
+    bank: { label: bank, value, routing: ROUTING[bank] },
+    invoice:
+      wallet || cur === "NGN"
+        ? undefined
+        : {
+            file: `${invNo}.pdf`,
+            number: invNo,
+            amount: flag === "mismatch" ? Math.round(amount * 0.9) : amount,
+            due: new Date(AS_OF + (4 + (i % 9)) * 86_400_000).toISOString(),
+          },
+    history: isNew
+      ? { count: 0, total: 0 }
+      : {
+          since: new Date(AS_OF - (90 + i * 11) * 86_400_000).toISOString(),
+          count: 3 + (i % 11),
+          total: usual * (3 + (i % 11)),
+          usual,
+          last: { amount: usual, at: at(60 * 24 * (8 + (i % 20))) },
+        },
+    detailsChangedAt:
+      flag === "changed" ? at(60 * 24 * (1 + (i % 3))) : undefined,
+    similar:
+      flag === "dupe"
+        ? { amount, at: at(60 * 24 * 5), id: `pay_7${i}a4` }
+        : undefined,
+    screening: flag === "screen" ? "review" : "clear",
+    expiresAt: flag === "expiring" ? ahead(35) : ahead(60 * 24 * (2 + (i % 5))),
+  };
+});
+
 for (const r of REQUESTS) r.context = CONTEXT[r.id];
 
 export function until(iso: string) {
