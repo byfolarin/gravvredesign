@@ -10,8 +10,15 @@ import { useCallback, useEffect, useState } from "react";
  * Wire `markDirty` to the panel's onInputCapture / onChangeCapture / onClickCapture.
  * Anything inside `[data-keeps-clean]` (a search box, a design picker) doesn't count.
  */
-export function useDiscardGuard(close: () => void) {
-  const [dirty, setDirty] = useState(false);
+export function useDiscardGuard(
+  close: () => void,
+  /** The flow's own "has something in it" — counts even when no input event fired
+   *  (picking from a custom list, a prefilled step). */
+  touched = false,
+) {
+  const [marked, setDirty] = useState(false);
+  const [cleared, setCleared] = useState(false);
+  const dirty = !cleared && (marked || touched);
   const [asking, setAsking] = useState(false);
   const requestClose = useCallback(
     () => (dirty ? setAsking(true) : close()),
@@ -47,7 +54,10 @@ export function useDiscardGuard(close: () => void) {
     requestClose,
     markDirty,
     /** The flow finished (sent, created): closing no longer asks. */
-    clear: () => setDirty(false),
+    clear: () => {
+      setDirty(false);
+      setCleared(true);
+    },
     keep: () => setAsking(false),
     discard: () => {
       setAsking(false);

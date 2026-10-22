@@ -82,7 +82,16 @@ export function OpenAccountFlow({
     setLeaving(true);
     setTimeout(onClose, 260);
   }, [onClose]);
-  const guard = useDiscardGuard(close);
+  // Any choice made counts — picking a customer from the list fires no input event.
+  const touched =
+    step !== "holder" ||
+    category !== "sub" ||
+    !!customer ||
+    !!query ||
+    currency !== (initialCurrency ?? "") ||
+    !!bank ||
+    !!nickname;
+  const guard = useDiscardGuard(close, touched);
   const ask = guard.requestClose;
   // Once requested, closing any way keeps the account (same as Done); before that, ask.
   const requestClose = useCallback(
