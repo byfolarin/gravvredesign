@@ -488,7 +488,7 @@ export function AccountsWorkspace() {
               <div className="grid gap-3">
                 <SideFact
                   label="Active accounts"
-                  tone="mint"
+                  tone={active ? "mint" : undefined}
                   value={
                     <>
                       <Roll value={active.toLocaleString("en-US")} />
