@@ -733,3 +733,9 @@ html {
 .content-theme [role="tab"] > span.tabular-nums {
   font-size: inherit;
 }
+
+/* Cents: small, and sitting on the big figure's baseline — not dropped below it. */
+sub {
+  bottom: 0;
+  vertical-align: baseline;
+}
