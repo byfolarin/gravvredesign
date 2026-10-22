@@ -48,6 +48,7 @@ import {
   type Pair,
 } from "../_data";
 import { UpdateNotice } from "@/app/_components/updates";
+import { LoadingState } from "@/app/_components/loading-state";
 
 const TWO_STEP_KEY = "gravv-trade-2fa";
 
@@ -355,7 +356,7 @@ export function TradeDesk() {
                     label: "Errors",
                     hint: "Returned, short, rejected…",
                   },
-                  { value: "loading", label: "Loading", hint: "Skeletons" },
+                  { value: "loading", label: "Loading", hint: "Drive loader" },
                 ]}
                 onChange={switchView}
               />
@@ -385,6 +386,11 @@ export function TradeDesk() {
                 setRowOpen(true);
               }}
             />
+            {view === "loading" && (
+              <div className="mb-8">
+                <LoadingState variant="Drive" label="Loading the desk" />
+              </div>
+            )}
             <Facts
               traded={view === "empty" ? 0 : traded}
               open={open.length}

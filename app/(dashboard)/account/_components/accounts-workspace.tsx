@@ -20,7 +20,6 @@ import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
 import {
-  LOADER_VARIANTS,
   LoadingState,
   type LoaderVariant,
 } from "@/app/_components/loading-state";
@@ -172,7 +171,8 @@ export function AccountsWorkspace() {
   const [list, setList] = useState(ALL);
   // Prototype: show the page as a new account, with problems, or loading.
   const [view, setView] = useState<View>("filled");
-  const [loader, setLoader] = useState<LoaderVariant>("Drive");
+  // One loader everywhere: Drive.
+  const loader: LoaderVariant = "Drive";
   const [section, setSection] = useState<Section>("accounts");
   const [tab, setTab] = useState<Tab>("All");
   const [currency, setCurrency] = useState<"All" | Currency>("All");
@@ -322,7 +322,7 @@ export function AccountsWorkspace() {
               label="State"
               variant="compact"
               align="right"
-              value={view === "loading" ? `loading:${loader}` : view}
+              value={view}
               options={[
                 { value: "filled", label: "Filled", hint: "Today's accounts" },
                 { value: "empty", label: "Empty", hint: "A new business" },
@@ -331,25 +331,9 @@ export function AccountsWorkspace() {
                   label: "Errors",
                   hint: "Needs info, declined, stale",
                 },
-                ...LOADER_VARIANTS.map((v) => ({
-                  value: `loading:${v}`,
-                  label: `Loading · ${v}`,
-                  hint:
-                    v === "Drive"
-                      ? "Chevron wave"
-                      : v === "Dots"
-                        ? "Round cells"
-                        : v === "Orbit"
-                          ? "Comet round the grid"
-                          : "With a video",
-                })),
+                { value: "loading", label: "Loading", hint: "Drive loader" },
               ]}
-              onChange={(v) => {
-                if (v.startsWith("loading:")) {
-                  setLoader(v.slice(8) as LoaderVariant);
-                  switchView("loading");
-                } else switchView(v as View);
-              }}
+              onChange={(v) => switchView(v as View)}
             />
             <button
               type="button"
