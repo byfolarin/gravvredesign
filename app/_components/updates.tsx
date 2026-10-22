@@ -174,8 +174,8 @@ export function toggleHideAmounts() {
  */
 const CELL = 8,
   GAP = 0,
-  COLS = 36,
-  ROWS = 11;
+  COLS = 38,
+  ROWS = 10;
 
 /**
  * A dither, not a scatter: the last columns are solid soft green, then the green breaks into
@@ -196,10 +196,10 @@ function pixelCells(seed: string) {
   for (let c = 0; c < COLS; c++)
     for (let r = 0; r < ROWS; r++) {
       const t = c / (COLS - 1); // 0 at the left of the field, 1 at the edge
-      // Solid for the last ~12%, then a steep fall-off into scattered pixels.
-      const keep = t > 0.88 ? 1 : Math.pow(Math.max(0, (t - 0.15) / 0.73), 2.2);
+      // Solid for the last ~28%, then it breaks up into pixels across the rest.
+      const keep = t > 0.72 ? 1 : Math.pow(t / 0.72, 1.7);
       if (rand() < keep)
-        cells.push({ c, r, o: t > 0.88 ? 0.22 : 0.12 + rand() * 0.14 });
+        cells.push({ c, r, o: t > 0.72 ? 0.22 : 0.12 + rand() * 0.14 });
     }
   return cells;
 }
@@ -209,15 +209,15 @@ function PixelField({ seed }: { seed: string }) {
   const W = COLS * (CELL + GAP),
     H = ROWS * (CELL + GAP);
   return (
+    // A quarter of the card, whatever its width; "slice" keeps the pixels square.
     <svg
       aria-hidden
-      width={W}
-      height={H}
       viewBox={`0 0 ${W} ${H}`}
-      className="pointer-events-none absolute top-1/2 right-0 -z-10 -translate-y-1/2"
+      preserveAspectRatio="xMaxYMid slice"
+      className="pointer-events-none absolute inset-y-0 right-0 -z-10 h-full w-1/4"
       style={{
-        maskImage: "linear-gradient(to left, #000 60%, transparent 100%)",
-        WebkitMaskImage: "linear-gradient(to left, #000 60%, transparent 100%)",
+        maskImage: "linear-gradient(to left, #000 85%, transparent 100%)",
+        WebkitMaskImage: "linear-gradient(to left, #000 85%, transparent 100%)",
       }}
     >
       {cells.map(({ c, r, o }) => (
