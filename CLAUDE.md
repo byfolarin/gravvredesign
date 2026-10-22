@@ -31,7 +31,7 @@ nothing persists. Owner: Folarin (product designer).
 
 ## Design system (keep consistent)
 
-- **Screen-size scaling:** the app is designed at full size for big monitors and scales down as one on smaller screens via `html { zoom: var(--app-zoom) }` (globals.css): 1 at ≥1800px, 0.94 / 0.9 (MacBook Pro 14", 1512px) / 0.82 / 0.78 below. Don't use `h-screen`/`100vh` for full-height layouts — use `.app-fill` / `.app-fill-min` or `calc(100dvh / var(--app-zoom) - …)` so zoomed layouts still fill the window. Page columns use `max-w-(--page-max)` (1180px, 1280px below 1800px) and `max-w-(--page-max-narrow)` (1080 / 1160) — never a hard-coded width.
+- **Screen-size scaling:** the app is designed at full size for big monitors and scales down as one on smaller screens via `html { zoom: var(--app-zoom) }` (globals.css): 1 at ≥1800px, 0.94 (also MacBook Pro 14", 1512px) / 0.82 / 0.78 below. Don't use `h-screen`/`100vh` for full-height layouts — use `.app-fill` / `.app-fill-min` or `calc(100dvh / var(--app-zoom) - …)` so zoomed layouts still fill the window. Page columns use `max-w-(--page-max)` (1180px, 1280px below 1800px) and `max-w-(--page-max-narrow)` (1080 / 1160) — never a hard-coded width.
 - Headline money: small grey unit (13px) and quiet superscript cents after the figure (`<Usdc big />` in Collections) — the unit never competes with the number.
 
 - Fonts: Geist + Geist Mono (local `geist` package). Dark first; light theme under
