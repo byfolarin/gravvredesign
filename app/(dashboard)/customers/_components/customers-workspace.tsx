@@ -227,9 +227,9 @@ export function CustomersWorkspace() {
             value={
               <span className="amount">
                 <Roll value={usd(stats.collected).split(".")[0]} />
-                <sup className="ml-px align-[0.55em] text-[0.5em] font-normal tracking-normal text-neutral-500">
+                <sub className="ml-px align-baseline text-[0.5em] font-normal tracking-normal text-neutral-500">
                   <Roll value={`.${usd(stats.collected).split(".")[1]}`} />
-                </sup>
+                </sub>
               </span>
             }
             aside={

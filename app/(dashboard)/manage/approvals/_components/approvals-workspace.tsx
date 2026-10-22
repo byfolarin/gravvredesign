@@ -62,9 +62,9 @@ function Money({
     <span className={`amount tabular-nums ${size}`}>
       {SYMBOL[r.currency]}
       {whole}
-      <sup className="ml-px align-[0.45em] text-[0.62em] font-normal text-neutral-500">
+      <sub className="ml-px align-baseline text-[0.62em] font-normal text-neutral-500">
         {cents}
-      </sup>
+      </sub>
       {r.currency === "USDC" && (
         <span className="ml-1 text-[0.8em] text-neutral-500">USDC</span>
       )}

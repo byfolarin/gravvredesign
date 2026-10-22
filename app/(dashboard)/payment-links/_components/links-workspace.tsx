@@ -120,7 +120,7 @@ export function Money({
       {symbol(currency)}
       {whole}
       {cents && (
-        <sup className="ml-px align-[0.45em] text-[0.62em]">{cents}</sup>
+        <sub className="ml-px align-baseline text-[0.62em]">{cents}</sub>
       )}
       {currency === "USDC" && (
         <span className="ml-1 text-[0.75em] text-neutral-500">USDC</span>
@@ -275,9 +275,9 @@ export function LinksWorkspace() {
             value={
               <span className="amount">
                 <Roll value={usd(collectedNow).split(".")[0]} />
-                <sup className="ml-px align-[0.55em] text-[0.5em] font-normal tracking-normal text-neutral-500">
+                <sub className="ml-px align-baseline text-[0.5em] font-normal tracking-normal text-neutral-500">
                   <Roll value={`.${usd(collectedNow).split(".")[1]}`} />
-                </sup>
+                </sub>
               </span>
             }
             aside={

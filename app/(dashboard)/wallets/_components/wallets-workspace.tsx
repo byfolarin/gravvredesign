@@ -38,9 +38,9 @@ const usdc = (v: number) =>
 /** Cents (with the point) as a light superscript: 23,445.⁰⁰ */
 function Cents({ value }: { value: string }) {
   return (
-    <sup className="ml-px align-[0.55em] text-[0.5em] font-normal tracking-normal text-neutral-500">
+    <sub className="ml-px align-baseline text-[0.5em] font-normal tracking-normal text-neutral-500">
       <Roll value={`.${value.split(".")[1]}`} />
-    </sup>
+    </sub>
   );
 }
 const dateFmt = new Intl.DateTimeFormat("en-US", {

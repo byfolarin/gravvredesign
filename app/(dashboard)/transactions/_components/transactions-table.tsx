@@ -777,9 +777,9 @@ function Summary({
         <Roll
           value={`${signed ? (value < 0 ? "−" : value > 0 ? "+" : "") : ""}${whole}`}
         />
-        <sup className="ml-px align-[0.55em] text-[0.5em] font-normal">
+        <sub className="ml-px align-baseline text-[0.5em] font-normal">
           <Roll value={`.${cents}`} />
-        </sup>
+        </sub>
         <span className="ml-1.5 text-[13px] font-normal tracking-normal text-neutral-500">
           USDC
         </span>
@@ -993,9 +993,9 @@ function DetailsSheet({
               <span className="amount text-[28px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
                 {credit ? "+" : "−"}
                 {money(t.amount).split(".")[0]}
-                <sup className="ml-px align-[0.55em] text-[0.5em] font-normal tracking-normal text-neutral-500">
+                <sub className="ml-px align-baseline text-[0.5em] font-normal tracking-normal text-neutral-500">
                   .{money(t.amount).split(".")[1]}
-                </sup>
+                </sub>
               </span>
               <span className="text-[13px] text-neutral-500">
                 {credit ? t.to : t.from}

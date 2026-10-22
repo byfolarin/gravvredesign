@@ -42,7 +42,7 @@ export function Money({
   return (
     <span className="amount tabular-nums">
       ${big ? <Roll value={w} /> : w}
-      <sup className="ml-px align-[0.5em] text-[0.58em]">.{c}</sup>
+      <sub className="ml-px align-baseline text-[0.58em]">.{c}</sub>
     </span>
   );
 }

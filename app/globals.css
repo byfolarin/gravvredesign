@@ -710,3 +710,10 @@ html {
   background: var(--ok-bg);
   color: var(--ok-fg);
 }
+
+/* Counts in tabs sit low and small, like a subscript ("All ₂,₆₉₀"), not on the label's line. */
+.content-theme [role="tab"] > span.tabular-nums {
+  position: relative;
+  top: 0.32em;
+  font-size: 0.82em;
+}

@@ -146,9 +146,9 @@ function Money({
       {SYMBOL[currency]}
       {whole}
       {cents && (
-        <sup className="ml-px align-[0.45em] text-[0.62em] text-neutral-500">
+        <sub className="ml-px align-baseline text-[0.62em] text-neutral-500">
           {cents}
-        </sup>
+        </sub>
       )}
     </span>
   );
@@ -1444,9 +1444,9 @@ function BalancePanel({
             {SYMBOL[currency]}
             {whole}
             {cents && (
-              <sup className="ml-px align-[0.55em] text-[0.5em] font-normal tracking-normal text-neutral-500">
+              <sub className="ml-px align-baseline text-[0.5em] font-normal tracking-normal text-neutral-500">
                 .{cents}
-              </sup>
+              </sub>
             )}
           </div>
           <div className="mt-2.5 flex h-5 items-center gap-2 text-[12px] text-neutral-500 tabular-nums">

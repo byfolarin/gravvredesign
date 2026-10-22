@@ -56,7 +56,7 @@ function Digit({ d, delay }: { d: number; delay: number }) {
     <span
       aria-hidden
       className="relative inline-block"
-      // Own line height: <sup> sets line-height 0, which would collapse the column.
+      // Own line height: <sub> sets line-height 0, which would collapse the column.
       style={{ clipPath: "inset(0 -0.15em)", lineHeight: 1.1 }}
     >
       {/* Invisible digit sizes the column to one character */}

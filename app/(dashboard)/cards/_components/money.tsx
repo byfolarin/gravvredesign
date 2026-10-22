@@ -20,9 +20,9 @@ export function Money({
   return (
     <span className={`tabular-nums ${className}`}>
       {roll ? <Roll value={whole} /> : whole}
-      <sup className="ml-px align-[0.5em] text-[0.55em] font-normal opacity-60">
+      <sub className="ml-px align-baseline text-[0.55em] font-normal opacity-60">
         {roll ? <Roll value={cents} /> : cents}
-      </sup>
+      </sub>
     </span>
   );
 }

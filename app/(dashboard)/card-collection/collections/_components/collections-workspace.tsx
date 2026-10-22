@@ -102,15 +102,15 @@ export function Usdc({
   return (
     <span className="amount tabular-nums">
       {whole}
-      <sup
+      <sub
         className={
           big
-            ? "ml-0.5 align-[0.85em] text-[0.42em] font-normal tracking-normal text-neutral-500"
-            : "ml-px align-[0.5em] text-[0.62em]"
+            ? "ml-0.5 align-baseline text-[0.42em] font-normal tracking-normal text-neutral-500"
+            : "ml-px align-baseline text-[0.62em]"
         }
       >
         .{cents}
-      </sup>
+      </sub>
       {unit && (
         <span
           className={
