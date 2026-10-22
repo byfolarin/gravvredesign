@@ -1,31 +1,31 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronRight } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check } from "lucide-react";
+import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
 import { ME, MEMBERS } from "../manage/roles/_data";
-import { REQUESTS } from "../manage/approvals/_data";
+import { REQUESTS, ago } from "../manage/approvals/_data";
 import { disputes, daysUntil } from "../card-collection/disputes/_data";
 import { collections, isStuck } from "../card-collection/collections/_data";
 import { recipients } from "../recipients/_data";
 import { AS_OF as ACCOUNTS_AS_OF, accounts } from "../account/_data";
-import {
-  AS_OF,
-  DAY,
-  OUTS,
-  RANGES,
-  SOURCES,
-  buckets,
-  totals,
-  type Bucket,
-  type Range,
-} from "./data";
+import { wallets } from "../wallets/_data";
+import { TOTAL as CUSTOMERS, liteAt } from "../customers/_data";
+import { transactions } from "../transactions/_data";
+import { GO_LIVE } from "../manage/configure/_data";
+import { DAY, days, sum } from "./data";
 
-const RANGE_WORDS: Record<Range, string> = {
-  "30D": "30 days",
-  "90D": "90 days",
-  "12M": "12 months",
+type Env = "live" | "sandbox";
+const FX: Record<string, number> = {
+  USD: 1,
+  EUR: 1.08,
+  GBP: 1.27,
+  NGN: 1 / 1550,
+  CAD: 0.73,
+  AUD: 0.66,
+  JPY: 0.0067,
 };
 const usd = (v: number) =>
   v.toLocaleString("en-US", {
@@ -34,167 +34,67 @@ const usd = (v: number) =>
   });
 const compact = (v: number) => {
   const a = Math.abs(v);
-  const s =
-    a >= 1e6
-      ? `${(a / 1e6).toFixed(2)}M`
-      : a >= 1e3
-        ? `${(a / 1e3).toFixed(1)}k`
-        : `${Math.round(a)}`;
-  return `$${s}`;
+  return `$${a >= 1e6 ? `${(a / 1e6).toFixed(1)}M` : a >= 1e3 ? `${(a / 1e3).toFixed(1)}k` : Math.round(a)}`;
 };
-const pct = (now: number, before: number) =>
-  before ? ((now - before) / Math.abs(before)) * 100 : 0;
+const n = (v: number) => v.toLocaleString("en-US");
 const day = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
   timeZone: "UTC",
 });
-const month = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  timeZone: "UTC",
-});
-const monthYear = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
-function Money({
-  value,
-  signed = false,
-  className = "",
-}: {
-  value: number;
-  signed?: boolean;
-  className?: string;
-}) {
-  const [w, c] = usd(Math.abs(value)).split(".");
-  const sign = signed ? (value < 0 ? "−" : "+") : "";
-  return (
-    <span className={`amount tabular-nums ${className}`}>
-      <Roll value={`${sign}$${w}`} />
-      <sup className="ml-0.5 align-[0.85em] text-[0.42em] font-normal tracking-normal text-neutral-500">
-        .{c}
-      </sup>
-    </span>
-  );
-}
-
-function Change({
-  value,
-  invert = false,
-}: {
-  value: number;
-  invert?: boolean;
-}) {
-  if (!Number.isFinite(value) || Math.abs(value) < 0.5)
-    return <span className="text-neutral-500">flat</span>;
-  const good = invert ? value < 0 : value > 0;
-  return (
-    <span className={good ? "text-[var(--ok-fg)]" : "text-neutral-400"}>
-      {value > 0 ? "↑" : "↓"} {Math.abs(value).toFixed(0)}%
-    </span>
-  );
-}
-
-const signed = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(0)}%`;
-/** Compare how deposits and spending moved, in words that stay true whichever way they went. */
-function paceWords(inn: number, out: number) {
-  if (Math.abs(inn - out) < 2) {
-    const avg = (inn + out) / 2;
-    return `money in and out both ${avg >= 0 ? "grew" : "fell"} about ${Math.abs(avg).toFixed(0)}%.`;
-  }
-  const both = inn >= 0 === out >= 0;
-  if (!both)
-    return inn > out
-      ? `deposits rose (${signed(inn)}) while spending fell (${signed(out)}).`
-      : `deposits fell (${signed(inn)}) while spending rose (${signed(out)}).`;
-  if (inn >= 0)
-    return inn > out
-      ? `deposits grew faster (${signed(inn)}) than spending (${signed(out)}).`
-      : `spending grew faster (${signed(out)}) than deposits (${signed(inn)}).`;
-  return inn > out
-    ? `deposits fell less (${signed(inn)}) than spending (${signed(out)}).`
-    : `spending fell less (${signed(out)}) than deposits (${signed(inn)}).`;
-}
 
 export function Overview() {
-  const [range, setRange] = useState<Range>("30D");
-  const r = RANGES.find((x) => x.id === range)!;
-  const to = AS_OF + DAY;
-  const from = to - r.days * DAY;
-  const cur = totals(from, to);
-  const prev = totals(from - r.days * DAY, from);
-  const net = cur.inTotal - cur.outTotal;
-  const prevNet = prev.inTotal - prev.outTotal;
-  const words = RANGE_WORDS[range];
+  const [env, setEnv] = useState<Env>("live");
+  const [done, setDone] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3200);
+    return () => clearTimeout(t);
+  }, [toast]);
 
-  // ——— What changed, worked out from the numbers ———
-  const topSource = SOURCES.map((s) => ({ s, v: cur.in[s.id] })).sort(
-    (a, b) => b.v - a.v,
-  )[0];
-  const outMoves = OUTS.map((o) => ({
-    o,
-    now: cur.out[o.id],
-    change: pct(cur.out[o.id], prev.out[o.id]),
-  })).sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
-  const fastest = SOURCES.map((s) => ({
-    s,
-    change: pct(cur.in[s.id], prev.in[s.id]),
-    now: cur.in[s.id],
-  })).sort((a, b) => b.change - a.change)[0];
-  const inChange = pct(cur.inTotal, prev.inTotal);
-  const outChange = pct(cur.outTotal, prev.outTotal);
-  const netChange = pct(net, prevNet);
-  const insights: { text: React.ReactNode; href: string }[] = [
-    {
-      text: (
-        <>
-          Net cashflow is{" "}
-          <b>
-            {netChange >= 0 ? "up" : "down"} {Math.abs(netChange).toFixed(0)}%
-          </b>{" "}
-          on the previous {words} — {paceWords(inChange, outChange)}
-        </>
-      ),
-      href: "/transactions",
-    },
-    {
-      text: (
-        <>
-          <b>{topSource.s.label}</b> brought in{" "}
-          <b>{Math.round((topSource.v / cur.inTotal) * 100)}%</b> of deposits (
-          <span className="amount">{compact(topSource.v)}</span>).
-        </>
-      ),
-      href: topSource.s.href,
-    },
-    {
-      text: (
-        <>
-          <b>{outMoves[0].o.label}</b>{" "}
-          {outMoves[0].change >= 0 ? "rose" : "fell"}{" "}
-          <b>{Math.abs(outMoves[0].change).toFixed(0)}%</b> to{" "}
-          <span className="amount">{compact(outMoves[0].now)}</span> — the
-          biggest change in spending.
-        </>
-      ),
-      href: outMoves[0].o.href,
-    },
-    {
-      text: (
-        <>
-          <b>{fastest.s.label}</b> is your fastest-growing source,{" "}
-          {fastest.change >= 0 ? "up" : "down"}{" "}
-          <b>{Math.abs(fastest.change).toFixed(0)}%</b> to{" "}
-          <span className="amount">{compact(fastest.now)}</span>.
-        </>
-      ),
-      href: fastest.s.href,
-    },
-  ];
+  // ——— Where you stand ———
+  const held =
+    accounts
+      .filter((a) => a.status === "Active" || a.status === "Frozen")
+      .reduce((s, a) => s + a.balance * (FX[a.currency] ?? 1), 0) +
+    wallets.reduce((s, w) => s + w.balance, 0);
+  const customers = useMemo(() => {
+    let verified = 0,
+      waiting = 0,
+      onYou = 0;
+    for (let i = 0; i < CUSTOMERS; i++) {
+      const v = liteAt(i).verification;
+      if (v === "Verified") verified++;
+      else if (v === "Pending") waiting++;
+      else onYou++;
+    }
+    return { verified, waiting, onYou };
+  }, []);
+  const funded = wallets.filter((w) => w.balance > 0).length;
+  const active = accounts.filter((a) => a.status === "Active").length;
+  const provisioning = accounts.filter((a) => a.status === "Pending");
+  const oldest = provisioning.reduce<string | null>(
+    (o, a) => (!o || a.createdAt < o ? a.createdAt : o),
+    null,
+  );
 
-  // ——— Needs you: from the pages themselves, so the counts match ———
+  // Balance over the last 30 days: today's total, walked back by each day's net movement.
+  const history = useMemo(() => {
+    const last = days.slice(-30);
+    let b = held;
+    const pts: { t: number; v: number }[] = [];
+    for (let i = last.length - 1; i >= 0; i--) {
+      pts.unshift({ t: last[i].t, v: b });
+      b -= sum(last[i].in) - sum(last[i].out);
+    }
+    return pts;
+  }, [held]);
+  const dayChange =
+    history[history.length - 1].v - history[history.length - 2].v;
+  const monthChange = history[history.length - 1].v - history[0].v;
+
+  // ——— Needs you: decisions, with the money attached ———
   const myRole = MEMBERS.find((m) => m.name === ME)?.role;
   const approvals = REQUESTS.filter(
     (q) =>
@@ -203,64 +103,94 @@ export function Overview() {
       q.approvers.includes(myRole) &&
       q.requestedBy !== ME &&
       !q.decisions.some((d) => d.by === ME),
-  );
+  ).sort((a, b) => b.amount - a.amount);
   const respond = disputes
     .filter((d) => d.status === "Needs response")
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt));
   const stuck = collections.filter(isStuck);
-  const blockedRecipients = recipients.filter(
-    (x) => x.status === "Pending" || x.payments.some((p) => p.failure),
-  );
-  const provisioning = accounts.filter((a) => a.status === "Pending");
-  const oldest = provisioning.reduce<string | null>(
-    (o, a) => (!o || a.createdAt < o ? a.createdAt : o),
-    null,
-  );
-  const needs = [
-    approvals.length && {
-      n: approvals.length,
-      text: `payment${approvals.length === 1 ? "" : "s"} waiting on your approval`,
-      sub: `Largest ${compact(Math.max(...approvals.map((q) => q.amount)))}`,
+  const closed = recipients.find((r) => r.payments.some((p) => p.failure));
+  const sym: Record<string, string> = {
+    USD: "$",
+    USDC: "",
+    EUR: "€",
+    GBP: "£",
+    NGN: "₦",
+  };
+  const amt = (v: number, c: string) =>
+    `${sym[c] ?? ""}${n(v)}${c === "USDC" ? " USDC" : ""}`;
+
+  type Item = {
+    id: string;
+    title: string;
+    why: string;
+    warn?: string;
+    action: string;
+    href?: string;
+    run?: () => void;
+  };
+  const items: Item[] = [];
+  if (approvals[0]) {
+    const q = approvals[0];
+    const c = q.context;
+    items.push({
+      id: "approval",
+      title: `Approve ${amt(q.amount, q.currency)} to ${q.recipient.name}`,
+      why: `${q.requestedBy.split(" ")[0]} asked ${ago(q.requestedAt)}${q.note ? ` · ${q.note}` : ""}${approvals.length > 1 ? ` · ${approvals.length - 1} more waiting` : ""}`,
+      warn: c?.detailsChangedAt
+        ? `Bank details changed ${ago(c.detailsChangedAt)}`
+        : c?.history.usual && q.amount >= c.history.usual * 2
+          ? `${(q.amount / c.history.usual).toFixed(1)}× what you usually send`
+          : undefined,
+      action: "Review",
       href: "/manage/approvals",
-      urgent: true,
-    },
-    respond.length && {
-      n: respond.length,
-      text: `dispute${respond.length === 1 ? "" : "s"} to answer`,
-      sub: `Next due in ${daysUntil(respond[0].dueAt)} days`,
+    });
+  }
+  if (respond[0]) {
+    const d = respond[0];
+    items.push({
+      id: "dispute",
+      title: `Answer ${respond.length} dispute${respond.length === 1 ? "" : "s"}`,
+      why: `Next: ${d.payment.customer.name} · ${usd(d.amount)} USDC · due in ${daysUntil(d.dueAt)} days`,
+      warn:
+        daysUntil(d.dueAt) <= 3
+          ? "Miss the deadline and the customer keeps the money"
+          : undefined,
+      action: "Respond",
       href: "/card-collection/disputes",
-      urgent: daysUntil(respond[0].dueAt) <= 3,
-    },
-    stuck.length && {
-      n: stuck.length,
-      text: `card payment${stuck.length === 1 ? "" : "s"} charged but not settled`,
-      sub: `${compact(stuck.reduce((s, c) => s + c.subtotal, 0))} held by Gravv`,
-      href: "/card-collection/collections",
-      urgent: false,
-    },
-    blockedRecipients.length && {
-      n: blockedRecipients.length,
-      text: `recipient${blockedRecipients.length === 1 ? "" : "s"} can't be paid yet`,
-      sub: "Bank checks and a closed account",
+    });
+  }
+  if (stuck[0]) {
+    const c = stuck[0];
+    items.push({
+      id: "settle",
+      title: `Retry settlement for ${c.customer.name}`,
+      why: `They paid ${usd(c.subtotal)} USDC; it hasn't reached your wallet yet`,
+      action: "Retry",
+      run: () => {
+        setDone((s) => new Set(s).add("settle"));
+        setToast(
+          `Settled — ${usd(c.subtotal)} USDC is in your Treasury wallet`,
+        );
+      },
+    });
+  }
+  if (closed) {
+    const p = closed.payments.find((x) => x.failure)!;
+    items.push({
+      id: "recipient",
+      title: `Update ${closed.name}'s bank details`,
+      why: `Their account is closed — ${amt(p.amount, p.currency)} came back to you`,
+      action: "Update",
       href: "/recipients",
-      urgent: false,
-    },
-    provisioning.length && {
-      n: provisioning.length,
-      text: "accounts being set up by banks",
-      sub: oldest
-        ? `Oldest waiting ${Math.round((ACCOUNTS_AS_OF - Date.parse(oldest)) / DAY)} days`
-        : "",
-      href: "/account",
-      urgent: false,
-    },
-  ].filter(Boolean) as {
-    n: number;
-    text: string;
-    sub: string;
-    href: string;
-    urgent: boolean;
-  }[];
+    });
+  }
+  const open = items.filter((i) => !done.has(i.id));
+  const checks = GO_LIVE;
+  const left = checks.filter((c) => !c.done);
+  const recent = [...transactions]
+    .filter((t) => t.amount > 0)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 6);
 
   return (
     <div className="sidebar-scroll h-full overflow-y-auto">
@@ -268,334 +198,371 @@ export function Overview() {
         <div className="flex items-start justify-between gap-6">
           <div>
             <h1 className="text-[26px] font-medium tracking-[-0.025em] text-white">
-              Overview
+              Good morning, {ME.split(" ")[0]}
             </h1>
             <p className="mt-1 text-[14px] text-neutral-500">
-              Money across every wallet and account, compared with the {words}{" "}
-              before.
+              {open.length
+                ? `${open.length} thing${open.length === 1 ? "" : "s"} need${open.length === 1 ? "s" : ""} you today.`
+                : "Nothing needs you today."}
             </p>
           </div>
-          <div
-            role="radiogroup"
-            aria-label="Range"
-            className="flex rounded-full bg-white/[0.07] p-0.5"
-          >
-            {RANGES.map((x) => (
-              <button
-                key={x.id}
-                type="button"
-                role="radio"
-                aria-checked={range === x.id}
-                onClick={() => setRange(x.id)}
-                className={`h-8 rounded-full px-3.5 text-[13px] tabular-nums transition-colors ${
-                  range === x.id
-                    ? "bg-surface font-medium text-white shadow-[0_1px_2px_rgb(0_0_0/0.25)]"
-                    : "text-neutral-500 hover:text-white"
-                }`}
+          <Dropdown
+            label="Environment"
+            variant="compact"
+            align="right"
+            value={env}
+            options={[
+              { value: "live", label: "Live", hint: "Real money" },
+              { value: "sandbox", label: "Sandbox", hint: "Before go-live" },
+            ]}
+            onChange={setEnv}
+          />
+        </div>
+
+        {/* Where you stand */}
+        {env === "sandbox" ? (
+          <section className="mt-10 rounded-2xl border border-amber-300/20 bg-amber-300/[0.04] p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="text-[13px] text-amber-300">Sandbox</div>
+                <h2 className="mt-1 text-[22px] font-medium tracking-[-0.02em] text-white">
+                  {left.length} step{left.length === 1 ? "" : "s"} left before
+                  you can move real money
+                </h2>
+                <p className="mt-1 text-[13px] text-neutral-400">
+                  Everything below is test data. Next:{" "}
+                  {left[0]?.label.toLowerCase() ?? "switch to Live"}.
+                </p>
+              </div>
+              <Link
+                href="/manage/configure"
+                className="flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-[13px] font-medium text-black hover:bg-neutral-200"
               >
-                {x.id}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Headline */}
-        <div className="mt-10 border-t border-white/8 pt-7">
-          <div className="text-[13px] text-neutral-500">
-            Net cashflow · last {words}
-          </div>
-          <div className="mt-3 flex flex-wrap items-end gap-x-10 gap-y-4">
-            <div className="text-[40px] leading-none font-medium tracking-[-0.035em] text-white">
-              <Money
-                value={net}
-                signed
-                className={net >= 0 ? "text-[var(--ok-fg)]" : ""}
-              />
+                Continue in Configure
+                <ArrowRight size={14} strokeWidth={1.75} />
+              </Link>
             </div>
-            <div className="flex gap-10 pb-1 text-[13px]">
-              <div>
-                <div className="text-neutral-500">Money in</div>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <span className="amount text-[17px] font-medium text-white tabular-nums">
-                    {compact(cur.inTotal)}
-                  </span>
-                  <Change value={inChange} />
-                </div>
-              </div>
-              <div>
-                <div className="text-neutral-500">Money out</div>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <span className="amount text-[17px] font-medium text-white tabular-nums">
-                    {compact(cur.outTotal)}
-                  </span>
-                  <Change value={outChange} invert />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-10 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="min-w-0 rounded-2xl border border-white/5 bg-white/[0.015] px-6 pt-5 pb-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-[15px] font-medium text-white">In and out</h2>
-              <div className="flex items-center gap-4 text-[12px] text-neutral-500">
-                <span className="flex items-center gap-1.5">
+            <ol className="mt-5 grid gap-x-6 gap-y-2 sm:grid-cols-3">
+              {checks.map((c) => (
+                <li key={c.id} className="flex items-center gap-2 text-[13px]">
                   <span
-                    aria-hidden
-                    className="h-2.5 w-1.5 rounded-[1px] bg-[var(--flow-in)]"
-                  />
-                  In
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span
-                    aria-hidden
-                    className="h-2.5 w-1.5 rounded-[1px] bg-[var(--flow-out)]"
-                  />
-                  Out
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span aria-hidden className="h-[2px] w-3 rounded bg-white" />
-                  Net
-                </span>
-              </div>
-            </div>
-            <FlowChart data={buckets(range)} range={range} />
-          </section>
-
-          <section className="rounded-2xl border border-white/8 bg-surface p-5">
-            <h2 className="text-[15px] font-medium text-white">Needs you</h2>
-            <ul className="mt-3 divide-y divide-white/6">
-              {needs.map((x) => (
-                <li key={x.href}>
-                  <Link
-                    href={x.href}
-                    className="group flex items-center gap-3 py-3"
+                    className={`flex size-4 shrink-0 items-center justify-center rounded-full ${c.done ? "bg-[var(--flow-in)] text-black" : "border border-dashed border-amber-300/70"}`}
                   >
-                    <span
-                      className={`w-9 shrink-0 text-[20px] font-medium tracking-[-0.02em] tabular-nums ${x.urgent ? "text-rose-300" : "text-white"}`}
-                    >
-                      {x.n.toLocaleString("en-US")}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] leading-snug text-neutral-100">
-                        {x.text}
-                      </span>
-                      <span className="mt-0.5 block truncate text-[12px] text-neutral-500">
-                        {x.sub}
-                      </span>
-                    </span>
-                    <ChevronRight
-                      size={14}
-                      strokeWidth={1.75}
-                      className="shrink-0 text-neutral-600 group-hover:text-white"
-                    />
-                  </Link>
+                    {c.done && <Check size={10} strokeWidth={3} />}
+                  </span>
+                  <span
+                    className={
+                      c.done
+                        ? "text-neutral-500 line-through decoration-neutral-600"
+                        : "text-neutral-100"
+                    }
+                  >
+                    {c.label}
+                  </span>
                 </li>
               ))}
-              {needs.length === 0 && (
-                <li className="py-3 text-[13px] text-neutral-500">
-                  Nothing needs you today.
+            </ol>
+          </section>
+        ) : (
+          <section className="mt-10 grid items-end gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+            <div>
+              <div className="text-[13px] text-neutral-500">
+                Held for your customers · USD equivalent
+              </div>
+              <div className="mt-3 text-[44px] leading-none font-medium tracking-[-0.035em] text-white">
+                <span className="amount tabular-nums">
+                  <Roll value={`$${usd(held).split(".")[0]}`} />
+                  <sup className="ml-0.5 align-[0.85em] text-[0.4em] font-normal tracking-normal text-neutral-500">
+                    .{usd(held).split(".")[1]}
+                  </sup>
+                </span>
+              </div>
+              <p className="mt-3 text-[13px] text-neutral-400">
+                <span
+                  className={
+                    dayChange >= 0 ? "text-[var(--ok-fg)]" : "text-neutral-300"
+                  }
+                >
+                  {dayChange >= 0 ? "+" : "−"}
+                  <span className="amount">{compact(dayChange)}</span> today
+                </span>{" "}
+                · {monthChange >= 0 ? "+" : "−"}
+                <span className="amount">{compact(monthChange)}</span> in 30
+                days · across {n(wallets.length)} wallets and{" "}
+                {n(accounts.length)} accounts
+              </p>
+            </div>
+            <BalanceLine points={history} />
+          </section>
+        )}
+
+        <div className="mt-12 grid items-start gap-10 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+          {/* Needs you — the reason to open this page */}
+          <section>
+            <h2 className="text-[15px] font-medium text-white">Needs you</h2>
+            <ul className="mt-3 divide-y divide-white/6 border-y border-white/8">
+              {open.map((x) => (
+                <li key={x.id} className="flex items-center gap-4 py-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[14px] font-medium text-white">
+                      {x.title}
+                    </div>
+                    <div className="mt-1 truncate text-[12.5px] text-neutral-500">
+                      {x.why}
+                    </div>
+                    {x.warn && (
+                      <div className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-amber-300">
+                        <AlertTriangle
+                          size={13}
+                          strokeWidth={1.75}
+                          className="shrink-0"
+                        />
+                        {x.warn}
+                      </div>
+                    )}
+                  </div>
+                  {x.href ? (
+                    <Link
+                      href={x.href}
+                      className="h-8 shrink-0 rounded-full border border-white/12 px-3.5 text-[13px] leading-8 text-neutral-100 transition-colors hover:border-white/30"
+                    >
+                      {x.action}
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={x.run}
+                      className="h-8 shrink-0 rounded-full bg-white px-3.5 text-[13px] font-medium text-black hover:bg-neutral-200"
+                    >
+                      {x.action}
+                    </button>
+                  )}
+                </li>
+              ))}
+              {open.length === 0 && (
+                <li className="flex items-center gap-2 py-5 text-[13px] text-neutral-400">
+                  <Check
+                    size={14}
+                    strokeWidth={2}
+                    className="text-[var(--ok-fg)]"
+                  />
+                  You&apos;re all caught up.
                 </li>
               )}
             </ul>
           </section>
+
+          {/* Recent activity, in words */}
+          <section>
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-[15px] font-medium text-white">
+                Recent activity
+              </h2>
+              <Link
+                href="/transactions"
+                className="text-[12.5px] text-neutral-400 hover:text-white"
+              >
+                All transactions
+              </Link>
+            </div>
+            <ul className="mt-3 divide-y divide-white/6 border-y border-white/8">
+              {recent.map((t) => {
+                const credit = t.direction === "Credit";
+                return (
+                  <li key={t.id} className="flex items-baseline gap-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] text-neutral-100">
+                        {t.type === "Account Funding"
+                          ? `Deposit from ${t.source.name}`
+                          : t.type === "Payout"
+                            ? `Payout to ${t.destination.name}`
+                            : t.type === "Offramp"
+                              ? `Offramp to ${t.destination.name}`
+                              : `Sent on ${t.channel}`}
+                      </div>
+                      <div className="mt-0.5 text-[12px] text-neutral-500 tabular-nums">
+                        {day.format(new Date(t.createdAt))} · {t.channel}
+                        {t.status !== "Completed" && (
+                          <span
+                            className={
+                              t.status === "Failed"
+                                ? "text-rose-300"
+                                : "text-amber-300"
+                            }
+                          >
+                            {" "}
+                            · {t.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      className={`amount shrink-0 text-[13px] font-medium tabular-nums ${t.status === "Failed" ? "text-neutral-600 line-through" : credit ? "text-[var(--ok-fg)]" : "text-white"}`}
+                    >
+                      {credit ? "+" : "−"}
+                      {usd(t.amount)}
+                      <span className="ml-1 text-[11px] font-normal text-neutral-500">
+                        {credit ? t.to : t.from}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         </div>
 
-        <section className="mt-12">
-          <h2 className="text-[15px] font-medium text-white">What changed</h2>
-          <ul className="mt-3 grid gap-x-10 border-t border-white/8 lg:grid-cols-2">
-            {insights.map((x, i) => (
-              <li key={i} className="border-b border-white/6">
-                <Link
-                  href={x.href}
-                  className="group flex items-start justify-between gap-4 py-4 text-[14px] leading-relaxed text-neutral-400 [&_b]:font-medium [&_b]:text-white"
-                >
-                  <span>{x.text}</span>
-                  <ArrowRight
-                    size={14}
-                    strokeWidth={1.75}
-                    className="mt-1.5 shrink-0 text-neutral-600 transition-colors group-hover:text-white"
-                  />
-                </Link>
-              </li>
-            ))}
-          </ul>
+        {/* Your customers' side of it, with the reason behind each number */}
+        <section className="mt-12 grid gap-y-8 border-t border-white/8 pt-7 lg:grid-cols-3">
+          <Health
+            label="Customers"
+            value={n(CUSTOMERS)}
+            lines={[
+              `${n(customers.verified)} verified`,
+              `${n(customers.waiting)} waiting on identity checks · ${n(customers.onYou)} need you`,
+            ]}
+            href="/customers"
+          />
+          <Health
+            label="Wallets"
+            value={n(wallets.length)}
+            lines={[
+              `${n(funded)} funded`,
+              `${n(wallets.length - funded)} never received money`,
+            ]}
+            href="/wallets"
+          />
+          <Health
+            label="Accounts"
+            value={n(accounts.length)}
+            lines={[
+              `${n(active)} active`,
+              `${n(provisioning.length)} waiting on banks${oldest ? ` · oldest ${Math.round((ACCOUNTS_AS_OF - Date.parse(oldest)) / DAY)} days` : ""}`,
+            ]}
+            href="/account"
+          />
         </section>
       </div>
+
+      {toast && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-white/10 bg-neutral-900 px-4 py-2.5 text-[13px] text-white shadow-2xl"
+        >
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
 
-/** In above the line in mint, out below in grey, net drawn across. One axis, values in USD. */
-function FlowChart({ data, range }: { data: Bucket[]; range: Range }) {
+function Health({
+  label,
+  value,
+  lines,
+  href,
+}: {
+  label: string;
+  value: string;
+  lines: string[];
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex min-w-0 flex-col border-white/8 lg:px-8 lg:first:pl-0 lg:last:pr-0 lg:[&:not(:first-child)]:border-l"
+    >
+      <div className="flex items-center justify-between text-[13px] text-neutral-500">
+        {label}
+        <ArrowRight
+          size={13}
+          strokeWidth={1.75}
+          className="text-neutral-600 transition-colors group-hover:text-white"
+        />
+      </div>
+      <div className="mt-2 text-[28px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
+        {value}
+      </div>
+      <div className="mt-3 text-[12.5px] text-neutral-300">{lines[0]}</div>
+      <div className="mt-0.5 truncate text-[12.5px] text-neutral-500">
+        {lines[1]}
+      </div>
+    </Link>
+  );
+}
+
+/** One quiet line: the total held, day by day, for 30 days. Hover for the day. */
+function BalanceLine({ points }: { points: { t: number; v: number }[] }) {
   const wrap = useRef<HTMLDivElement>(null);
-  const [w, setW] = useState(640);
+  const [w, setW] = useState(480);
   const [hover, setHover] = useState<number | null>(null);
   useEffect(() => {
     const el = wrap.current;
     if (!el) return;
     const ro = new ResizeObserver(([e]) =>
-      setW(Math.max(320, Math.round(e.contentRect.width))),
+      setW(Math.max(240, Math.round(e.contentRect.width))),
     );
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const H = 240;
-  const left = 52;
-  const maxIn = Math.max(...data.map((d) => d.in), 1);
-  const maxOut = Math.max(...data.map((d) => d.out), 1);
-  const scale = (H - 16) / (maxIn + maxOut);
-  const zero = 8 + maxIn * scale;
-  const band = (w - left) / data.length;
-  const barW = Math.max(3, Math.min(28, band * 0.56));
-  const cx = (i: number) => left + band * (i + 0.5);
-  const net = data
-    .map(
-      (d, i) =>
-        `${i ? "L" : "M"}${cx(i).toFixed(1)},${(zero - (d.in - d.out) * scale).toFixed(1)}`,
-    )
+  const H = 110;
+  const min = Math.min(...points.map((p) => p.v));
+  const max = Math.max(...points.map((p) => p.v));
+  const pad = (max - min) * 0.12 || 1;
+  const x = (i: number) => (i / (points.length - 1)) * w;
+  const y = (v: number) =>
+    6 + (1 - (v - min + pad) / (max - min + pad * 2)) * (H - 12);
+  const line = points
+    .map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`)
     .join("");
-  const label = (b: Bucket) =>
-    range === "12M"
-      ? monthYear.format(b.start)
-      : range === "90D"
-        ? `Week of ${day.format(b.start)}`
-        : day.format(b.start);
-  const tick = (b: Bucket) =>
-    range === "12M" ? month.format(b.start) : day.format(b.start);
-  const ticks = [maxIn, maxIn / 2, 0, -maxOut / 2, -maxOut];
-  const h = hover === null ? null : data[hover];
-
+  const h = hover === null ? null : points[hover];
   return (
-    <div
-      ref={wrap}
-      className="relative mt-5"
-      onMouseLeave={() => setHover(null)}
-    >
+    <div ref={wrap} className="relative" onMouseLeave={() => setHover(null)}>
       <svg
         width={w}
-        height={H + 22}
-        className="block"
+        height={H}
+        className="block touch-none"
         role="img"
-        aria-label={`Money in and out per ${range === "12M" ? "month" : range === "90D" ? "week" : "day"}`}
-      >
-        {ticks.map((v) => (
-          <g key={v}>
-            <line
-              x1={left}
-              x2={w}
-              y1={zero - v * scale}
-              y2={zero - v * scale}
-              stroke="currentColor"
-              className={v === 0 ? "text-white/20" : "text-white/[0.05]"}
-            />
-            <text
-              x={left - 10}
-              y={zero - v * scale + 4}
-              textAnchor="end"
-              className="fill-neutral-500 text-[10px] tabular-nums"
-            >
-              {v === 0
-                ? "0"
-                : `${v > 0 ? "+" : "−"}${compact(Math.abs(v)).slice(1)}`}
-            </text>
-          </g>
-        ))}
-        {data.map((d, i) => {
-          const dim = hover !== null && hover !== i;
-          return (
-            <g key={d.start} opacity={dim ? 0.35 : 1}>
-              {hover === i && (
-                <rect
-                  x={cx(i) - band / 2}
-                  y={0}
-                  width={band}
-                  height={H}
-                  className="fill-white/[0.04]"
-                />
-              )}
-              <rect
-                x={cx(i) - barW / 2}
-                y={zero - d.in * scale}
-                width={barW}
-                height={Math.max(1, d.in * scale - 1)}
-                rx={2}
-                fill="var(--flow-in)"
-              />
-              <rect
-                x={cx(i) - barW / 2}
-                y={zero + 1}
-                width={barW}
-                height={Math.max(1, d.out * scale - 1)}
-                rx={2}
-                fill="var(--flow-out)"
-              />
-            </g>
+        aria-label="Total held over the last 30 days"
+        onPointerMove={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          const i = Math.round(
+            ((e.clientX - r.left) / r.width) * (points.length - 1),
           );
-        })}
+          setHover(Math.max(0, Math.min(points.length - 1, i)));
+        }}
+      >
+        <defs>
+          <linearGradient id="held-fill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor="var(--flow-in)" stopOpacity="0.16" />
+            <stop offset="1" stopColor="var(--flow-in)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={`${line}L${w},${H}L0,${H}Z`} fill="url(#held-fill)" />
         <path
-          d={net}
+          d={line}
           fill="none"
-          stroke="currentColor"
-          strokeWidth={1.75}
+          stroke="var(--flow-in)"
+          strokeWidth={2}
           strokeLinejoin="round"
-          className="text-white/80"
         />
-        {[0, Math.floor(data.length / 2), data.length - 1].map((i) => (
-          <text
-            key={i}
-            x={cx(i)}
-            y={H + 16}
-            textAnchor={
-              i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"
-            }
-            className="fill-neutral-500 text-[11px]"
-          >
-            {i === data.length - 1
-              ? range === "12M"
-                ? "This month"
-                : range === "90D"
-                  ? "This week"
-                  : "Today"
-              : tick(data[i])}
-          </text>
-        ))}
-        {data.map((d, i) => (
-          <rect
-            key={`hit${d.start}`}
-            x={cx(i) - band / 2}
-            y={0}
-            width={band}
-            height={H}
-            fill="transparent"
-            onMouseEnter={() => setHover(i)}
+        {h && hover !== null && (
+          <line
+            x1={x(hover)}
+            x2={x(hover)}
+            y1={0}
+            y2={H}
+            stroke="currentColor"
+            className="text-white/20"
           />
-        ))}
+        )}
       </svg>
-      {h && hover !== null && (
-        <div
-          className="pointer-events-none absolute top-2 z-10 w-48 rounded-lg border border-white/10 bg-raised px-3 py-2.5 text-xs shadow-2xl"
-          style={{ left: `clamp(0px, ${cx(hover) - 96}px, ${w - 192}px)` }}
-        >
-          <div className="text-neutral-400">{label(h)}</div>
-          <div className="mt-1.5 flex justify-between tabular-nums">
-            <span className="text-neutral-400">In</span>
-            <span className="amount text-[var(--ok-fg)]">+{compact(h.in)}</span>
-          </div>
-          <div className="mt-0.5 flex justify-between tabular-nums">
-            <span className="text-neutral-400">Out</span>
-            <span className="amount text-neutral-200">−{compact(h.out)}</span>
-          </div>
-          <div className="mt-1.5 flex justify-between border-t border-white/8 pt-1.5 font-medium text-white tabular-nums">
-            <span>Net</span>
-            <span className="amount">
-              {h.in - h.out >= 0 ? "+" : "−"}
-              {compact(Math.abs(h.in - h.out))}
-            </span>
-          </div>
-        </div>
-      )}
+      <div className="mt-1 flex justify-between text-[11px] text-neutral-500">
+        <span>{h ? day.format(h.t) : day.format(points[0].t)}</span>
+        <span className="amount tabular-nums">
+          {h ? `$${usd(h.v)}` : "Today"}
+        </span>
+      </div>
     </div>
   );
 }
