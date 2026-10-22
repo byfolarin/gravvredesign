@@ -1,5 +1,7 @@
 "use client";
 
+import { toneClass, toneFor } from "@/app/_components/tone";
+
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -765,7 +767,7 @@ export function Avatar({
     <span
       aria-hidden
       style={{ width: size, height: size, fontSize: Math.round(size * 0.34) }}
-      className={`flex shrink-0 items-center justify-center bg-white/[0.07] font-medium text-neutral-300 ${kind === "Business" ? (size > 36 ? "rounded-xl" : "rounded-lg") : "rounded-full"}`}
+      className={`flex shrink-0 items-center justify-center font-medium ${toneClass(toneFor(name))} ${kind === "Business" ? (size > 36 ? "rounded-xl" : "rounded-lg") : "rounded-full"}`}
     >
       {initials}
     </span>
@@ -773,20 +775,17 @@ export function Avatar({
 }
 
 export function IdentityBadge({ v }: { v: Verification }) {
-  // Only "Verified" carries colour; the two unfinished states stay neutral, with a dot when it's on you.
+  // Each state its own hue: done mint, waiting amber, on you rose.
   const tone =
     v === "Verified"
       ? "bg-[var(--ok-bg)] text-[var(--ok-fg)]"
       : v === "Pending"
-        ? "bg-white/[0.05] text-neutral-400"
-        : "bg-white/[0.1] text-white";
+        ? "bg-amber-400/12 text-amber-300"
+        : "bg-rose-400/12 text-rose-300";
   return (
     <span
-      className={`inline-flex h-5 items-center gap-1.5 rounded-md px-1.5 text-[11px] font-medium ${tone}`}
+      className={`inline-flex h-5 items-center rounded-md px-1.5 text-[11px] font-medium ${tone}`}
     >
-      {v === "Action needed" && (
-        <span aria-hidden className="size-1.5 rounded-full bg-current" />
-      )}
       {v}
     </span>
   );

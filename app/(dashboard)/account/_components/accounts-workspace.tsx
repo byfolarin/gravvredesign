@@ -915,7 +915,7 @@ function Status({ account: a }: { account: Account }) {
     a.status === "Active"
       ? "border-transparent bg-[var(--ok-bg)] text-[var(--ok-fg)]"
       : a.status === "Pending"
-        ? "border-dashed border-white/20 text-neutral-300"
+        ? "border-transparent bg-blue-400/12 text-blue-300"
         : a.status === "Frozen"
           ? "border-sky-300/25 bg-sky-400/10 text-sky-200"
           : "border-transparent bg-white/[0.05] text-neutral-500";

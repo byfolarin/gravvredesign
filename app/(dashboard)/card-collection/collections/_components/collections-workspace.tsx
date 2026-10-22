@@ -1017,7 +1017,7 @@ function Status({ status }: { status: CollectionStatus }) {
     status === "Settlement completed"
       ? "border-transparent bg-[var(--ok-bg)] text-[var(--ok-fg)]"
       : status === "Settlement pending"
-        ? "border-dashed border-white/20 text-neutral-300"
+        ? "border-transparent bg-amber-400/12 text-amber-300"
         : status === "Settlement failed" || status === "Payment failed"
           ? "border-transparent bg-rose-400/10 text-rose-300"
           : status === "Refunded" || status === "Partially refunded"

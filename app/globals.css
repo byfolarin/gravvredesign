@@ -156,6 +156,8 @@ body {
   --color-emerald-300: #047857;
   --color-rose-300: #be123c;
   --color-teal-300: #0f766e;
+  --color-blue-300: #1d4ed8;
+  --color-orange-300: #c2410c;
 }
 
 [data-theme="light"] .content-theme .sidebar-scroll {
@@ -196,14 +198,39 @@ body {
 }
 
 /* Bottom sheet (Create link): panel rises from the bottom over a dimmed page, and sinks back on close. */
-.sheet-panel { animation: sheet-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-.sheet-scrim { animation: sheet-fade 300ms ease-out both; }
-[data-leaving] .sheet-panel { animation: sheet-down 260ms cubic-bezier(0.4, 0, 1, 1) both; }
-[data-leaving] .sheet-scrim { animation: sheet-fade 260ms ease-in reverse both; }
-@keyframes sheet-up { from { transform: translateY(100%); } }
-@keyframes sheet-down { to { transform: translateY(100%); } }
-@keyframes sheet-fade { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .sheet-panel, .sheet-scrim { animation: none; } }
+.sheet-panel {
+  animation: sheet-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.sheet-scrim {
+  animation: sheet-fade 300ms ease-out both;
+}
+[data-leaving] .sheet-panel {
+  animation: sheet-down 260ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+[data-leaving] .sheet-scrim {
+  animation: sheet-fade 260ms ease-in reverse both;
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-down {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-panel,
+  .sheet-scrim {
+    animation: none;
+  }
+}
 
 /* Theme toggle shows the icon for the mode you'd switch to. */
 .theme-icon-sun {
@@ -216,28 +243,53 @@ body {
   display: none;
 }
 
-
 /* Soft gradient "stage" the card face sits on (lavender → periwinkle wash).
    No border: the colour field itself defines the area. */
 .card-stage {
   background:
-    radial-gradient(80% 110% at 0% 0%, rgb(170 160 255 / 0.08), transparent 60%),
-    radial-gradient(90% 120% at 100% 100%, rgb(124 140 255 / 0.16), transparent 62%),
+    radial-gradient(
+      80% 110% at 0% 0%,
+      rgb(170 160 255 / 0.08),
+      transparent 60%
+    ),
+    radial-gradient(
+      90% 120% at 100% 100%,
+      rgb(124 140 255 / 0.16),
+      transparent 62%
+    ),
     #121216;
 }
 [data-theme="light"] .content-theme .card-stage {
   background:
-    radial-gradient(90% 120% at 0% 0%, rgb(200 190 255 / 0.28), transparent 62%),
-    radial-gradient(90% 120% at 100% 100%, rgb(120 132 255 / 0.26), transparent 62%),
+    radial-gradient(
+      90% 120% at 0% 0%,
+      rgb(200 190 255 / 0.28),
+      transparent 62%
+    ),
+    radial-gradient(
+      90% 120% at 100% 100%,
+      rgb(120 132 255 / 0.26),
+      transparent 62%
+    ),
     #f3f3fa;
 }
 
 /* Faint tint fading down from the top of a panel. */
 .panel-glow {
-  background-image: linear-gradient(180deg, rgb(124 140 255 / 0.09), rgb(124 140 255 / 0.03) 140px, transparent 300px);
+  background-image: linear-gradient(
+    180deg,
+    rgb(124 140 255 / 0.09),
+    rgb(124 140 255 / 0.03) 140px,
+    transparent 300px
+  );
 }
 [data-theme="light"] .content-theme .panel-glow {
-  background-image: linear-gradient(180deg, rgb(130 140 255 / 0.14), rgb(130 140 255 / 0.05) 140px, transparent 300px);
+  background-image: linear-gradient(
+    180deg,
+    rgb(130 140 255 / 0.14),
+    rgb(130 140 255 / 0.05) 140px,
+    transparent 300px
+  );
 }
 
 /* Attached "folder" tab: the active tab and the table block share one tint,
@@ -259,13 +311,20 @@ body {
 }
 .tab-fillet-l {
   left: -14px;
-  background: radial-gradient(circle at 0 0, transparent 13.5px, var(--table-tint) 14px);
+  background: radial-gradient(
+    circle at 0 0,
+    transparent 13.5px,
+    var(--table-tint) 14px
+  );
 }
 .tab-fillet-r {
   right: -14px;
-  background: radial-gradient(circle at 100% 0, transparent 13.5px, var(--table-tint) 14px);
+  background: radial-gradient(
+    circle at 100% 0,
+    transparent 13.5px,
+    var(--table-tint) 14px
+  );
 }
-
 
 /* Frozen state: diagonal hatch (monochrome "paused" cue). Uses currentColor-free
    white stripes so it reads on the dark card face in both themes. */
@@ -347,7 +406,12 @@ body {
 /* "Hide amounts" (top bar): figures are pixelated — a mosaic of their own colours, via the
    SVG filter #gravv-pixelate mounted in the top bar. Nested matches aren't filtered twice. */
 [data-hide-amounts] .amount,
-[data-hide-amounts] .content-theme main :is(.amount, .tabular-nums):not(input):not(.font-mono):not([role="radio"]):not([role="radio"] *) {
+[data-hide-amounts]
+  .content-theme
+  main
+  :is(.amount, .tabular-nums):not(input):not(.font-mono):not(
+    [role="radio"]
+  ):not([role="radio"] *) {
   filter: url(#gravv-pixelate);
   user-select: none;
 }
@@ -356,26 +420,104 @@ body {
 }
 
 /* Payment link flow: the summary panel's contents settle in after it moves (right ↔ centre) */
-.morph-in { animation: morph-in 420ms 160ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-@keyframes morph-in { from { opacity: 0; filter: blur(4px); transform: translateY(4px); } }
-@media (prefers-reduced-motion: reduce) { .morph-in { animation: none; } }
+.morph-in {
+  animation: morph-in 420ms 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes morph-in {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .morph-in {
+    animation: none;
+  }
+}
 
 /* Customize checkout: edit the pay page in place */
-.cc-spot { position: relative; cursor: pointer; border-radius: 12px; outline: 1.5px dashed transparent; outline-offset: 2px; transition: outline-color 160ms, background-color 160ms; }
-.cc-spot:hover, .cc-spot:focus-visible { outline-color: rgb(37 99 235 / 0.55); background-color: rgb(37 99 235 / 0.035); }
-.cc-spot[data-on] { outline: 1.5px solid #2563eb; background-color: rgb(37 99 235 / 0.05); }
-.cc-spot::after { content: attr(data-label); position: absolute; top: -9px; left: 10px; transform: translateY(-50%); padding: 2px 7px; border-radius: 999px; background: #2563eb; color: #fff; font-size: 10.5px; font-weight: 500; line-height: 1.4; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 140ms; z-index: 2; }
-.cc-spot:hover::after, .cc-spot:focus-visible::after, .cc-spot[data-on]::after { opacity: 1; }
-.cc-spot .cc-spot::after { display: none; }
-.cc-tool { animation: cc-tool 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-@keyframes cc-tool { from { opacity: 0; transform: translateY(4px) scale(0.98); } }
-@media (prefers-reduced-motion: reduce) { .cc-tool { animation: none; } }
+.cc-spot {
+  position: relative;
+  cursor: pointer;
+  border-radius: 12px;
+  outline: 1.5px dashed transparent;
+  outline-offset: 2px;
+  transition:
+    outline-color 160ms,
+    background-color 160ms;
+}
+.cc-spot:hover,
+.cc-spot:focus-visible {
+  outline-color: rgb(37 99 235 / 0.55);
+  background-color: rgb(37 99 235 / 0.035);
+}
+.cc-spot[data-on] {
+  outline: 1.5px solid #2563eb;
+  background-color: rgb(37 99 235 / 0.05);
+}
+.cc-spot::after {
+  content: attr(data-label);
+  position: absolute;
+  top: -9px;
+  left: 10px;
+  transform: translateY(-50%);
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms;
+  z-index: 2;
+}
+.cc-spot:hover::after,
+.cc-spot:focus-visible::after,
+.cc-spot[data-on]::after {
+  opacity: 1;
+}
+.cc-spot .cc-spot::after {
+  display: none;
+}
+.cc-tool {
+  animation: cc-tool 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes cc-tool {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cc-tool {
+    animation: none;
+  }
+}
 /* The stage the pay page sits on, and the page's lift — tuned per theme so it reads as a sheet, not a haze. */
-.cc-stage { background: radial-gradient(120% 80% at 50% 0%, rgb(255 255 255 / 0.05), transparent 60%); }
-.pay-sheet { box-shadow: 0 40px 120px -30px rgb(0 0 0 / 0.7); }
+.cc-stage {
+  background: radial-gradient(
+    120% 80% at 50% 0%,
+    rgb(255 255 255 / 0.05),
+    transparent 60%
+  );
+}
+.pay-sheet {
+  box-shadow: 0 40px 120px -30px rgb(0 0 0 / 0.7);
+}
 [data-theme="light"] .content-theme .cc-stage,
-[data-theme="light"] .content-theme .cc-caption { background: #f1f1f0; }
-[data-theme="light"] .content-theme .pay-sheet { box-shadow: 0 0 0 1px rgb(0 0 0 / 0.05), 0 1px 2px rgb(0 0 0 / 0.04), 0 24px 48px -28px rgb(0 0 0 / 0.22); }
+[data-theme="light"] .content-theme .cc-caption {
+  background: #f1f1f0;
+}
+[data-theme="light"] .content-theme .pay-sheet {
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.05),
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 24px 48px -28px rgb(0 0 0 / 0.22);
+}
 
 /* ------------------------------------------------------------------
    Cards opening sequence (app/(dashboard)/cards/_components/opening-sequence.tsx).
@@ -472,18 +614,32 @@ html[data-intro] .content-theme {
 
 /* Pixel-grid loader (app/_components/loading-state.tsx) */
 @keyframes pixel-on {
-  0%, 100% { opacity: 0.15; }
-  35% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  35% {
+    opacity: 1;
+  }
 }
 @keyframes shimmer-text {
-  from { background-position: 100% 0; }
-  to { background-position: -100% 0; }
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
 }
 @keyframes pop-in {
-  from { opacity: 0; transform: scale(0.96) translateY(-2px); }
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pixel-cell { animation: none !important; }
+  .pixel-cell {
+    animation: none !important;
+  }
 }
 
 /* ─── Screen-size scaling ───────────────────────────────────────────────────
@@ -492,19 +648,51 @@ html[data-intro] .content-theme {
  * cramming full-size parts into less room. Full-height layouts divide by
  * --app-zoom so they still fill the window.
  */
-:root { --app-zoom: 1; }
-@media (max-width: 1799px) { :root { --app-zoom: 0.94; } }
-@media (max-width: 1599px) { :root { --app-zoom: 0.94; } }
-@media (max-width: 1439px) { :root { --app-zoom: 0.82; } }
-@media (max-width: 1279px) { :root { --app-zoom: 0.78; } }
-html { zoom: var(--app-zoom); }
-.app-fill { height: calc(100dvh / var(--app-zoom)); }
-.app-fill-min { min-height: calc(100dvh / var(--app-zoom)); }
+:root {
+  --app-zoom: 1;
+}
+@media (max-width: 1799px) {
+  :root {
+    --app-zoom: 0.94;
+  }
+}
+@media (max-width: 1599px) {
+  :root {
+    --app-zoom: 0.94;
+  }
+}
+@media (max-width: 1439px) {
+  :root {
+    --app-zoom: 0.82;
+  }
+}
+@media (max-width: 1279px) {
+  :root {
+    --app-zoom: 0.78;
+  }
+}
+html {
+  zoom: var(--app-zoom);
+}
+.app-fill {
+  height: calc(100dvh / var(--app-zoom));
+}
+.app-fill-min {
+  min-height: calc(100dvh / var(--app-zoom));
+}
 
 /* Page column: full design width on big monitors; a little wider on smaller
  * screens (where the app is zoomed down) so toolbars and tables keep their air. */
-:root { --page-max: 1180px; --page-max-narrow: 1080px; }
-@media (max-width: 1799px) { :root { --page-max: 1280px; --page-max-narrow: 1160px; } }
+:root {
+  --page-max: 1180px;
+  --page-max-narrow: 1080px;
+}
+@media (max-width: 1799px) {
+  :root {
+    --page-max: 1280px;
+    --page-max-narrow: 1160px;
+  }
+}
 
 /* Every table's heading sits on a grey band, so it reads apart from the body. */
 .content-theme thead > tr {
@@ -513,4 +701,10 @@ html { zoom: var(--app-zoom); }
 .content-theme thead th {
   font-weight: 500;
   color: var(--color-neutral-400);
+}
+
+/* Selected pill tabs carry the brand mint (the one place the brand colour marks "you are here"). */
+.content-theme [role="tab"][aria-selected="true"].rounded-full {
+  background: var(--ok-bg);
+  color: var(--ok-fg);
 }

@@ -73,12 +73,12 @@ export function Dropdown<T extends string | number>({
 
   const trigger =
     variant === "chip"
-      ? `h-8 rounded-lg px-2.5 ${active ? "bg-white/[0.12] text-white" : "bg-white/[0.05] text-neutral-300 hover:bg-white/[0.08] hover:text-white"}`
+      ? `h-8 rounded-lg px-2.5 ${active ? "bg-[var(--ok-bg)] text-[var(--ok-fg)]" : "bg-white/[0.05] text-neutral-300 hover:bg-white/[0.08] hover:text-white"}`
       : variant === "bare"
         ? "h-9 rounded-l-full pr-2.5 pl-3.5 text-neutral-200 hover:text-white"
         : variant === "compact"
-          ? `h-8 rounded-full border bg-surface pr-2.5 pl-3 ${active ? "border-white/30 text-white" : "border-white/10 text-neutral-200 hover:border-white/25"}`
-          : `h-9 rounded-full border bg-white/[0.03] pr-3 pl-3.5 ${active ? "border-white/30 text-white" : "border-white/10 text-neutral-300 hover:border-white/20"}`;
+          ? `h-8 rounded-full border bg-surface pr-2.5 pl-3 ${active ? "border-[color-mix(in_oklab,var(--ok-fg)_45%,transparent)] text-[var(--ok-fg)]" : "border-white/10 text-neutral-200 hover:border-white/25"}`
+          : `h-9 rounded-full border bg-white/[0.03] pr-3 pl-3.5 ${active ? "border-[color-mix(in_oklab,var(--ok-fg)_45%,transparent)] text-[var(--ok-fg)]" : "border-white/10 text-neutral-300 hover:border-white/20"}`;
 
   return (
     <div ref={root} className={`relative ${className}`}>

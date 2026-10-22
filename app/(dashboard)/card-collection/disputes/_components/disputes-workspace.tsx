@@ -463,7 +463,7 @@ function Status({ status }: { status: DisputeStatus }) {
     status === "Needs response"
       ? "border-transparent bg-amber-300/10 text-amber-200"
       : status === "Under review"
-        ? "border-dashed border-white/20 text-neutral-300"
+        ? "border-transparent bg-blue-400/12 text-blue-300"
         : status === "Won"
           ? "border-transparent bg-[var(--ok-bg)] text-[var(--ok-fg)]"
           : status === "Accepted"

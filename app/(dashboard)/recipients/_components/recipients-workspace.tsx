@@ -114,7 +114,7 @@ function ProblemChip({ p }: { p: Problem }) {
       ? "border-transparent bg-rose-400/10 text-rose-300"
       : p.tone === "warn"
         ? "border-transparent bg-amber-300/10 text-amber-200"
-        : "border-dashed border-white/20 text-neutral-300";
+        : "border-transparent bg-blue-400/12 text-blue-300";
   return (
     <span
       className={`inline-flex h-6 items-center rounded-full border px-2.5 text-xs leading-none font-medium whitespace-nowrap ${tone}`}

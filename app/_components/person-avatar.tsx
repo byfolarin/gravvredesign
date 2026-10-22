@@ -1,3 +1,5 @@
+import { toneClass, toneFor } from "./tone";
+
 /**
  * Teammates, wherever their name appears. Most have a photo (randomuser.me placeholder set,
  * same source as Cards and Recipients); a few stay as initials, the way real teams look.
@@ -105,8 +107,8 @@ export function PersonAvatar({
     <span
       aria-hidden
       title={name}
-      // A quiet fill and lighter letters, so initials carry the same visual weight as a photo.
-      className={`flex shrink-0 items-center justify-center rounded-full bg-neutral-800 font-medium tracking-[0.04em] text-neutral-300 ${edge} ${className}`}
+      // Initials on the person's own tint, the same on every page.
+      className={`flex shrink-0 items-center justify-center rounded-full font-medium tracking-[0.04em] ${toneClass(toneFor(name))} ${edge} ${className}`}
       style={{ width: size, height: size, fontSize: Math.max(8.5, size * 0.3) }}
     >
       {initials(name)}

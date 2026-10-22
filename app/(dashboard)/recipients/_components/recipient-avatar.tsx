@@ -1,3 +1,4 @@
+import { toneClass, toneFor } from "@/app/_components/tone";
 import type { Recipient } from "../_data";
 
 const initials = (name: string) =>
@@ -31,8 +32,7 @@ export function RecipientAvatar({
         width={size}
         height={size}
         loading="lazy"
-        // Placeholder logos are greyscale so they don't fight the monochrome UI.
-        className={`shrink-0 border border-white/10 object-cover ${shape} ${business ? "bg-white/6 grayscale" : ""}`}
+        className={`shrink-0 border border-white/10 object-cover ${shape} ${business ? "bg-white/6" : ""}`}
         style={{ width: size, height: size }}
       />
     );
@@ -40,7 +40,7 @@ export function RecipientAvatar({
   return (
     <span
       aria-hidden
-      className={`flex shrink-0 items-center justify-center border border-white/10 bg-white/6 font-semibold text-neutral-200 ${shape}`}
+      className={`flex shrink-0 items-center justify-center font-semibold ${toneClass(toneFor(recipient.name))} ${shape}`}
       style={{ width: size, height: size, fontSize: size * 0.34 }}
     >
       {initials(recipient.name)}

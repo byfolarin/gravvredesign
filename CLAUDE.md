@@ -38,7 +38,8 @@ nothing persists. Owner: Folarin (product designer).
   `[data-theme="light"] .content-theme`. Theme switch (Light / Dark / System) in the sidebar footer.
 - Weights: page titles and headline numbers are **font-medium**, never semibold.
 - Colour: brand mint `--brand` / `--flow-in` means money in / good; grey `--flow-out` for out.
-  Status chips: Completed/Active `--ok-bg`/`--ok-fg`, Pending/Paused dashed outline, Failed rose.
+  Status chips: every state its own soft hue — Completed/Active/Verified mint (`--ok-bg`/`--ok-fg`), Pending/Settling amber, Provisioning/Verifying/Under review blue, Failed/Declined/Action needed rose; no grey dashed outlines for live states.
+- **Colour with a job** (`app/_components/tone.ts`): `toneFor(name)` gives each person/business one tint everywhere (avatar initials); type marks are tinted icon squares (funding mint, payout blue, offramp sky, crypto violet); money in reads mint (`--ok-fg`), money out ink; the selected pill tab and active filters are brand mint (global rule + Dropdown `active`). Business logos in colour, not greyscale.
 - Amounts: tabular nums, superscript cents; headline numbers roll in with `<Roll>`
   (`app/_components/roll.tsx`) on every page enter. Mark money with `.amount` so "Hide amounts"
   (top bar eye or ⇧H) can hide it — hidden figures are **pixelated** (8px mosaic via SVG filter `#gravv-pixelate` mounted in the top bar, applied in `globals.css`). Owner rejected blur and redaction bars.

@@ -2,6 +2,9 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
+  ArrowDownLeft,
+  ArrowLeftRight,
+  ArrowUpRight,
   ChevronDown,
   ArrowUpDown,
   Check,
@@ -28,6 +31,7 @@ import {
   type TxnType,
 } from "../_data";
 import { Roll } from "@/app/_components/roll";
+import { toneClass, type Tone } from "@/app/_components/tone";
 
 type Tab = "All" | TxnStatus;
 const TABS: Tab[] = ["All", "Completed", "Pending", "Failed"];
@@ -441,17 +445,24 @@ export function TransactionsTable({ initial }: { initial: Transaction[] }) {
                       )}
                     </td>
                     <td className={`${cell} pr-4`}>
-                      <div className="truncate text-white">{t.type}</div>
-                      {/* Channel rides along with where the money went */}
-                      <div
-                        className={`flex min-w-0 items-center gap-1.5 text-[11px] text-neutral-500 ${density === "Compact" ? "hidden" : ""}`}
-                      >
-                        <ChannelMark channel={t.channel} />
-                        <span className="truncate">
-                          {t.channel} · To {t.destination.name}
-                          {t.destination.detail !== "External wallet" &&
-                            ` ${t.destination.detail}`}
-                        </span>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <KindMark type={t.type} />
+                        <div className="min-w-0">
+                          <div className="truncate font-medium text-white">
+                            {t.type}
+                          </div>
+                          {/* Channel rides along with where the money went */}
+                          <div
+                            className={`mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] text-neutral-500 ${density === "Compact" ? "hidden" : ""}`}
+                          >
+                            <ChannelMark channel={t.channel} />
+                            <span className="truncate">
+                              {t.channel} · To {t.destination.name}
+                              {t.destination.detail !== "External wallet" &&
+                                ` ${t.destination.detail}`}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </td>
                     {cols.category && (
@@ -469,7 +480,7 @@ export function TransactionsTable({ initial }: { initial: Transaction[] }) {
                     >
                       <div>
                         <span
-                          className={`font-medium ${t.status === "Failed" ? "text-neutral-600 line-through" : credit ? "text-white" : "text-neutral-200"}`}
+                          className={`font-medium ${t.status === "Failed" ? "text-neutral-600 line-through" : credit ? "text-[var(--ok-fg)]" : "text-white"}`}
                         >
                           {credit ? "+" : "−"}
                           {money(t.amount)}
@@ -772,13 +783,35 @@ function Status({ status }: { status: TxnStatus }) {
     status === "Completed"
       ? "border-transparent bg-[var(--ok-bg)] text-[var(--ok-fg)]"
       : status === "Pending"
-        ? "border-dashed border-white/20 text-neutral-300"
+        ? "border-transparent bg-amber-400/12 text-amber-300"
         : "border-transparent bg-rose-400/10 text-rose-300";
   return (
     <span
       className={`inline-flex h-6 items-center rounded-full border px-2.5 text-xs leading-none font-medium ${tone}`}
     >
       {status}
+    </span>
+  );
+}
+
+/** What kind of movement it is, at a glance: money in mint, out blue, conversions violet, crypto by network colour. */
+const KIND: Record<
+  Transaction["type"],
+  { tone: Tone; Icon: typeof ArrowDownLeft }
+> = {
+  "Account Funding": { tone: "mint", Icon: ArrowDownLeft },
+  Payout: { tone: "blue", Icon: ArrowUpRight },
+  Offramp: { tone: "sky", Icon: ArrowUpRight },
+  "Crypto Transfer": { tone: "violet", Icon: ArrowLeftRight },
+};
+function KindMark({ type }: { type: Transaction["type"] }) {
+  const k = KIND[type] ?? { tone: "grey" as Tone, Icon: ArrowLeftRight };
+  return (
+    <span
+      aria-hidden
+      className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${toneClass(k.tone)}`}
+    >
+      <k.Icon size={15} strokeWidth={1.9} />
     </span>
   );
 }
