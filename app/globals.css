@@ -712,6 +712,11 @@ html {
 /* Every table's heading sits on a grey band, so it reads apart from the body. */
 .content-theme thead > tr {
   background: color-mix(in oklab, var(--color-white) 3%, transparent);
+  /* The fill separates the header; no rule lines above or below it. */
+  border-color: transparent !important;
+}
+.content-theme table:has(> thead) {
+  border-top-color: transparent !important;
 }
 .content-theme thead th {
   font-weight: 500;
@@ -724,9 +729,7 @@ html {
   color: var(--ok-fg);
 }
 
-/* Counts in tabs sit low and small, like a subscript ("All ₂,₆₉₀"), not on the label's line. */
+/* Counts in tabs sit on the label's line at the label's size — only the colour is quieter. */
 .content-theme [role="tab"] > span.tabular-nums {
-  position: relative;
-  top: 0.32em;
-  font-size: 0.82em;
+  font-size: inherit;
 }
