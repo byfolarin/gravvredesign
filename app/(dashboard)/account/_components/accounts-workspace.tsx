@@ -469,7 +469,7 @@ export function AccountsWorkspace() {
                       tab: "Pending",
                       label: "Pending",
                       n: count("Pending"),
-                      color: "var(--color-orange-400)",
+                      color: "var(--color-amber-400)",
                     },
                     {
                       tab: "Frozen",
@@ -843,7 +843,7 @@ function Status({ account: a }: { account: Account }) {
     a.status === "Active"
       ? "border-transparent bg-[var(--ok-bg)] text-[var(--ok-fg)]"
       : a.status === "Pending"
-        ? "border-transparent bg-orange-400/14 text-orange-300"
+        ? "border-transparent bg-amber-400/16 text-amber-300"
         : a.status === "Frozen"
           ? "border-sky-300/25 bg-sky-400/10 text-sky-200"
           : "border-transparent bg-white/[0.05] text-neutral-500";
