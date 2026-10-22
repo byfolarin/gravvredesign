@@ -172,12 +172,15 @@ export function toggleHideAmounts() {
  * Brand-mint pixels anchored to the right edge, thinning out and fading to nothing before the
  * text. Seeded by the update id, so each notice keeps its own pattern.
  */
-const CELL = 6,
-  GAP = 2,
-  COLS = 46,
-  ROWS = 12;
+const CELL = 8,
+  GAP = 0,
+  COLS = 36,
+  ROWS = 11;
 
-/** Which cells are lit, and how brightly: denser and brighter towards the right edge. */
+/**
+ * A dither, not a scatter: the last columns are solid soft green, then the green breaks into
+ * pixels that thin out to nothing — the pixels themselves do the fading.
+ */
 function pixelCells(seed: string) {
   let x = [...seed].reduce(
     (h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619),
@@ -192,9 +195,11 @@ function pixelCells(seed: string) {
   const cells: { c: number; r: number; o: number }[] = [];
   for (let c = 0; c < COLS; c++)
     for (let r = 0; r < ROWS; r++) {
-      const toRight = c / (COLS - 1); // 0 at the left of the field, 1 at the edge
-      if (rand() < toRight * toRight * 0.42)
-        cells.push({ c, r, o: 0.1 + rand() * 0.42 * toRight });
+      const t = c / (COLS - 1); // 0 at the left of the field, 1 at the edge
+      // Solid for the last ~12%, then a steep fall-off into scattered pixels.
+      const keep = t > 0.88 ? 1 : Math.pow(Math.max(0, (t - 0.15) / 0.73), 2.2);
+      if (rand() < keep)
+        cells.push({ c, r, o: t > 0.88 ? 0.22 : 0.12 + rand() * 0.14 });
     }
   return cells;
 }
@@ -211,8 +216,8 @@ function PixelField({ seed }: { seed: string }) {
       viewBox={`0 0 ${W} ${H}`}
       className="pointer-events-none absolute top-1/2 right-0 -z-10 -translate-y-1/2"
       style={{
-        maskImage: "linear-gradient(to left, #000 15%, transparent 95%)",
-        WebkitMaskImage: "linear-gradient(to left, #000 15%, transparent 95%)",
+        maskImage: "linear-gradient(to left, #000 60%, transparent 100%)",
+        WebkitMaskImage: "linear-gradient(to left, #000 60%, transparent 100%)",
       }}
     >
       {cells.map(({ c, r, o }) => (
@@ -222,7 +227,6 @@ function PixelField({ seed }: { seed: string }) {
           y={r * (CELL + GAP)}
           width={CELL}
           height={CELL}
-          rx={1}
           fill="var(--brand)"
           opacity={o.toFixed(2)}
         />
