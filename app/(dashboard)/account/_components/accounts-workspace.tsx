@@ -117,10 +117,6 @@ const longDate = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 const shortRef = (id: string) => `${id.slice(0, 8)}…${id.slice(-6)}`;
-const ago = (iso: string) => {
-  const h = Math.round((AS_OF - Date.parse(iso)) / (60 * 60 * 1000));
-  return h < 24 ? `${Math.max(1, h)}h` : `${Math.round(h / 24)}d`;
-};
 
 /** Currencies without a minor unit — shown in whole amounts. */
 const WHOLE_ONLY: Currency[] = ["JPY"];
@@ -227,13 +223,7 @@ export function AccountsWorkspace() {
     );
   const inTab = (a: Account, t: Tab) =>
     t === "All" ? true : t === "Needs action" ? blocked(a) : a.status === t;
-  // A provisioning stage picked on the right narrows Pending to that step.
-  const [stage, setStage] = useState<number | null>(null);
-  const rows = scoped.filter(
-    (a) =>
-      inTab(a, tab) &&
-      (stage === null || tab !== "Pending" || (a.step ?? 0) === stage),
-  );
+  const rows = scoped.filter((a) => inTab(a, tab));
   const count = (t: Tab) => scoped.filter((a) => inTab(a, t)).length;
   const tabs: Tab[] = count("Needs action")
     ? ["All", "Needs action", ...TABS.slice(1)]
@@ -286,11 +276,6 @@ export function AccountsWorkspace() {
       (a.status === "Active" || a.status === "Frozen"),
   );
   const total = funded.reduce((s, a) => s + a.balance, 0);
-  const pending = scoped.filter((a) => a.status === "Pending");
-  const oldest = pending.reduce<Account | null>(
-    (o, a) => (!o || a.createdAt < o.createdAt ? a : o),
-    null,
-  );
 
   return (
     <div className="sidebar-scroll h-full overflow-y-auto">
@@ -498,29 +483,6 @@ export function AccountsWorkspace() {
                   active={tab}
                   onPick={(t) => {
                     setTab(t);
-                    setStage(null);
-                    reset();
-                  }}
-                />
-                <StageMix
-                  stages={PROVISION_STEPS.slice(0, 3).map((name, i) => ({
-                    name: ["Submitted", "Compliance", "With the bank"][i],
-                    n: pending.filter((a) => (a.step ?? 0) === i).length,
-                  }))}
-                  total={pending.length}
-                  needYou={count("Needs action")}
-                  oldest={
-                    oldest ? `${ago(oldest.createdAt)} · ${oldest.bank}` : null
-                  }
-                  active={tab === "Pending" ? stage : null}
-                  onPick={(i) => {
-                    setTab("Pending");
-                    setStage(i);
-                    reset();
-                  }}
-                  onNeedYou={() => {
-                    setTab("Needs action");
-                    setStage(null);
                     reset();
                   }}
                 />
@@ -541,7 +503,6 @@ export function AccountsWorkspace() {
                     aria-selected={tab === t}
                     onClick={() => {
                       setTab(t);
-                      setStage(null);
                       reset();
                     }}
                     className={`flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] transition-colors ${
@@ -1847,12 +1808,20 @@ function StatusMix({
 }) {
   const [hover, setHover] = useState<Tab | null>(null);
   const fmt = (n: number) => n.toLocaleString("en-US");
+  const live = parts[0];
+  const rest = parts.slice(1);
   return (
     <section>
-      <div className="text-[13px] text-neutral-500">Accounts</div>
-      <div className="mt-1.5 text-[28px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
-        <Roll value={fmt(total)} />
+      <div className="text-[13px] text-neutral-500">Active accounts</div>
+      <div className="mt-1.5 flex items-baseline gap-1.5">
+        <span className="text-[28px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
+          <Roll value={fmt(live.n)} />
+        </span>
+        <span className="text-[13px] text-neutral-500 tabular-nums">
+          of {fmt(total)}
+        </span>
       </div>
+      {/* One bar, every status in its share — hover a word below to find its part */}
       <div className="mt-4 flex h-1.5 gap-[2px] overflow-hidden rounded-full">
         {parts
           .filter((p) => p.n > 0)
@@ -1868,119 +1837,27 @@ function StatusMix({
             />
           ))}
       </div>
-      <ul className="mt-3">
-        {parts.map((p) => {
-          const on = active === p.tab;
-          return (
-            <li key={p.tab}>
-              <button
-                type="button"
-                aria-pressed={on}
-                onClick={() => onPick(on ? "All" : p.tab)}
-                onMouseEnter={() => setHover(p.tab)}
-                onMouseLeave={() => setHover(null)}
-                className={`-mx-2 flex w-[calc(100%+1rem)] items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors hover:bg-white/[0.04] ${on ? "bg-white/[0.05]" : ""}`}
-              >
-                <span
-                  aria-hidden
-                  className="h-2.5 w-[3px] shrink-0 rounded-full"
-                  style={{ background: p.color }}
-                />
-                <span className={on ? "text-white" : "text-neutral-300"}>
-                  {p.label}
-                </span>
-                <span className="ml-auto text-neutral-200 tabular-nums">
-                  {fmt(p.n)}
-                </span>
-                <span className="w-9 text-right text-[12px] text-neutral-500 tabular-nums">
-                  {total ? Math.round((p.n / total) * 100) : 0}%
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      {/* The rest in one line; each count filters the table */}
+      <p className="mt-3 text-[12.5px] leading-relaxed text-neutral-500">
+        {rest.map((p, i) => (
+          <span key={p.tab}>
+            {i > 0 && " · "}
+            <button
+              type="button"
+              aria-pressed={active === p.tab}
+              onClick={() => onPick(active === p.tab ? "All" : p.tab)}
+              onMouseEnter={() => setHover(p.tab)}
+              onMouseLeave={() => setHover(null)}
+              className={`tabular-nums underline-offset-4 transition-colors hover:text-white hover:underline ${active === p.tab ? "text-white underline" : ""}`}
+            >
+              {fmt(p.n)} {p.label.toLowerCase()}
+            </button>
+          </span>
+        ))}
+      </p>
     </section>
   );
 }
-
-/**
- * Where the accounts still opening are: one slim bar per stage, scaled to the busiest.
- * Rows filter the table to that stage; "need you" jumps to the accounts blocked on you.
- */
-function StageMix({
-  stages,
-  total,
-  needYou,
-  oldest,
-  active,
-  onPick,
-  onNeedYou,
-}: {
-  stages: { name: string; n: number }[];
-  total: number;
-  needYou: number;
-  oldest: string | null;
-  active: number | null;
-  onPick: (i: number) => void;
-  onNeedYou: () => void;
-}) {
-  const max = Math.max(1, ...stages.map((s) => s.n));
-  return (
-    <section>
-      <div className="flex items-baseline justify-between">
-        <span className="text-[13px] text-neutral-500">Opening</span>
-        <span className="text-[13px] text-neutral-200 tabular-nums">
-          {total.toLocaleString("en-US")}
-        </span>
-      </div>
-      <ul className="mt-2">
-        {stages.map((s, i) => {
-          const on = active === i;
-          return (
-            <li key={s.name}>
-              <button
-                type="button"
-                aria-pressed={on}
-                onClick={() => onPick(i)}
-                className={`-mx-2 grid w-[calc(100%+1rem)] grid-cols-[96px_minmax(0,1fr)_40px] items-center gap-3 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors hover:bg-white/[0.04] ${on ? "bg-white/[0.05]" : ""}`}
-              >
-                <span className={on ? "text-white" : "text-neutral-300"}>
-                  {s.name}
-                </span>
-                <span className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
-                  <span
-                    className="block h-full rounded-full bg-[var(--color-blue-400)]"
-                    style={{ width: `${(s.n / max) * 100}%` }}
-                  />
-                </span>
-                <span className="text-right text-neutral-200 tabular-nums">
-                  {s.n}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="mt-2.5 text-[12px] text-neutral-500">
-        {needYou > 0 ? (
-          <button
-            type="button"
-            onClick={onNeedYou}
-            className="text-amber-300 underline decoration-amber-300/30 underline-offset-4 hover:decoration-amber-300"
-          >
-            {needYou} need you
-          </button>
-        ) : oldest ? (
-          <>Oldest waiting {oldest}</>
-        ) : (
-          "Nothing waiting on a bank"
-        )}
-      </div>
-    </section>
-  );
-}
-
 
 function RowMenu({
   account: a,
