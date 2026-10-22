@@ -99,7 +99,9 @@ const MAX_SHOWN = 4;
 const SHOWN_KEY = "gravv-accounts-currencies";
 const DEFAULT_SHOWN: Currency[] = ["USD", "EUR", "GBP", "NGN"];
 const CATEGORIES: ("All" | Category)[] = ["All", "Individual", "Business"];
-const PER_PAGE = 20;
+const PAGE_SIZES = [10, 20, 50, 100] as const;
+type PageSize = (typeof PAGE_SIZES)[number];
+const PAGE_SIZE_KEY = "gravv-accounts-page-size";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("en-US", {
@@ -174,6 +176,24 @@ export function AccountsWorkspace() {
   // One loader everywhere: Drive.
   const loader: LoaderVariant = "Drive";
   const [section, setSection] = useState<Section>("accounts");
+  // Rows per page: your pick, remembered in this browser.
+  const [perPage, setPerPage] = useState<PageSize>(20);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        const n = Number(localStorage.getItem(PAGE_SIZE_KEY));
+        if (PAGE_SIZES.includes(n as PageSize)) setPerPage(n as PageSize);
+      } catch {}
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+  const choosePerPage = (n: PageSize) => {
+    setPerPage(n);
+    setPage(1);
+    try {
+      localStorage.setItem(PAGE_SIZE_KEY, String(n));
+    } catch {}
+  };
   const [tab, setTab] = useState<Tab>("All");
   const [currency, setCurrency] = useState<"All" | Currency>("All");
   const [shown, setShown] = useState<Currency[]>(DEFAULT_SHOWN);
@@ -279,6 +299,7 @@ export function AccountsWorkspace() {
       setToast("Stearns Bank is back — balances are current");
     }, 2500);
   };
+  const PER_PAGE = perPage;
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   const current = Math.min(page, pages);
   const visible = rows.slice((current - 1) * PER_PAGE, current * PER_PAGE);
@@ -804,10 +825,26 @@ export function AccountsWorkspace() {
 
             {/* Pagination */}
             <div className="mt-2 flex items-center justify-between border-t border-white/6 pt-4 text-[13px] text-neutral-500">
-              <span className="tabular-nums">
-                {rows.length === 0
-                  ? "No results"
-                  : `Showing ${((current - 1) * PER_PAGE + 1).toLocaleString("en-US")}–${Math.min(current * PER_PAGE, rows.length).toLocaleString("en-US")} of ${rows.length.toLocaleString("en-US")}`}
+              <span className="flex items-center gap-4 tabular-nums">
+                <span>
+                  {rows.length === 0
+                    ? "No results"
+                    : `Showing ${((current - 1) * PER_PAGE + 1).toLocaleString("en-US")}–${Math.min(current * PER_PAGE, rows.length).toLocaleString("en-US")} of ${rows.length.toLocaleString("en-US")}`}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="text-neutral-500">Rows per page</span>
+                  <Dropdown
+                    label="Rows per page"
+                    variant="compact"
+                    placement="top"
+                    value={perPage}
+                    options={PAGE_SIZES.map((n) => ({
+                      value: n,
+                      label: String(n),
+                    }))}
+                    onChange={choosePerPage}
+                  />
+                </span>
               </span>
               <div className="flex items-center gap-1">
                 <PageButton
