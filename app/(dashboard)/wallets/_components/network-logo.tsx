@@ -15,7 +15,15 @@ const ICONS = {
  * Small circular network mark ("background" variant clipped to a circle), so every logo —
  * including Stellar's black mark — reads on both the dark and light themes.
  */
-export function NetworkLogo({ network, size = 16, className = "" }: { network: Network; size?: number; className?: string }) {
+export function NetworkLogo({
+  network,
+  size = 16,
+  className = "",
+}: {
+  network: Network;
+  size?: number;
+  className?: string;
+}) {
   const Icon = ICONS[network];
   return (
     <Icon

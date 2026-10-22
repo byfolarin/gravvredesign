@@ -62,11 +62,19 @@ function getBook(): Entry[] {
 }
 
 const usd = (v: number) =>
-  new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+  new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(v);
 const compact = (v: number) =>
-  v >= 1_000_000 ? `${Number((v / 1_000_000).toFixed(1))}M` : v >= 1000 ? `${Number((v / 1000).toFixed(1))}k` : String(Math.round(v));
+  v >= 1_000_000
+    ? `${Number((v / 1_000_000).toFixed(1))}M`
+    : v >= 1000
+      ? `${Number((v / 1000).toFixed(1))}k`
+      : String(Math.round(v));
 const count = (n: number) => new Intl.NumberFormat("en-US").format(n);
-const daysUntil = (iso: string) => Math.max(0, Math.ceil((Date.parse(iso) - AS_OF) / DAY));
+const daysUntil = (iso: string) =>
+  Math.max(0, Math.ceil((Date.parse(iso) - AS_OF) / DAY));
 
 const matches = (e: Lite, tab: Tab) =>
   tab === "All" ||
@@ -94,7 +102,13 @@ export function CustomersWorkspace() {
   // Book-wide figures for the facts and tab counts (in production these come from the server).
   const stats = useMemo(() => {
     const all = getBook();
-    let paying = 0, owes = 0, review = 0, blocked = 0, collected = 0, owed = 0, openLinks = 0;
+    let paying = 0,
+      owes = 0,
+      review = 0,
+      blocked = 0,
+      collected = 0,
+      owed = 0,
+      openLinks = 0;
     let top: Customer | null = null;
     let soonest: { c: Customer; at: string } | null = null;
     for (const e of all) {
@@ -112,21 +126,41 @@ export function CustomersWorkspace() {
         for (const l of c.openLinks) {
           owed += l.amount;
           openLinks++;
-          if (!soonest || l.expiresAt < soonest.at) soonest = { c, at: l.expiresAt };
+          if (!soonest || l.expiresAt < soonest.at)
+            soonest = { c, at: l.expiresAt };
         }
       }
     }
-    return { paying, owes, review, blocked, collected, owed, openLinks, top, soonest };
+    return {
+      paying,
+      owes,
+      review,
+      blocked,
+      collected,
+      owed,
+      openLinks,
+      top,
+      soonest,
+    };
   }, []);
 
   const tabCount = (t: Tab) =>
-    t === "All" ? TOTAL : t === "Paying" ? stats.paying : t === "Owes you" ? stats.owes : stats.review;
+    t === "All"
+      ? TOTAL
+      : t === "Paying"
+        ? stats.paying
+        : t === "Owes you"
+          ? stats.owes
+          : stats.review;
 
   // Filter the whole book, then show one page. Search runs across all 100,000.
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return getBook().filter(
-      (e) => matches(e, tab) && (kind === "All" || e.kind === kind) && (!needle || e.hay.includes(needle)),
+      (e) =>
+        matches(e, tab) &&
+        (kind === "All" || e.kind === kind) &&
+        (!needle || e.hay.includes(needle)),
     );
   }, [tab, kind, query]);
   const pages = Math.max(1, Math.ceil(filtered.length / size));
@@ -145,8 +179,12 @@ export function CustomersWorkspace() {
         {/* Heading */}
         <div className="flex items-center justify-between gap-6">
           <div>
-            <h1 className="text-[26px] font-medium tracking-[-0.025em] text-white">Customers</h1>
-            <p className="mt-1 text-[13px] text-neutral-500">The people and businesses who pay you.</p>
+            <h1 className="text-[26px] font-medium tracking-[-0.025em] text-white">
+              Customers
+            </h1>
+            <p className="mt-1 text-[13px] text-neutral-500">
+              The people and businesses who pay you.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -159,7 +197,11 @@ export function CustomersWorkspace() {
             </button>
             <button
               type="button"
-              onClick={() => setToast("Add customer: name, email, and we send them the identity check")}
+              onClick={() =>
+                setToast(
+                  "Add customer: name, email, and we send them the identity check",
+                )
+              }
               className="flex h-9 items-center gap-1.5 rounded-full bg-white/[0.08] pr-3.5 pl-3 text-[13px] font-medium text-white transition-colors hover:bg-white/[0.12]"
             >
               <Plus size={14} strokeWidth={2} />
@@ -180,7 +222,11 @@ export function CustomersWorkspace() {
                 </sup>
               </span>
             }
-            aside={<span className="text-neutral-300">{count(stats.paying)} paying</span>}
+            aside={
+              <span className="text-neutral-300">
+                {count(stats.paying)} paying
+              </span>
+            }
             footer={
               <>
                 <span>USD equivalent</span>
@@ -207,12 +253,17 @@ export function CustomersWorkspace() {
                 $<Roll value={compact(stats.owed)} />
               </span>
             }
-            aside={<span className="text-neutral-300">{count(stats.openLinks)} open links</span>}
+            aside={
+              <span className="text-neutral-300">
+                {count(stats.openLinks)} open links
+              </span>
+            }
             footer={
               <>
                 {stats.soonest ? (
                   <span className="truncate">
-                    {stats.soonest.c.name} · link ends in {daysUntil(stats.soonest.at)} days
+                    {stats.soonest.c.name} · link ends in{" "}
+                    {daysUntil(stats.soonest.at)} days
                   </span>
                 ) : (
                   <span>No open links</span>
@@ -231,10 +282,18 @@ export function CustomersWorkspace() {
           <Fact
             label="Identity checks"
             value={<Roll value={count(stats.review)} />}
-            aside={stats.blocked > 0 ? <span className="text-neutral-300">{count(stats.blocked)} need you</span> : null}
+            aside={
+              stats.blocked > 0 ? (
+                <span className="text-neutral-300">
+                  {count(stats.blocked)} need you
+                </span>
+              ) : null
+            }
             footer={
               <>
-                <span className="truncate">Unverified customers can pay up to $1,000</span>
+                <span className="truncate">
+                  Unverified customers can pay up to $1,000
+                </span>
                 <button
                   type="button"
                   onClick={() => go("Needs review")}
@@ -265,7 +324,9 @@ export function CustomersWorkspace() {
                 }`}
               >
                 {t}
-                <span className={`text-xs tabular-nums ${tab === t ? "text-neutral-400" : "text-neutral-600"}`}>
+                <span
+                  className={`text-xs tabular-nums ${tab === t ? "text-neutral-400" : "text-neutral-600"}`}
+                >
                   <Roll value={compact(tabCount(t))} />
                 </span>
               </button>
@@ -288,7 +349,11 @@ export function CustomersWorkspace() {
               }}
             />
             <label className="flex h-9 w-[260px] shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 transition-colors hover:border-white/20 focus-within:border-white/35 focus-within:bg-transparent">
-              <Search size={14} strokeWidth={1.75} className="shrink-0 text-neutral-500" />
+              <Search
+                size={14}
+                strokeWidth={1.75}
+                className="shrink-0 text-neutral-500"
+              />
               <input
                 value={query}
                 onChange={(e) => {
@@ -302,7 +367,11 @@ export function CustomersWorkspace() {
             </label>
             <button
               type="button"
-              onClick={() => setToast(`Exporting ${count(filtered.length)} customers. We'll email the CSV.`)}
+              onClick={() =>
+                setToast(
+                  `Exporting ${count(filtered.length)} customers. We'll email the CSV.`,
+                )
+              }
               className="ml-1 flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] text-neutral-300 transition-colors hover:bg-white/[0.06] hover:text-white"
             >
               <Download size={14} strokeWidth={1.75} />
@@ -347,32 +416,54 @@ export function CustomersWorkspace() {
                       <div className="flex min-w-0 items-center gap-3">
                         <Avatar name={c.name} kind={c.kind} />
                         <div className="min-w-0">
-                          <div className="truncate text-white">{c.name}</div>
-                          <div className="truncate text-xs text-neutral-500">{c.email}</div>
+                          <div className="truncate text-[13.5px] font-semibold tracking-[-0.005em] text-white">
+                            {c.name}
+                          </div>
+                          <div className="truncate text-xs text-neutral-500">
+                            {c.email}
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td className="py-3">
                       <div className="text-neutral-200">{c.kind}</div>
-                      <div className="truncate text-xs text-neutral-500">{c.country}</div>
+                      <div className="truncate text-xs text-neutral-500">
+                        {c.country}
+                      </div>
                     </td>
                     <td className="py-3">
                       <IdentityBadge v={c.verification} />
                     </td>
                     <td className="amount py-3 pr-6 text-right text-white tabular-nums">
-                      {c.lifetime ? `$${usd(c.lifetime)}` : <span className="text-neutral-600">—</span>}
+                      {c.lifetime ? (
+                        `$${usd(c.lifetime)}`
+                      ) : (
+                        <span className="text-neutral-600">—</span>
+                      )}
                     </td>
                     <td className="py-3">
                       {c.lastPayment ? (
                         <>
-                          <div className={c.lastPayment.status === "Failed" ? "text-red-300" : "text-neutral-200"}>
-                            {c.lastPayment.status === "Failed" ? "Failed · " : ""}
+                          <div
+                            className={
+                              c.lastPayment.status === "Failed"
+                                ? "text-red-300"
+                                : "text-neutral-200"
+                            }
+                          >
+                            {c.lastPayment.status === "Failed"
+                              ? "Failed · "
+                              : ""}
                             {dateFmt.format(new Date(c.lastPayment.at))}
                           </div>
-                          <div className="truncate text-xs text-neutral-500">{c.lastPayment.method}</div>
+                          <div className="truncate text-xs text-neutral-500">
+                            {c.lastPayment.method}
+                          </div>
                         </>
                       ) : (
-                        <span className="text-neutral-600">No payments yet</span>
+                        <span className="text-neutral-600">
+                          No payments yet
+                        </span>
                       )}
                     </td>
                     <td className="amount py-3 pr-3 text-right tabular-nums">
@@ -380,7 +471,8 @@ export function CustomersWorkspace() {
                         <>
                           <div className="text-white">${usd(owed)}</div>
                           <div className="text-xs text-neutral-500">
-                            {c.openLinks.length} link{c.openLinks.length > 1 ? "s" : ""}
+                            {c.openLinks.length} link
+                            {c.openLinks.length > 1 ? "s" : ""}
                           </div>
                         </>
                       ) : (
@@ -398,7 +490,11 @@ export function CustomersWorkspace() {
                   {open && (
                     <tr className="border-b border-white/6 bg-white/[0.03]">
                       <td colSpan={7} className="px-3 pb-4">
-                        <Expanded c={c} onToast={setToast} onCreateLink={() => setLinkFor(c)} />
+                        <Expanded
+                          c={c}
+                          onToast={setToast}
+                          onCreateLink={() => setLinkFor(c)}
+                        />
                       </td>
                     </tr>
                   )}
@@ -410,7 +506,8 @@ export function CustomersWorkspace() {
 
         {rows.length === 0 && (
           <div className="py-16 text-center text-[13px] text-neutral-500">
-            No customers match{query.trim() ? ` "${query.trim()}"` : " these filters"}.
+            No customers match
+            {query.trim() ? ` "${query.trim()}"` : " these filters"}.
           </div>
         )}
 
@@ -424,7 +521,10 @@ export function CustomersWorkspace() {
                 variant="compact"
                 placement="top"
                 value={size}
-                options={PAGE_SIZES.map((n) => ({ value: n, label: String(n) }))}
+                options={PAGE_SIZES.map((n) => ({
+                  value: n,
+                  label: String(n),
+                }))}
                 onChange={(n) => {
                   setSize(n);
                   setPage(0);
@@ -433,13 +533,23 @@ export function CustomersWorkspace() {
             </div>
             <div className="flex items-center gap-3">
               <span className="tabular-nums">
-                {count(at * size + 1)}–{count(Math.min(filtered.length, at * size + size))} of {count(filtered.length)}
+                {count(at * size + 1)}–
+                {count(Math.min(filtered.length, at * size + size))} of{" "}
+                {count(filtered.length)}
               </span>
               <div className="flex items-center gap-1">
-                <PageButton label="Previous page" disabled={at === 0} onClick={() => setPage(at - 1)}>
+                <PageButton
+                  label="Previous page"
+                  disabled={at === 0}
+                  onClick={() => setPage(at - 1)}
+                >
                   <ChevronLeft size={14} strokeWidth={1.75} />
                 </PageButton>
-                <PageButton label="Next page" disabled={at >= pages - 1} onClick={() => setPage(at + 1)}>
+                <PageButton
+                  label="Next page"
+                  disabled={at >= pages - 1}
+                  onClick={() => setPage(at + 1)}
+                >
                   <ChevronRight size={14} strokeWidth={1.75} />
                 </PageButton>
               </div>
@@ -454,7 +564,9 @@ export function CustomersWorkspace() {
           onClose={() => setLinkFor(null)}
           onCreated={(l) => setToast(`${l.name} created`)}
           onCopy={(l) => {
-            navigator.clipboard?.writeText(`https://pay.gravv.xyz/${l.slug}`).catch(() => {});
+            navigator.clipboard
+              ?.writeText(`https://pay.gravv.xyz/${l.slug}`)
+              .catch(() => {});
             setToast("Link copied");
           }}
         />
@@ -488,14 +600,19 @@ function Expanded({
         <Detail label="Customer ID" value={c.id} mono copy />
         <Detail label="Email" value={c.email} copy />
         <Detail label="Country" value={c.country} />
-        <Detail label="Customer since" value={fullDateFmt.format(new Date(c.createdAt))} />
+        <Detail
+          label="Customer since"
+          value={fullDateFmt.format(new Date(c.createdAt))}
+        />
       </div>
 
       {c.verification !== "Verified" && (
         <div className="mx-5 mb-4 flex items-center justify-between gap-4 rounded-lg bg-white/[0.04] px-4 py-3">
           <div className="min-w-0">
             <div className="text-[13px] text-white">
-              {c.verification === "Pending" ? "Identity check in progress" : "Identity check needs you"}
+              {c.verification === "Pending"
+                ? "Identity check in progress"
+                : "Identity check needs you"}
             </div>
             <div className="mt-0.5 text-xs text-neutral-400">
               {c.verificationNote}. Until it clears they can pay up to $1,000.
@@ -503,7 +620,11 @@ function Expanded({
           </div>
           <button
             type="button"
-            onClick={() => onToast(`Sent ${c.name.split(" ")[0]} a new link to finish the check`)}
+            onClick={() =>
+              onToast(
+                `Sent ${c.name.split(" ")[0]} a new link to finish the check`,
+              )
+            }
             className="h-8 shrink-0 rounded-full bg-white/[0.08] px-3 text-[12.5px] text-white transition-colors hover:bg-white/[0.12]"
           >
             {c.verification === "Pending" ? "Send reminder" : "Ask again"}
@@ -527,10 +648,19 @@ function Expanded({
             <div className="mt-3 text-xs text-neutral-500">Open links</div>
             <ul className="mt-1">
               {c.openLinks.map((l) => (
-                <li key={l.name} className="flex items-center gap-4 py-1.5 text-[13px]">
-                  <span className="min-w-0 flex-1 truncate text-neutral-200">{l.name}</span>
-                  <span className="text-xs text-neutral-500">ends in {daysUntil(l.expiresAt)} days</span>
-                  <span className="amount w-28 text-right text-white tabular-nums">${usd(l.amount)}</span>
+                <li
+                  key={l.name}
+                  className="flex items-center gap-4 py-1.5 text-[13px]"
+                >
+                  <span className="min-w-0 flex-1 truncate text-neutral-200">
+                    {l.name}
+                  </span>
+                  <span className="text-xs text-neutral-500">
+                    ends in {daysUntil(l.expiresAt)} days
+                  </span>
+                  <span className="amount w-28 text-right text-white tabular-nums">
+                    ${usd(l.amount)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -568,7 +698,9 @@ function Expanded({
 function PaymentLine({ p }: { p: CustomerPayment }) {
   return (
     <li className="flex items-center gap-4 py-1.5 text-[13px]">
-      <span className="w-14 shrink-0 text-neutral-500">{dateFmt.format(new Date(p.at))}</span>
+      <span className="w-14 shrink-0 text-neutral-500">
+        {dateFmt.format(new Date(p.at))}
+      </span>
       <span className="min-w-0 flex-1 truncate text-neutral-200">{p.for}</span>
       <span className="text-xs text-neutral-500">{p.method}</span>
       <span
@@ -585,20 +717,44 @@ function PaymentLine({ p }: { p: CustomerPayment }) {
   );
 }
 
-function Detail({ label, value, mono, copy }: { label: string; value: string; mono?: boolean; copy?: boolean }) {
+function Detail({
+  label,
+  value,
+  mono,
+  copy,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  copy?: boolean;
+}) {
   return (
     <div className="min-w-0">
       <div className="text-xs text-neutral-500">{label}</div>
       <div className="mt-1 flex items-center gap-1">
-        <span className={`truncate text-neutral-100 ${mono ? "font-mono text-[12.5px]" : "text-[13px]"}`}>{value}</span>
-        {copy && <CopyButton value={value} label={`Copy ${label.toLowerCase()}`} />}
+        <span
+          className={`truncate text-neutral-100 ${mono ? "font-mono text-[12.5px]" : "text-[13px]"}`}
+        >
+          {value}
+        </span>
+        {copy && (
+          <CopyButton value={value} label={`Copy ${label.toLowerCase()}`} />
+        )}
       </div>
     </div>
   );
 }
 
 /** Initials, round for people and squared for businesses, so the two read apart at a glance. */
-export function Avatar({ name, kind, size = 32 }: { name: string; kind: CustomerKind; size?: number }) {
+export function Avatar({
+  name,
+  kind,
+  size = 32,
+}: {
+  name: string;
+  kind: CustomerKind;
+  size?: number;
+}) {
   const initials = name
     .split(" ")
     .slice(0, 2)
@@ -625,8 +781,12 @@ export function IdentityBadge({ v }: { v: Verification }) {
         ? "bg-white/[0.05] text-neutral-400"
         : "bg-white/[0.1] text-white";
   return (
-    <span className={`inline-flex h-5 items-center gap-1.5 rounded-md px-1.5 text-[11px] font-medium ${tone}`}>
-      {v === "Action needed" && <span aria-hidden className="size-1.5 rounded-full bg-current" />}
+    <span
+      className={`inline-flex h-5 items-center gap-1.5 rounded-md px-1.5 text-[11px] font-medium ${tone}`}
+    >
+      {v === "Action needed" && (
+        <span aria-hidden className="size-1.5 rounded-full bg-current" />
+      )}
       {v}
     </span>
   );
@@ -647,10 +807,18 @@ function Fact({
     <div className="flex min-w-0 flex-col border-white/8 lg:px-8 lg:first:pl-0 lg:last:pr-0 lg:[&:not(:first-child)]:border-l">
       <div className="text-[13px] text-neutral-500">{label}</div>
       <div className="mt-2 flex items-baseline justify-between gap-3">
-        <span className="text-[34px] leading-none font-medium tracking-[-0.035em] text-white tabular-nums">{value}</span>
-        {aside && <span className="text-[13px] whitespace-nowrap tabular-nums">{aside}</span>}
+        <span className="text-[34px] leading-none font-medium tracking-[-0.035em] text-white tabular-nums">
+          {value}
+        </span>
+        {aside && (
+          <span className="text-[13px] whitespace-nowrap tabular-nums">
+            {aside}
+          </span>
+        )}
       </div>
-      <div className="mt-3 flex min-w-0 items-center justify-between gap-3 text-xs text-neutral-500">{footer}</div>
+      <div className="mt-3 flex min-w-0 items-center justify-between gap-3 text-xs text-neutral-500">
+        {footer}
+      </div>
     </div>
   );
 }

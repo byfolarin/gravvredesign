@@ -10,13 +10,19 @@ import { Avatar, IdentityBadge } from "./customers-workspace";
 import { CreateFlow } from "../../payment-links/_components/links-workspace";
 
 const usd = (v: number) =>
-  new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
-const daysUntil = (iso: string) => Math.max(0, Math.ceil((Date.parse(iso) - AS_OF) / DAY));
+  new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(v);
+const daysUntil = (iso: string) =>
+  Math.max(0, Math.ceil((Date.parse(iso) - AS_OF) / DAY));
 
 /** The full customer page: everything the row breakdown shows, plus history, identity steps and notes. */
 export function CustomerDetail({ c }: { c: Customer }) {
   const [toast, setToast] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"All" | CustomerPayment["status"]>("All");
+  const [filter, setFilter] = useState<"All" | CustomerPayment["status"]>(
+    "All",
+  );
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2600);
@@ -24,12 +30,18 @@ export function CustomerDetail({ c }: { c: Customer }) {
   }, [toast]);
 
   const owed = c.openLinks.reduce((s, l) => s + l.amount, 0);
-  const shown = c.payments.filter((p) => filter === "All" || p.status === filter);
+  const shown = c.payments.filter(
+    (p) => filter === "All" || p.status === filter,
+  );
   const failed = c.payments.filter((p) => p.status === "Failed").length;
   const [creating, setCreating] = useState(false);
 
   // Identity check, step by step, in the order the customer goes through it.
-  const steps: { label: string; state: "done" | "now" | "todo"; note?: string }[] =
+  const steps: {
+    label: string;
+    state: "done" | "now" | "todo";
+    note?: string;
+  }[] =
     c.verification === "Verified"
       ? [
           { label: "Email confirmed", state: "done" },
@@ -39,8 +51,19 @@ export function CustomerDetail({ c }: { c: Customer }) {
       : c.verification === "Pending"
         ? [
             { label: "Email confirmed", state: "done" },
-            { label: "ID document", state: /uploaded/i.test(c.verificationNote ?? "") ? "done" : "now" },
-            { label: "Selfie match", state: /uploaded/i.test(c.verificationNote ?? "") ? "now" : "todo", note: c.verificationNote },
+            {
+              label: "ID document",
+              state: /uploaded/i.test(c.verificationNote ?? "")
+                ? "done"
+                : "now",
+            },
+            {
+              label: "Selfie match",
+              state: /uploaded/i.test(c.verificationNote ?? "")
+                ? "now"
+                : "todo",
+              note: c.verificationNote,
+            },
           ]
         : [
             { label: "Email confirmed", state: "done" },
@@ -65,11 +88,14 @@ export function CustomerDetail({ c }: { c: Customer }) {
             <Avatar name={c.name} kind={c.kind} size={44} />
             <div className="min-w-0">
               <div className="flex items-center gap-2.5">
-                <h1 className="truncate text-[26px] font-medium tracking-[-0.025em] text-white">{c.name}</h1>
+                <h1 className="truncate text-[26px] font-medium tracking-[-0.025em] text-white">
+                  {c.name}
+                </h1>
                 <IdentityBadge v={c.verification} />
               </div>
               <p className="mt-0.5 text-[13px] text-neutral-500">
-                {c.kind} · {c.country} · customer since {fullDateFmt.format(new Date(c.createdAt))}
+                {c.kind} · {c.country} · customer since{" "}
+                {fullDateFmt.format(new Date(c.createdAt))}
               </p>
             </div>
           </div>
@@ -126,15 +152,22 @@ export function CustomerDetail({ c }: { c: Customer }) {
               <div className="mb-8 flex items-center justify-between gap-4 rounded-xl bg-white/[0.04] px-5 py-4">
                 <div className="min-w-0">
                   <div className="text-[14px] text-white">
-                    {c.verification === "Pending" ? "Identity check in progress" : "Identity check needs you"}
+                    {c.verification === "Pending"
+                      ? "Identity check in progress"
+                      : "Identity check needs you"}
                   </div>
                   <div className="mt-0.5 text-[13px] text-neutral-400">
-                    {c.verificationNote}. Until it clears they can pay up to $1,000.
+                    {c.verificationNote}. Until it clears they can pay up to
+                    $1,000.
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setToast(`Sent ${c.name.split(" ")[0]} a new link to finish the check`)}
+                  onClick={() =>
+                    setToast(
+                      `Sent ${c.name.split(" ")[0]} a new link to finish the check`,
+                    )
+                  }
                   className="h-9 shrink-0 rounded-full bg-white px-4 text-[13px] font-medium text-black transition-colors hover:bg-neutral-200"
                 >
                   {c.verification === "Pending" ? "Send reminder" : "Ask again"}
@@ -148,7 +181,14 @@ export function CustomerDetail({ c }: { c: Customer }) {
               <div className="flex items-center justify-between gap-4">
                 <h2 className="text-[15px] font-medium text-white">Payments</h2>
                 <div role="tablist" className="flex items-center gap-1">
-                  {(["All", "Paid", ...(failed ? (["Failed"] as const) : []), "Refunded"] as const).map((t) => (
+                  {(
+                    [
+                      "All",
+                      "Paid",
+                      ...(failed ? (["Failed"] as const) : []),
+                      "Refunded",
+                    ] as const
+                  ).map((t) => (
                     <button
                       key={t}
                       type="button"
@@ -177,16 +217,26 @@ export function CustomerDetail({ c }: { c: Customer }) {
                       <th className="py-2.5 font-normal">For</th>
                       <th className="py-2.5 font-normal">Method</th>
                       <th className="py-2.5 font-normal">Status</th>
-                      <th className="py-2.5 pr-1 text-right font-normal">Amount</th>
+                      <th className="py-2.5 pr-1 text-right font-normal">
+                        Amount
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {shown.map((p) => (
                       <tr key={p.id} className="border-b border-white/6">
-                        <td className="py-3 pl-1 text-neutral-400">{dateFmt.format(new Date(p.at))}</td>
-                        <td className="truncate py-3 pr-4 text-neutral-100">{p.for}</td>
+                        <td className="py-3 pl-1 text-neutral-400">
+                          {dateFmt.format(new Date(p.at))}
+                        </td>
+                        <td className="truncate py-3 pr-4 text-neutral-100">
+                          {p.for}
+                        </td>
                         <td className="py-3 text-neutral-400">{p.method}</td>
-                        <td className={`py-3 ${p.status === "Failed" ? "text-red-300" : "text-neutral-400"}`}>{p.status}</td>
+                        <td
+                          className={`py-3 ${p.status === "Failed" ? "text-red-300" : "text-neutral-400"}`}
+                        >
+                          {p.status}
+                        </td>
                         <td
                           className={`amount py-3 pr-1 text-right tabular-nums ${p.status === "Paid" ? "text-white" : "text-neutral-500 line-through decoration-neutral-600"}`}
                         >
@@ -198,25 +248,42 @@ export function CustomerDetail({ c }: { c: Customer }) {
                 </table>
               ) : (
                 <p className="mt-3 border-t border-white/15 py-10 text-center text-[13px] text-neutral-500">
-                  {c.payments.length ? "No payments with this status." : `${c.name.split(" ")[0]} hasn't paid you yet.`}
+                  {c.payments.length
+                    ? "No payments with this status."
+                    : `${c.name.split(" ")[0]} hasn't paid you yet.`}
                 </p>
               )}
             </section>
 
             <section className="mt-10">
               <div className="flex items-center justify-between gap-4">
-                <h2 className="text-[15px] font-medium text-white">Open links</h2>
-                <button type="button" onClick={() => setCreating(true)} className="text-[12.5px] text-neutral-400 transition-colors hover:text-white">
+                <h2 className="text-[15px] font-medium text-white">
+                  Open links
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setCreating(true)}
+                  className="text-[12.5px] text-neutral-400 transition-colors hover:text-white"
+                >
                   New link
                 </button>
               </div>
               {c.openLinks.length ? (
                 <ul className="mt-3 border-t border-white/15">
                   {c.openLinks.map((l) => (
-                    <li key={l.name} className="flex items-center gap-4 border-b border-white/6 py-3 text-[13px]">
-                      <span className="min-w-0 flex-1 truncate text-neutral-100">{l.name}</span>
-                      <span className="text-xs text-neutral-500">ends in {daysUntil(l.expiresAt)} days</span>
-                      <span className="amount w-32 text-right text-white tabular-nums">${usd(l.amount)}</span>
+                    <li
+                      key={l.name}
+                      className="flex items-center gap-4 border-b border-white/6 py-3 text-[13px]"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-neutral-100">
+                        {l.name}
+                      </span>
+                      <span className="text-xs text-neutral-500">
+                        ends in {daysUntil(l.expiresAt)} days
+                      </span>
+                      <span className="amount w-32 text-right text-white tabular-nums">
+                        ${usd(l.amount)}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -237,7 +304,10 @@ export function CustomerDetail({ c }: { c: Customer }) {
                 <Detail label="Email" value={c.email} copy />
                 <Detail label="Type" value={c.kind} />
                 <Detail label="Country" value={c.country} />
-                <Detail label="Customer since" value={fullDateFmt.format(new Date(c.createdAt))} />
+                <Detail
+                  label="Customer since"
+                  value={fullDateFmt.format(new Date(c.createdAt))}
+                />
               </dl>
             </section>
 
@@ -245,7 +315,10 @@ export function CustomerDetail({ c }: { c: Customer }) {
               <h2 className="text-[13px] text-neutral-500">Identity check</h2>
               <ol className="mt-3">
                 {steps.map((s, i) => (
-                  <li key={s.label} className="relative flex gap-3 pb-4 last:pb-0">
+                  <li
+                    key={s.label}
+                    className="relative flex gap-3 pb-4 last:pb-0"
+                  >
                     {i < steps.length - 1 && (
                       <span
                         aria-hidden
@@ -262,14 +335,24 @@ export function CustomerDetail({ c }: { c: Customer }) {
                             : "border border-white/20"
                       }`}
                     >
-                      {s.state === "done" && <Check size={11} strokeWidth={3} />}
-                      {s.state === "now" && <span className="size-1.5 rounded-full bg-current" />}
+                      {s.state === "done" && (
+                        <Check size={11} strokeWidth={3} />
+                      )}
+                      {s.state === "now" && (
+                        <span className="size-1.5 rounded-full bg-current" />
+                      )}
                     </span>
                     <div className="min-w-0 pt-px">
-                      <div className={`text-[13px] ${s.state === "todo" ? "text-neutral-500" : "text-neutral-100"}`}>
+                      <div
+                        className={`text-[13px] ${s.state === "todo" ? "text-neutral-500" : "text-neutral-100"}`}
+                      >
                         {s.label}
                       </div>
-                      {s.note && <div className="mt-0.5 text-xs text-neutral-500">{s.note}</div>}
+                      {s.note && (
+                        <div className="mt-0.5 text-xs text-neutral-500">
+                          {s.note}
+                        </div>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -277,7 +360,10 @@ export function CustomerDetail({ c }: { c: Customer }) {
             </section>
 
             <section>
-              <label htmlFor="cus-note" className="text-[13px] text-neutral-500">
+              <label
+                htmlFor="cus-note"
+                className="text-[13px] text-neutral-500"
+              >
                 Internal note
               </label>
               <textarea
@@ -297,7 +383,9 @@ export function CustomerDetail({ c }: { c: Customer }) {
           onClose={() => setCreating(false)}
           onCreated={(l) => setToast(`${l.name} created`)}
           onCopy={(l) => {
-            navigator.clipboard?.writeText(`https://pay.gravv.xyz/${l.slug}`).catch(() => {});
+            navigator.clipboard
+              ?.writeText(`https://pay.gravv.xyz/${l.slug}`)
+              .catch(() => {});
             setToast("Link copied");
           }}
         />
@@ -323,13 +411,17 @@ function MonthlyBars({ payments }: { payments: CustomerPayment[] }) {
   const [hover, setHover] = useState<number | null>(null);
   const end = new Date(AS_OF);
   const months = Array.from({ length: 12 }, (_, k) => {
-    const d = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - 11 + k, 1));
+    const d = new Date(
+      Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - 11 + k, 1),
+    );
     return { y: d.getUTCFullYear(), m: d.getUTCMonth(), total: 0, n: 0 };
   });
   for (const p of payments) {
     if (p.status !== "Paid") continue;
     const d = new Date(p.at);
-    const b = months.find((x) => x.y === d.getUTCFullYear() && x.m === d.getUTCMonth());
+    const b = months.find(
+      (x) => x.y === d.getUTCFullYear() && x.m === d.getUTCMonth(),
+    );
     if (b) {
       b.total += p.amount;
       b.n++;
@@ -344,8 +436,15 @@ function MonthlyBars({ payments }: { payments: CustomerPayment[] }) {
   // Average over the months they've been paying, not months before they were a customer.
   const first = months.findIndex((b) => b.n > 0);
   const span = 12 - first;
-  const short = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" });
-  const long = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  const short = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    timeZone: "UTC",
+  });
+  const long = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
   const label = (b: (typeof months)[number]) => new Date(Date.UTC(b.y, b.m, 1));
 
   return (
@@ -353,7 +452,10 @@ function MonthlyBars({ payments }: { payments: CustomerPayment[] }) {
       <div className="flex items-baseline justify-between gap-4">
         <h2 className="text-[15px] font-medium text-white">Paid per month</h2>
         <span className="text-xs text-neutral-500 tabular-nums">
-          Avg ${usd(sum / span)} a month · {first === 0 ? "last 12 months" : `since ${short.format(label(months[first]))}`}
+          Avg ${usd(sum / span)} a month ·{" "}
+          {first === 0
+            ? "last 12 months"
+            : `since ${short.format(label(months[first]))}`}
         </span>
       </div>
       <div
@@ -382,15 +484,21 @@ function MonthlyBars({ payments }: { payments: CustomerPayment[] }) {
                     style={{ height: `${h}%` }}
                   />
                 ) : (
-                  <span className={`w-full border-t border-dashed ${on ? "border-white/40" : "border-white/15"}`} />
+                  <span
+                    className={`w-full border-t border-dashed ${on ? "border-white/40" : "border-white/15"}`}
+                  />
                 )}
                 {on && (
                   <span
                     className={`pointer-events-none absolute bottom-[calc(100%+6px)] z-10 rounded-lg bg-raised px-2.5 py-1.5 text-left whitespace-nowrap shadow-xl ring-1 ring-white/10 ${i > 8 ? "right-0" : i < 3 ? "left-0" : "left-1/2 -translate-x-1/2"}`}
                   >
-                    <span className="block text-[11px] text-neutral-500">{long.format(label(b))}</span>
+                    <span className="block text-[11px] text-neutral-500">
+                      {long.format(label(b))}
+                    </span>
                     <span className="amount block text-[13px] text-white tabular-nums">
-                      {b.n ? `$${usd(b.total)} · ${b.n} payment${b.n > 1 ? "s" : ""}` : "No payments"}
+                      {b.n
+                        ? `$${usd(b.total)} · ${b.n} payment${b.n > 1 ? "s" : ""}`
+                        : "No payments"}
                     </span>
                   </span>
                 )}
@@ -413,7 +521,15 @@ function MonthlyBars({ payments }: { payments: CustomerPayment[] }) {
   );
 }
 
-function Fact({ label, value, foot }: { label: string; value: string; foot: string }) {
+function Fact({
+  label,
+  value,
+  foot,
+}: {
+  label: string;
+  value: string;
+  foot: string;
+}) {
   return (
     <div className="flex min-w-0 flex-col border-white/8 lg:px-8 lg:first:pl-0 lg:last:pr-0 lg:[&:not(:first-child)]:border-l">
       <div className="text-[13px] text-neutral-500">{label}</div>
@@ -425,13 +541,29 @@ function Fact({ label, value, foot }: { label: string; value: string; foot: stri
   );
 }
 
-function Detail({ label, value, mono, copy }: { label: string; value: string; mono?: boolean; copy?: boolean }) {
+function Detail({
+  label,
+  value,
+  mono,
+  copy,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  copy?: boolean;
+}) {
   return (
     <div className="flex items-center justify-between gap-4">
       <dt className="shrink-0 text-[13px] text-neutral-500">{label}</dt>
       <dd className="flex min-w-0 items-center gap-1">
-        <span className={`truncate text-neutral-100 ${mono ? "font-mono text-[12.5px]" : "text-[13px]"}`}>{value}</span>
-        {copy && <CopyButton value={value} label={`Copy ${label.toLowerCase()}`} />}
+        <span
+          className={`truncate text-neutral-100 ${mono ? "font-mono text-[12.5px]" : "text-[13px]"}`}
+        >
+          {value}
+        </span>
+        {copy && (
+          <CopyButton value={value} label={`Copy ${label.toLowerCase()}`} />
+        )}
       </dd>
     </div>
   );

@@ -571,7 +571,7 @@ export function LinksWorkspace() {
                         <Badge status={l.status} />
                       </td>
                       <td className="py-3 pr-4">
-                        <div className="truncate text-neutral-100">
+                        <div className="truncate text-[13.5px] font-semibold tracking-[-0.005em] text-white">
                           {l.name}
                         </div>
                         <div className="truncate text-[11px] text-neutral-500">

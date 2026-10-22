@@ -964,8 +964,11 @@ export function WalletsWorkspace({
             footer={
               <>
                 <span className="tabular-nums">
-                  Avg {Math.round(fundedBalance / Math.max(1, fundedCount)).toLocaleString("en-US")} USDC
-                  each
+                  Avg{" "}
+                  {Math.round(
+                    fundedBalance / Math.max(1, fundedCount),
+                  ).toLocaleString("en-US")}{" "}
+                  USDC each
                 </span>
                 <button
                   type="button"
@@ -1360,7 +1363,10 @@ export function WalletsWorkspace({
               placement="top"
               align="right"
               value={perPage}
-              options={PAGE_SIZES.map((n) => ({ value: n, label: `${n} per page` }))}
+              options={PAGE_SIZES.map((n) => ({
+                value: n,
+                label: `${n} per page`,
+              }))}
               onChange={(v) => {
                 setPerPage(v);
                 setPage(1);

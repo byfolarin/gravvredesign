@@ -505,3 +505,12 @@ html { zoom: var(--app-zoom); }
  * screens (where the app is zoomed down) so toolbars and tables keep their air. */
 :root { --page-max: 1180px; --page-max-narrow: 1080px; }
 @media (max-width: 1799px) { :root { --page-max: 1280px; --page-max-narrow: 1160px; } }
+
+/* Every table's heading sits on a grey band, so it reads apart from the body. */
+.content-theme thead > tr {
+  background: color-mix(in oklab, var(--color-white) 5.5%, transparent);
+}
+.content-theme thead th {
+  font-weight: 500;
+  color: var(--color-neutral-400);
+}

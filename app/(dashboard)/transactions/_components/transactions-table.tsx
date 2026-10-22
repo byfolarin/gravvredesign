@@ -464,7 +464,9 @@ export function TransactionsTable({ initial }: { initial: Transaction[] }) {
                         />
                       </td>
                     )}
-                    <td className={`${cell} amount pr-8 text-right tabular-nums`}>
+                    <td
+                      className={`${cell} amount pr-8 text-right tabular-nums`}
+                    >
                       <div>
                         <span
                           className={`font-medium ${t.status === "Failed" ? "text-neutral-600 line-through" : credit ? "text-white" : "text-neutral-200"}`}
