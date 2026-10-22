@@ -11,10 +11,12 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Pencil,
+  X,
 } from "lucide-react";
 import { NavIcon } from "../icons/nav-icon";
 import { navSections, type NavLink, type NavSection } from "./nav-config";
 import { AccountMenu } from "./account-menu";
+import { UPDATES, UpdateArt, useDismissed } from "../updates";
 
 function cx(...classes: (string | false | null | undefined)[]) {
   return classes.filter(Boolean).join(" ");
@@ -430,6 +432,8 @@ export function Sidebar({
         )}
       </nav>
 
+      {!collapsed && <SidebarNews />}
+
       {/* You — opens the account menu upward */}
       <div
         className={cx(
@@ -562,6 +566,35 @@ function EditRow({
         ) : (
           <Eye size={13} strokeWidth={1.75} />
         )}
+      </button>
+    </div>
+  );
+}
+
+/** One launch at a time above your name, with its picture; gone once dismissed. */
+function SidebarNews() {
+  const { gone, dismiss } = useDismissed("sidebar");
+  const u = UPDATES.find((x) => !gone.has(x.id));
+  if (!u) return null;
+  return (
+    <div className="relative mx-3 mb-3 overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
+      <UpdateArt u={u} className="h-20" />
+      <div className="px-3 pt-2.5 pb-3">
+        <div className="text-[11px] text-[var(--brand)]">New</div>
+        <Link
+          href="/whats-new"
+          className="mt-0.5 block text-[12.5px] leading-snug text-neutral-100 hover:text-white"
+        >
+          {u.title}
+        </Link>
+      </div>
+      <button
+        type="button"
+        aria-label="Dismiss"
+        onClick={() => dismiss(u.id)}
+        className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-black/50 text-neutral-200 backdrop-blur hover:text-white"
+      >
+        <X size={12} strokeWidth={2} />
       </button>
     </div>
   );

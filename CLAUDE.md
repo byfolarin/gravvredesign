@@ -51,6 +51,7 @@ nothing persists. Owner: Folarin (product designer).
 - Discard guards set their dirty flag in a `setTimeout` — setting state during the input event made controlled inputs drop the first character typed.
 - Loading: use `LoadingState` (`app/_components/loading-state.tsx`, owner-supplied) — variants Drive, Dots, Orbit, Surfer; keyframes `pixel-on` / `shimmer-text` / `pop-in` in globals.css; ink = `--color-white` so it works in both themes. Pair it with skeletons in the page's own shapes.
 - Table hierarchy: header row on a grey band — applied to every table by a global rule in globals.css (`.content-theme thead > tr`), medium weight, neutral-400; the row's lead (customer / name) medium 13.5px white — never semibold; supporting columns (date, IDs) muted; second lines 12px with a 4px gap.
+- **Product updates** (`app/_components/updates-data.ts` list + `updates.tsx` UI): real product screenshots (`public/updates/*.png`) on soft two-stop gradients — the one place gradients are used. Shown in four places: Overview bottom "What's new at Gravv" (2 cards, dismissible), sidebar "New" card above your name (one at a time), on the page a feature belongs to (Payment links checkout notice), and the `/whats-new` page (avatar menu → What's new). Dismissals per place in localStorage.
 - Tables: hairline rows, row click expands an inline preview, "View all details" opens a right sheet;
   bulk selection uses a black floating bar; ⋮ row menus.
 

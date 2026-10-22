@@ -7,6 +7,7 @@ import {
   HelpCircleIcon,
   Logout01Icon,
   PaintBoardIcon,
+  SparklesIcon,
   Settings01Icon,
   UserIcon,
 } from "@hugeicons/core-free-icons";
@@ -138,6 +139,21 @@ export function AccountMenu({
                 </div>
               )}
             </div>
+
+            <Link
+              href="/whats-new"
+              role="menuitem"
+              onClick={close}
+              className={item}
+            >
+              <HugeiconsIcon
+                icon={SparklesIcon}
+                size={15}
+                strokeWidth={1.6}
+                className="text-neutral-400"
+              />
+              What&apos;s new
+            </Link>
 
             <a
               href="mailto:support@gravv.xyz"

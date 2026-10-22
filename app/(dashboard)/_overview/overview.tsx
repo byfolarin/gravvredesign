@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowRight, Check } from "lucide-react";
 import { Dropdown } from "@/app/_components/dropdown";
 import { Roll } from "@/app/_components/roll";
+import { UPDATES, UpdateCard, useDismissed } from "@/app/_components/updates";
 import { ME, MEMBERS } from "../manage/roles/_data";
 import { REQUESTS, ago } from "../manage/approvals/_data";
 import { disputes, daysUntil } from "../card-collection/disputes/_data";
@@ -47,6 +48,7 @@ export function Overview() {
   const [env, setEnv] = useState<Env>("live");
   const [done, setDone] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
+  const news = useDismissed("overview");
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3200);
@@ -442,6 +444,34 @@ export function Overview() {
             href="/account"
           />
         </section>
+
+        {/* What's new at Gravv — below the work, dismissible */}
+        {UPDATES.some((u) => !news.gone.has(u.id)) && (
+          <section className="mt-14">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-[15px] font-medium text-white">
+                What&apos;s new at Gravv
+              </h2>
+              <Link
+                href="/whats-new"
+                className="text-[12.5px] text-neutral-400 hover:text-white"
+              >
+                All updates
+              </Link>
+            </div>
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              {UPDATES.filter((u) => !news.gone.has(u.id))
+                .slice(0, 2)
+                .map((u) => (
+                  <UpdateCard
+                    key={u.id}
+                    u={u}
+                    onDismiss={() => news.dismiss(u.id)}
+                  />
+                ))}
+            </div>
+          </section>
+        )}
       </div>
 
       {toast && (
