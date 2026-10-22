@@ -473,17 +473,6 @@ export function AccountsWorkspace() {
                   }
                   share={scoped.length ? active / scoped.length : 0}
                   note={`${count("Frozen")} frozen · ${count("Closed")} closed`}
-                  action={
-                    count("Frozen") > 0
-                      ? {
-                          label: "Show frozen",
-                          onClick: () => {
-                            setTab("Frozen");
-                            reset();
-                          },
-                        }
-                      : undefined
-                  }
                 />
                 <SideFact
                   label="Being provisioned"
@@ -494,25 +483,6 @@ export function AccountsWorkspace() {
                       : oldest
                         ? `Oldest waiting ${ago(oldest.createdAt)} · ${oldest.bank}`
                         : "Nothing waiting on a bank"
-                  }
-                  action={
-                    count("Needs action")
-                      ? {
-                          label: "Review",
-                          onClick: () => {
-                            setTab("Needs action");
-                            reset();
-                          },
-                        }
-                      : oldest
-                        ? {
-                            label: "Review",
-                            onClick: () => {
-                              setTab("Pending");
-                              reset();
-                            },
-                          }
-                        : undefined
                   }
                 />
               </div>
