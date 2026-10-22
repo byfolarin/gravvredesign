@@ -296,6 +296,13 @@ export function AccountsWorkspace() {
       (a.status === "Active" || a.status === "Frozen"),
   );
   const total = funded.reduce((s, a) => s + a.balance, 0);
+  // Every currency's balance, for the row of balances (and the "more" list).
+  const totals = {} as Record<Currency, number>;
+  for (const c of ALL_CURRENCIES) totals[c] = 0;
+  // Across every account, not just the currency being looked at.
+  for (const a of list)
+    if (a.status === "Active" || a.status === "Frozen")
+      totals[a.currency] += a.balance;
   const active = scoped.filter((a) => a.status === "Active").length;
   const pending = scoped.filter((a) => a.status === "Pending");
   const oldest = pending.reduce<Account | null>(
@@ -448,6 +455,7 @@ export function AccountsWorkspace() {
             <div className="mt-8 grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px]">
               <BalancePanel
                 total={total}
+                totals={totals}
                 currency={balanceCurrency}
                 currencies={shown}
                 onCurrencies={saveShown}
@@ -1197,8 +1205,6 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
   );
 }
 
-
-
 /** Applications that become accounts: who applied, where it is, and what's blocking it. */
 function Applications() {
   const tone: Record<Application["status"], string> = {
@@ -1348,6 +1354,7 @@ const compactMoney = (v: number) =>
  */
 function BalancePanel({
   total,
+  totals,
   currency,
   currencies,
   onCurrency,
@@ -1359,6 +1366,8 @@ function BalancePanel({
   accountsNote,
 }: {
   total: number;
+  /** Balance per currency, for the row of balances. */
+  totals: Record<Currency, number>;
   currency: Currency;
   currencies: Currency[];
   onCurrency: (c: Currency) => void;
@@ -1411,36 +1420,28 @@ function BalancePanel({
 
   return (
     <section className="min-w-0 pt-1 pr-4">
-      <div className="flex items-start justify-between gap-6">
+      <BalanceRow
+        currencies={currencies}
+        currency={currency}
+        totals={totals}
+        counts={counts}
+        period={period}
+        onCurrency={onCurrency}
+        editor={
+          <CurrencyEditor
+            value={currencies}
+            counts={counts}
+            onChange={onCurrencies}
+            onOpenAccount={onOpenAccount}
+          />
+        }
+      />
+      <div className="mt-7 flex items-end justify-between gap-6">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[13px] text-neutral-500">
-            <span>Balance</span>
-            {/* Currency switch lives with the number it changes */}
-            <span className="flex rounded-full bg-white/[0.06] p-0.5">
-              {currencies.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => onCurrency(c)}
-                  aria-pressed={c === currency}
-                  className={`h-6 rounded-full px-2 text-[11px] transition-colors ${
-                    c === currency
-                      ? "bg-surface font-medium text-white shadow-[0_1px_2px_rgb(0_0_0/0.25)]"
-                      : "text-neutral-500 hover:text-white"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </span>
-            <CurrencyEditor
-              value={currencies}
-              counts={counts}
-              onChange={onCurrencies}
-              onOpenAccount={onOpenAccount}
-            />
+          <div className="text-[13px] text-neutral-500">
+            {NAMES[currency]} balance
           </div>
-          <div className="amount mt-3 text-[34px] leading-none font-medium tracking-[-0.035em] text-white tabular-nums">
+          <div className="amount mt-1.5 text-[34px] leading-none font-medium tracking-[-0.035em] text-white tabular-nums">
             {SYMBOL[currency]}
             {whole}
             {cents && (
@@ -1702,6 +1703,175 @@ function BalancePanel({
       )}
     </section>
   );
+}
+
+/**
+ * Balances up front, like Gravv's own page — but only the chosen few (max 4). Each is the
+ * switch for the chart below. Everything else you hold sits behind "+N more", largest
+ * first; picking one shows it in the row until you pick another.
+ */
+function BalanceRow({
+  currencies,
+  currency,
+  totals,
+  counts,
+  period,
+  onCurrency,
+  editor,
+}: {
+  currencies: Currency[];
+  currency: Currency;
+  totals: Record<Currency, number>;
+  counts: Record<Currency, number>;
+  period: Period;
+  onCurrency: (c: Currency) => void;
+  editor: React.ReactNode;
+}) {
+  const [more, setMore] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!more) return;
+    const down = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setMore(false);
+    };
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setMore(false);
+    document.addEventListener("mousedown", down);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("mousedown", down);
+      document.removeEventListener("keydown", key);
+    };
+  }, [more]);
+
+  // The row: the chosen currencies, plus the one being looked at if it came from "more".
+  const row = currencies.includes(currency)
+    ? currencies
+    : [...currencies, currency];
+  const rest = ALL_CURRENCIES.filter(
+    (c) => !row.includes(c) && counts[c] > 0,
+  ).sort((a, b) => counts[b] - counts[a]);
+  const change = (c: Currency) => {
+    const { previous } = balanceHistory(totals[c], c, period);
+    const before = previous[previous.length - 1];
+    return before ? (totals[c] - before) / before : 0;
+  };
+
+  return (
+    <div className="flex items-stretch border-y border-white/8">
+      <div
+        role="tablist"
+        aria-label="Balances"
+        className="grid min-w-0 flex-1"
+        style={{ gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))` }}
+      >
+        {row.map((c, i) => {
+          const on = c === currency;
+          const d = change(c);
+          return (
+            <button
+              key={c}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => onCurrency(c)}
+              className={`relative min-w-0 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.02] ${i ? "border-l border-white/8" : "pl-0"}`}
+            >
+              <span className="flex items-center gap-1.5 text-[12px] text-neutral-500">
+                <span className="text-[13px] leading-none">{FLAGS[c]}</span>
+                {c}
+              </span>
+              <span
+                className={`amount mt-1.5 block truncate text-[18px] font-medium tracking-[-0.015em] tabular-nums ${on ? "text-white" : "text-neutral-400"}`}
+              >
+                {totals[c] ? compactIn(c, totals[c]) : "—"}
+              </span>
+              <span
+                className={`mt-0.5 block text-[11.5px] tabular-nums ${
+                  !totals[c]
+                    ? "text-neutral-600"
+                    : d >= 0
+                      ? "text-[var(--ok-fg)]"
+                      : "text-neutral-500"
+                }`}
+              >
+                {totals[c]
+                  ? `${d >= 0 ? "+" : "−"}${Math.abs(d * 100).toFixed(1)}%`
+                  : "No balance"}
+              </span>
+              {/* The one the chart shows: an ink line along the bottom, like our tabs */}
+              {on && (
+                <span
+                  aria-hidden
+                  className="absolute inset-x-4 -bottom-px h-[2px] rounded-full bg-white"
+                  style={i ? undefined : { left: 0 }}
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        ref={ref}
+        className="relative flex shrink-0 items-center border-l border-white/8 pl-4"
+      >
+        {rest.length > 0 && (
+          <button
+            type="button"
+            aria-expanded={more}
+            onClick={() => setMore((v) => !v)}
+            className="flex items-center gap-2 rounded-full px-2.5 py-1.5 text-[12.5px] text-neutral-400 transition-colors hover:bg-white/[0.04] hover:text-white"
+          >
+            <span className="flex -space-x-0.5 text-[12px] leading-none">
+              {rest.slice(0, 3).map((c) => (
+                <span key={c}>{FLAGS[c]}</span>
+              ))}
+            </span>
+            +{rest.length} more
+          </button>
+        )}
+        {editor}
+        {more && (
+          <div className="orbit-pop absolute top-full right-0 z-30 mt-2 w-[280px] rounded-xl border border-white/10 bg-raised p-1.5 shadow-[0_20px_50px_-12px_rgb(0_0_0/0.5)]">
+            <div className="px-2.5 pt-1.5 pb-2 text-[11.5px] text-neutral-500">
+              Other balances · most accounts first
+            </div>
+            {rest.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => {
+                  onCurrency(c);
+                  setMore(false);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-white/[0.06]"
+              >
+                <span className="text-[15px] leading-none">{FLAGS[c]}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] text-white">{c}</span>
+                  <span className="block truncate text-[11.5px] text-neutral-500">
+                    {NAMES[c]} · {counts[c]}{" "}
+                    {counts[c] === 1 ? "account" : "accounts"}
+                  </span>
+                </span>
+                <span className="amount text-[13px] text-neutral-200 tabular-nums">
+                  {totals[c] ? compactIn(c, totals[c]) : "—"}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Short money for the strip: $32.18M, ₦2.51B, £940K. */
+function compactIn(c: Currency, v: number) {
+  return `${SYMBOL[c]}${new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(v)}`;
 }
 
 /**
