@@ -84,17 +84,19 @@ export function TwoFactorGate({ onEnabled }: { onEnabled: () => void }) {
   };
 
   return (
-    <div className="mt-14 max-w-[760px] pb-10">
-      <h2 className="text-[28px] leading-tight font-medium tracking-[-0.025em] text-white">
-        Turn on two-step to start trading
+    // A set-up step under the page title, not a second page: one heading per page.
+    <section className="mt-8 max-w-[880px] rounded-2xl border border-white/8 px-8 pt-7 pb-6 max-sm:px-5">
+      <div className="text-[12px] text-neutral-500">Before you trade</div>
+      <h2 className="mt-1 text-[17px] font-medium tracking-[-0.01em] text-white">
+        Turn on two-step
       </h2>
-      <p className="mt-2 max-w-[560px] text-[14px] leading-relaxed text-neutral-400">
+      <p className="mt-1.5 max-w-[560px] text-[13px] leading-relaxed text-neutral-400">
         Every order on the desk moves money, so it opens once your account has a
         second factor. You&apos;ll also confirm each order with a code. It takes
         about a minute.
       </p>
 
-      <div className="mt-10 grid gap-10 border-t border-white/8 pt-8 sm:grid-cols-[auto_1fr]">
+      <div className="mt-7 grid gap-10 border-t border-white/8 pt-7 sm:grid-cols-[auto_1fr]">
         <div>
           <div className="flex size-[152px] items-center justify-center rounded-xl bg-[#fafafa] p-3">
             <QRCodeSVG
@@ -166,7 +168,7 @@ export function TwoFactorGate({ onEnabled }: { onEnabled: () => void }) {
         </ol>
       </div>
 
-      <p className="mt-10 border-t border-white/8 pt-5 text-xs text-neutral-500">
+      <p className="mt-8 border-t border-white/8 pt-5 text-xs text-neutral-500">
         Admins can require two-step for everyone in{" "}
         <Link
           href="/manage/team"
@@ -176,6 +178,6 @@ export function TwoFactorGate({ onEnabled }: { onEnabled: () => void }) {
         </Link>
         .
       </p>
-    </div>
+    </section>
   );
 }

@@ -322,8 +322,8 @@ export function TradeDesk() {
   return (
     <div ref={scroller} className="sidebar-scroll h-full overflow-y-auto">
       <div className="mx-auto max-w-[1240px] px-8 pt-12 pb-16">
-        <div className="flex items-start justify-between gap-6">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+          <div className="min-w-0">
             <h1 className="text-[26px] font-medium tracking-[-0.025em] text-white">
               Trade desk
             </h1>
