@@ -1514,13 +1514,7 @@ function BalancePanel({
   const pct = (k: number) => `${(X(k) / W) * 100}%`;
 
   return (
-    // A card whose colour says how the balance is doing: a mint wash when it's up, none when down.
-    <section
-      className="relative isolate min-w-0 overflow-hidden rounded-2xl border border-white/8 p-6"
-      style={
-        funded > 0 && vsPrev >= 0 ? wash("mint", "100% 0%", 20) : undefined
-      }
-    >
+    <section className="min-w-0 pt-1 pr-4">
       <div className="flex items-start justify-between gap-6">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-[13px] text-neutral-500">
