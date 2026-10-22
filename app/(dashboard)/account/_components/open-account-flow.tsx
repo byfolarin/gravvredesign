@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   Check,
   ChevronRight,
-  Globe,
   Search,
   X,
 } from "lucide-react";
@@ -722,27 +721,41 @@ export function OpenAccountFlow({
               New account
             </div>
             <div className="mt-4 flex items-center gap-3">
-              {/* Placeholder mark until a currency is picked, then its flag */}
+              {/* A blank coin with ¤ (the generic currency sign) until a currency is picked */}
               {currency ? (
-                <span className="orbit-pop flex size-7 shrink-0 items-center justify-center text-[22px] leading-none">
+                <span
+                  key={currency}
+                  className="orbit-pop flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-[26px] leading-none"
+                >
                   {FLAGS[currency]}
                 </span>
               ) : (
                 <span
                   aria-hidden
-                  className="flex size-7 shrink-0 items-center justify-center rounded-full border border-dashed border-white/20 text-neutral-500"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] text-[15px] text-neutral-400"
                 >
-                  <Globe size={14} strokeWidth={1.75} />
+                  ¤
                 </span>
               )}
               <span className="min-w-0">
-                <span
-                  className={`block truncate text-[15px] ${currency ? "text-white" : "text-neutral-500"}`}
-                >
-                  {currency ? `${currency} account` : "Currency not set"}
+                {/* The code slot fills in as it's picked: "··· account" → "USD account" */}
+                <span className="flex items-center gap-1.5 text-[15px] text-white">
+                  {currency ? (
+                    <span key={currency} className="orbit-pop tabular-nums">
+                      {currency}
+                    </span>
+                  ) : (
+                    <span
+                      aria-label="Currency not chosen"
+                      className="inline-block h-[15px] w-9 rounded-[5px] bg-white/[0.08]"
+                    />
+                  )}
+                  <span className={currency ? "" : "text-neutral-500"}>
+                    account
+                  </span>
                 </span>
                 <span className="block truncate text-[12px] text-neutral-500">
-                  {holder ? holder.name : "Account holder not chosen"}
+                  {holder ? holder.name : "No holder yet"}
                 </span>
               </span>
             </div>
