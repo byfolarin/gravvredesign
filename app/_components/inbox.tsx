@@ -119,7 +119,7 @@ export function InboxBell() {
           <div className="flex items-center justify-between gap-3 border-b border-white/8 px-3 py-2.5">
             <div
               role="tablist"
-              className="flex rounded-full bg-white/[0.06] p-0.5"
+              className="flex items-center gap-1"
             >
               {(
                 [
@@ -133,15 +133,16 @@ export function InboxBell() {
                   role="tab"
                   aria-selected={tab === id}
                   onClick={() => setTab(id)}
-                  className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-[12.5px] transition-colors ${
+                  // Ink pill, not the app's mint tab (rounded-[999px] keeps it out of that rule).
+                  className={`flex h-7 items-center gap-1.5 rounded-[999px] px-3 text-[12.5px] transition-colors ${
                     tab === id
-                      ? "bg-surface font-medium text-white shadow-[0_1px_2px_rgb(0_0_0/0.2)]"
-                      : "text-neutral-500 hover:text-white"
+                      ? "bg-white font-medium text-black"
+                      : "text-neutral-500 hover:bg-white/[0.05] hover:text-white"
                   }`}
                 >
                   {label}
                   <span
-                    className={`tabular-nums ${tab === id ? "text-neutral-400" : "text-neutral-600"}`}
+                    className={`tabular-nums ${tab === id ? "text-black/55" : "text-neutral-600"}`}
                   >
                     {n}
                   </span>
