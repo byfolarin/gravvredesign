@@ -730,12 +730,7 @@ export function OpenAccountFlow({
                   {FLAGS[currency]}
                 </span>
               ) : (
-                <span
-                  aria-hidden
-                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] text-[15px] text-neutral-400"
-                >
-                  ¤
-                </span>
+                <PixelCoin />
               )}
               <span className="min-w-0">
                 {/* The code slot fills in as it's picked: "··· account" → "USD account" */}
@@ -745,10 +740,7 @@ export function OpenAccountFlow({
                       {currency}
                     </span>
                   ) : (
-                    <span
-                      aria-label="Currency not chosen"
-                      className="inline-block h-[15px] w-9 rounded-[5px] bg-white/[0.08]"
-                    />
+                    <PixelSlot />
                   )}
                   <span className={currency ? "" : "text-neutral-500"}>
                     account
@@ -1038,5 +1030,78 @@ function SummaryRow({ label, value }: { label: string; value?: string }) {
       <dt className="text-neutral-500">{label}</dt>
       <dd className="truncate text-right text-neutral-200">{value ?? "—"}</dd>
     </div>
+  );
+}
+
+/**
+ * The flag that isn't there yet, in Gravv's pixel language (Drive loader, dither, hidden
+ * amounts): a round disc of cells quietly switching on and off. Becomes the real flag once a
+ * currency is picked.
+ */
+function PixelCoin() {
+  const N = 7;
+  const cells: { x: number; y: number; d: number }[] = [];
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      const dx = x - (N - 1) / 2,
+        dy = y - (N - 1) / 2;
+      if (dx * dx + dy * dy <= 10.5)
+        cells.push({ x, y, d: ((x * 7 + y * 13) % 11) * 0.16 });
+    }
+  return (
+    <svg
+      aria-label="Currency not chosen"
+      viewBox={`0 0 ${N * 4} ${N * 4}`}
+      className="size-8 shrink-0 text-neutral-500"
+    >
+      {cells.map(({ x, y, d }) => (
+        <rect
+          key={`${x}-${y}`}
+          x={x * 4 + 0.5}
+          y={y * 4 + 0.5}
+          width={3}
+          height={3}
+          rx={0.6}
+          fill="currentColor"
+          style={{
+            animation: `pixel-on 1.8s ease-in-out ${d}s infinite`,
+            opacity: 0.15,
+          }}
+        />
+      ))}
+    </svg>
+  );
+}
+
+/** The currency code to come: three pixel letters' worth of cells, dimly lit. */
+function PixelSlot() {
+  const cols = 9,
+    rows = 3;
+  return (
+    <svg
+      aria-hidden
+      viewBox={`0 0 ${cols * 4} ${rows * 4}`}
+      className="h-[13px] w-[39px] text-neutral-500"
+    >
+      {Array.from({ length: cols * rows }, (_, i) => {
+        const x = i % cols,
+          y = Math.floor(i / cols);
+        return (
+          <rect
+            key={i}
+            x={x * 4 + 0.5}
+            y={y * 4 + 0.5}
+            width={3}
+            height={3}
+            rx={0.5}
+            fill="currentColor"
+            style={{
+              animation: `pixel-on 1.8s ease-in-out ${((x * 5 + y * 3) % 9) * 0.18}s infinite`,
+              opacity: 0.15,
+            }}
+          />
+        );
+      })}
+    </svg>
   );
 }
