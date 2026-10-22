@@ -416,7 +416,7 @@ export function CustomersWorkspace() {
                       <div className="flex min-w-0 items-center gap-3">
                         <Avatar name={c.name} kind={c.kind} />
                         <div className="min-w-0">
-                          <div className="truncate text-[13.5px] font-semibold tracking-[-0.005em] text-white">
+                          <div className="truncate text-[13.5px] font-medium text-white">
                             {c.name}
                           </div>
                           <div className="truncate text-xs text-neutral-500">

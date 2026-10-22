@@ -692,7 +692,7 @@ export function AccountsWorkspace() {
                           </span>
                         </td>
                         <td className="py-3 pr-4">
-                          <div className="truncate text-[13.5px] font-semibold tracking-[-0.005em] text-white">
+                          <div className="truncate text-[13.5px] font-medium text-white">
                             {a.label}
                           </div>
                           <div className="truncate text-[11px] text-neutral-500">

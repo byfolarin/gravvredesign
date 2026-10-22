@@ -49,7 +49,7 @@ nothing persists. Owner: Folarin (product designer).
 - Bar charts: shared `BucketBars` (`app/_components/bucket-bars.tsx`) — day (30D) or week (90D) buckets, optional stacking with 2px gaps, left value axis, hover tooltip dims the rest, click a bar to filter the table (banner with Clear), summary line + range switch + "Hide chart" pill, sits on the same soft panel as Wallets/Transactions (Trade desk is the exception — owner rejected a panel there), open by default and remembered. Used by Payment links ("Collected", USD-eq, avg line, top links in tooltip).
 - Discard guards set their dirty flag in a `setTimeout` — setting state during the input event made controlled inputs drop the first character typed.
 - Loading: use `LoadingState` (`app/_components/loading-state.tsx`, owner-supplied) — variants Drive, Dots, Orbit, Surfer; keyframes `pixel-on` / `shimmer-text` / `pop-in` in globals.css; ink = `--color-white` so it works in both themes. Pair it with skeletons in the page's own shapes.
-- Table hierarchy: header row on a grey band — applied to every table by a global rule in globals.css (`.content-theme thead > tr`), medium weight, neutral-400; the row's lead (customer / name) semibold 13.5px white; supporting columns (date, IDs) muted; second lines 12px with a 4px gap.
+- Table hierarchy: header row on a grey band — applied to every table by a global rule in globals.css (`.content-theme thead > tr`), medium weight, neutral-400; the row's lead (customer / name) medium 13.5px white — never semibold; supporting columns (date, IDs) muted; second lines 12px with a 4px gap.
 - Tables: hairline rows, row click expands an inline preview, "View all details" opens a right sheet;
   bulk selection uses a black floating bar; ⋮ row menus.
 

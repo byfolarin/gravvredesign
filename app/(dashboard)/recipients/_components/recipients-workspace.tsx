@@ -453,7 +453,7 @@ export function RecipientsWorkspace({
                         <div className="flex min-w-0 items-center gap-3">
                           <RecipientAvatar recipient={r} size={28} />
                           <div className="min-w-0">
-                            <div className="truncate text-[13.5px] font-semibold tracking-[-0.005em] text-white">
+                            <div className="truncate text-[13.5px] font-medium text-white">
                               {r.name}
                             </div>
                             <div className="truncate text-[11px] text-neutral-500">

@@ -528,7 +528,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
                       />
                     </td>
                     <td className="py-4 pr-6">
-                      <div className="truncate text-[13.5px] font-semibold tracking-[-0.005em] text-white">
+                      <div className="truncate text-[13.5px] font-medium text-white">
                         {c.customer.name}
                       </div>
                       <div className="mt-1 truncate text-[12px] text-neutral-500">

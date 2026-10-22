@@ -220,7 +220,7 @@ export function TeamWorkspace() {
                     <span className="flex items-center gap-3">
                       <Avatar name={m.name} />
                       <span className="min-w-0">
-                        <span className="block truncate text-[13.5px] font-semibold tracking-[-0.005em] text-white">
+                        <span className="block truncate text-[13.5px] font-medium text-white">
                           {m.name}
                           {m.name === ME && (
                             <span className="text-neutral-500"> (you)</span>
