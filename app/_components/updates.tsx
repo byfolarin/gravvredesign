@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronUp, Layers, X } from "lucide-react";
+import { openInbox } from "./inbox-events";
 import { PixelField } from "./pixel-field";
 import { UPDATES, updateDate, type Update } from "./updates-data";
 
@@ -132,7 +133,6 @@ export function UpdateNotice({
 }) {
   const { gone, dismiss } = useDismissed(place);
   const [open, setOpen] = useState(false);
-  const [sheet, setSheet] = useState(false);
   const lead = UPDATES.find((x) => x.id === id);
   const list = [
     ...(lead && !gone.has(lead.id) ? [lead] : []),
@@ -140,8 +140,7 @@ export function UpdateNotice({
   ].slice(0, MAX_STACK);
   const n = list.length;
   const fanned = open && n > 1;
-  if (!n)
-    return sheet ? <UpdatesSheet onClose={() => setSheet(false)} /> : null;
+  if (!n) return null;
 
   const height = fanned
     ? n * CARD_H + (n - 1) * GAP
@@ -184,7 +183,7 @@ export function UpdateNotice({
                   if (n <= 2) setOpen(false);
                 }}
                 count={i === 0 ? n : 0}
-                onAll={() => setSheet(true)}
+                onAll={() => openInbox("promotions")}
               />
             </div>
           );
@@ -202,7 +201,7 @@ export function UpdateNotice({
           </button>
           <button
             type="button"
-            onClick={() => setSheet(true)}
+            onClick={() => openInbox("promotions")}
             className="flex items-center gap-1 hover:text-white"
           >
             All updates
@@ -210,7 +209,6 @@ export function UpdateNotice({
           </button>
         </div>
       )}
-      {sheet && <UpdatesSheet onClose={() => setSheet(false)} />}
     </div>
   );
 }
@@ -288,62 +286,6 @@ function NoticeCard({
           <X size={14} strokeWidth={1.75} />
         </button>
       </div>
-    </div>
-  );
-}
-
-/** Every update on the platform, newest first, in a right-hand sheet. Esc or the scrim closes it. */
-export function UpdatesSheet({ onClose }: { onClose: () => void }) {
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", key);
-    return () => document.removeEventListener("keydown", key);
-  }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-[70]">
-      <div
-        aria-hidden
-        onClick={onClose}
-        className="scrim-in absolute inset-0 bg-black/40"
-      />
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-label="What's new"
-        className="drawer-in absolute inset-y-0 right-0 flex w-[460px] max-w-full flex-col bg-surface shadow-[-24px_0_80px_-20px_rgb(0_0_0/0.45)] ring-1 ring-white/8"
-      >
-        <div className="flex items-center justify-between border-b border-white/8 px-6 py-4">
-          <div>
-            <div className="text-[15px] font-medium text-white">
-              What&apos;s new
-            </div>
-            <div className="mt-0.5 text-[12px] text-neutral-500">
-              {UPDATES.length} updates across Gravv
-            </div>
-          </div>
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={onClose}
-            className="flex size-8 items-center justify-center rounded-full text-neutral-500 hover:bg-white/8 hover:text-white"
-          >
-            <X size={16} strokeWidth={1.75} />
-          </button>
-        </div>
-        <div className="sidebar-scroll flex-1 space-y-4 overflow-y-auto p-6">
-          {UPDATES.map((u) => (
-            <UpdateCard key={u.id} u={u} />
-          ))}
-          <Link
-            href="/whats-new"
-            onClick={onClose}
-            className="flex items-center justify-center gap-1 pt-2 text-[13px] text-neutral-400 hover:text-white"
-          >
-            Open the What&apos;s new page
-            <ArrowRight size={13} strokeWidth={1.75} />
-          </Link>
-        </div>
-      </aside>
     </div>
   );
 }

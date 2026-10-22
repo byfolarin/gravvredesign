@@ -11,7 +11,6 @@ import {
   ArrowDataTransferHorizontalIcon,
   ArrowDown01Icon,
   Link01Icon,
-  Notification01Icon,
   RefreshIcon,
   Search01Icon,
   SentIcon,
@@ -19,6 +18,7 @@ import {
   ViewIcon,
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
+import { InboxBell } from "./inbox";
 
 const HIDE_KEY = "gravv-hide-amounts";
 /** Fired by the top bar's Send money while on Recipients, which opens its own flow. */
@@ -147,11 +147,7 @@ export function TopBar() {
         >
           <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.6} />
         </Link>
-        <IconButton
-          icon={Notification01Icon}
-          label="Notifications"
-          onClick={() => {}}
-        />
+        <InboxBell />
       </div>
     </header>
   );
