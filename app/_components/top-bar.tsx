@@ -19,6 +19,7 @@ import {
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { InboxBell } from "./inbox";
+import { ExperienceSwitch } from "./experience-switch";
 
 const HIDE_KEY = "gravv-hide-amounts";
 /** Fired by the top bar's Send money while on Recipients, which opens its own flow. */
@@ -130,6 +131,8 @@ export function TopBar() {
       </label>
 
       <div className="flex shrink-0 items-center gap-1">
+        <ExperienceSwitch />
+        <span className="mx-1.5 h-4 w-px bg-white/10" aria-hidden />
         <Freshness />
         <MoveMoney />
         <span className="mx-1.5 h-4 w-px bg-white/10" aria-hidden />
