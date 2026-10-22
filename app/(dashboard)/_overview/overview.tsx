@@ -100,8 +100,10 @@ function Change({
 const signed = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(0)}%`;
 /** Compare how deposits and spending moved, in words that stay true whichever way they went. */
 function paceWords(inn: number, out: number) {
-  if (Math.abs(inn - out) < 2)
-    return "money in and out moved at about the same pace.";
+  if (Math.abs(inn - out) < 2) {
+    const avg = (inn + out) / 2;
+    return `money in and out both ${avg >= 0 ? "grew" : "fell"} about ${Math.abs(avg).toFixed(0)}%.`;
+  }
   const both = inn >= 0 === out >= 0;
   if (!both)
     return inn > out
