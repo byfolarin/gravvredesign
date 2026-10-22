@@ -40,6 +40,7 @@ import { FLAGS, NAMES, SYMBOL } from "./currency";
 import { OpenAccountFlow } from "./open-account-flow";
 import { AccountSheet } from "./account-sheet";
 import { UpdateNotice } from "@/app/_components/updates";
+import { PixelField, wash, type WashTone } from "@/app/_components/pixel-field";
 
 type Section = "accounts" | "applications";
 type Tab = "All" | AccountStatus | "Needs action";
@@ -487,6 +488,7 @@ export function AccountsWorkspace() {
               <div className="grid gap-3">
                 <SideFact
                   label="Active accounts"
+                  tone="mint"
                   value={
                     <>
                       <Roll value={active.toLocaleString("en-US")} />
@@ -511,6 +513,7 @@ export function AccountsWorkspace() {
                 />
                 <SideFact
                   label="Being provisioned"
+                  tone={count("Needs action") ? "amber" : "blue"}
                   value={<Roll value={String(pending.length)} />}
                   note={
                     count("Needs action")
@@ -1123,7 +1126,18 @@ const OFFER: {
 function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
   return (
     <div className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-      <div>
+      {/* The invitation is the one place this page gets colour: mint, money that will land */}
+      <div
+        className="relative isolate overflow-hidden rounded-2xl border border-white/8 p-8 pb-28"
+        style={wash("mint", "100% 100%", 22)}
+      >
+        <PixelField
+          seed="no-accounts"
+          className="right-0 bottom-0 h-[34%] w-[70%]"
+          solid={0.25}
+          cols={40}
+          rows={9}
+        />
         <h2 className="text-[22px] font-medium tracking-[-0.02em] text-white">
           No accounts yet
         </h2>
@@ -1500,7 +1514,13 @@ function BalancePanel({
   const pct = (k: number) => `${(X(k) / W) * 100}%`;
 
   return (
-    <section className="min-w-0 pt-1 pr-4">
+    // A card whose colour says how the balance is doing: a mint wash when it's up, none when down.
+    <section
+      className="relative isolate min-w-0 overflow-hidden rounded-2xl border border-white/8 p-6"
+      style={
+        funded > 0 && vsPrev >= 0 ? wash("mint", "100% 0%", 20) : undefined
+      }
+    >
       <div className="flex items-start justify-between gap-6">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-[13px] text-neutral-500">
@@ -1622,7 +1642,24 @@ function BalancePanel({
 
       {funded === 0 ? (
         // Nothing to chart yet — say why, and what happens next.
-        <div className="mt-6 flex h-[214px] flex-col items-center justify-center rounded-xl border border-dashed border-white/12 px-6 text-center">
+        <div
+          className="relative isolate mt-6 flex h-[214px] flex-col items-center justify-center overflow-hidden rounded-xl px-6 text-center"
+          style={
+            waiting
+              ? wash("blue", "50% 100%", 12)
+              : wash("mint", "50% 100%", 12)
+          }
+        >
+          {!waiting && (
+            <PixelField
+              seed={`empty-${currency}`}
+              className="inset-x-0 bottom-0 h-1/3 w-full"
+              solid={0.1}
+              strength={0.7}
+              cols={90}
+              rows={9}
+            />
+          )}
           <div className="text-[14px] text-white">
             {waiting
               ? `Your ${currency} account is being set up`
@@ -1953,15 +1990,21 @@ function SideFact({
   note,
   share,
   action,
+  tone,
 }: {
   label: string;
   value: React.ReactNode;
   note: string;
   share?: number;
   action?: { label: string; onClick: () => void };
+  /** What the number means: mint good, blue in progress, amber needs you. */
+  tone?: WashTone;
 }) {
   return (
-    <div className="flex min-w-0 flex-col rounded-2xl border border-white/8 p-5">
+    <div
+      className="flex min-w-0 flex-col rounded-2xl border border-white/8 p-5"
+      style={tone ? wash(tone, "100% 100%", 20) : undefined}
+    >
       <div className="text-[13px] text-neutral-500">{label}</div>
       <div className="mt-2 text-[28px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
         {value}

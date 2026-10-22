@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, X } from "lucide-react";
+import { PixelField } from "./pixel-field";
 import { UPDATES, updateDate, type Update } from "./updates-data";
 
 export { UPDATES, updateDate, type Update } from "./updates-data";
@@ -165,72 +166,5 @@ export function UpdateNotice({
 export function toggleHideAmounts() {
   document.body.dispatchEvent(
     new KeyboardEvent("keydown", { key: "H", shiftKey: true, bubbles: true }),
-  );
-}
-
-/**
- * Brand-mint pixels anchored to the right edge, thinning out and fading to nothing before the
- * text. Seeded by the update id, so each notice keeps its own pattern.
- */
-const CELL = 8,
-  GAP = 0,
-  COLS = 38,
-  ROWS = 10;
-
-/**
- * A dither, not a scatter: the last columns are solid soft green, then the green breaks into
- * pixels that thin out to nothing — the pixels themselves do the fading.
- */
-function pixelCells(seed: string) {
-  let x = [...seed].reduce(
-    (h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619),
-    2166136261,
-  );
-  const rand = () => {
-    x =
-      Math.imul(x ^ (x >>> 15), 2246822507) ^
-      Math.imul(x ^ (x >>> 13), 3266489909);
-    return ((x >>> 0) % 1000) / 1000;
-  };
-  const cells: { c: number; r: number; o: number }[] = [];
-  for (let c = 0; c < COLS; c++)
-    for (let r = 0; r < ROWS; r++) {
-      const t = c / (COLS - 1); // 0 at the left of the field, 1 at the edge
-      // Solid for the last ~28%, then it breaks up into pixels across the rest.
-      const keep = t > 0.72 ? 1 : Math.pow(t / 0.72, 1.7);
-      if (rand() < keep)
-        cells.push({ c, r, o: t > 0.72 ? 0.22 : 0.12 + rand() * 0.14 });
-    }
-  return cells;
-}
-
-function PixelField({ seed }: { seed: string }) {
-  const cells = pixelCells(seed);
-  const W = COLS * (CELL + GAP),
-    H = ROWS * (CELL + GAP);
-  return (
-    // A quarter of the card, whatever its width; "slice" keeps the pixels square.
-    <svg
-      aria-hidden
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="xMaxYMid slice"
-      className="pointer-events-none absolute inset-y-0 right-0 -z-10 h-full w-1/4"
-      style={{
-        maskImage: "linear-gradient(to left, #000 85%, transparent 100%)",
-        WebkitMaskImage: "linear-gradient(to left, #000 85%, transparent 100%)",
-      }}
-    >
-      {cells.map(({ c, r, o }) => (
-        <rect
-          key={`${c}-${r}`}
-          x={c * (CELL + GAP)}
-          y={r * (CELL + GAP)}
-          width={CELL}
-          height={CELL}
-          fill="var(--brand)"
-          opacity={o.toFixed(2)}
-        />
-      ))}
-    </svg>
   );
 }

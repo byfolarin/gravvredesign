@@ -15,6 +15,7 @@ import {
   type Currency,
 } from "../_data";
 import { FLAGS, NAMES, RAILS, READY_IN } from "./currency";
+import { PixelField, wash } from "@/app/_components/pixel-field";
 
 type Step = "currency" | "holder" | "review" | "done";
 const STEPS: { id: Exclude<Step, "done">; label: string }[] = [
@@ -461,7 +462,21 @@ export function OpenAccountFlow({
           </div>
 
           {/* What you're opening, filling in as you go */}
-          <aside className="sticky top-6 mt-10 h-fit rounded-2xl border border-white/10 p-5">
+          {/* Lights up once requested: the account you just opened, in mint */}
+          <aside
+            className="relative isolate sticky top-6 mt-10 h-fit overflow-hidden rounded-2xl border border-white/10 p-5 transition-[background-image]"
+            style={step === "done" ? wash("mint", "100% 0%", 16) : undefined}
+          >
+            {step === "done" && (
+              <PixelField
+                seed={`opened-${currency}`}
+                className="orbit-pop inset-y-0 right-0 h-full w-1/2"
+                strength={0.9}
+                solid={0.2}
+                cols={20}
+                rows={34}
+              />
+            )}
             <div className="text-[10.5px] tracking-[0.08em] text-neutral-500 uppercase">
               New account
             </div>
