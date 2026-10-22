@@ -1034,19 +1034,22 @@ function SummaryRow({ label, value }: { label: string; value?: string }) {
 }
 
 /**
- * The flag that isn't there yet, in Gravv's pixel language (Drive loader, dither, hidden
- * amounts): a round disc of cells quietly switching on and off. Becomes the real flag once a
- * currency is picked.
+ * The flag that isn't there yet, in Gravv's pixel language: a ring of squares snapped to a
+ * grid — it reads as a circle without being one — each square pulsing on its own beat.
+ * Becomes the real flag once a currency is picked.
  */
 function PixelCoin() {
-  const N = 7;
+  const N = 9;
+  const c = (N - 1) / 2;
   const cells: { x: number; y: number; d: number }[] = [];
   for (let y = 0; y < N; y++)
     for (let x = 0; x < N; x++) {
-      const dx = x - (N - 1) / 2,
-        dy = y - (N - 1) / 2;
-      if (dx * dx + dy * dy <= 10.5)
-        cells.push({ x, y, d: ((x * 7 + y * 13) % 11) * 0.16 });
+      const r = Math.hypot(x - c, y - c);
+      // A one-cell band around the edge, so the outline steps like pixels do.
+      if (r > 2.9 && r <= 4.05) {
+        // Scattered beats, not a sweep — a sweep reads as a spinner.
+        cells.push({ x, y, d: ((x * 37 + y * 61) % 17) / 10 });
+      }
     }
   return (
     <svg
@@ -1054,18 +1057,22 @@ function PixelCoin() {
       viewBox={`0 0 ${N * 4} ${N * 4}`}
       className="size-8 shrink-0 text-neutral-500"
     >
+      <style>{`@keyframes coin-pulse{0%,100%{transform:scale(.45);opacity:.25}45%{transform:scale(1);opacity:1}}
+      @media (prefers-reduced-motion:reduce){.coin-px{animation:none!important}}`}</style>
       {cells.map(({ x, y, d }) => (
         <rect
           key={`${x}-${y}`}
-          x={x * 4 + 0.5}
-          y={y * 4 + 0.5}
-          width={3}
-          height={3}
-          rx={0.6}
+          className="coin-px"
+          x={x * 4 + 0.6}
+          y={y * 4 + 0.6}
+          width={2.8}
+          height={2.8}
+          rx={0.4}
           fill="currentColor"
           style={{
-            animation: `pixel-on 1.8s ease-in-out ${d}s infinite`,
-            opacity: 0.15,
+            transformBox: "fill-box",
+            transformOrigin: "center",
+            animation: `coin-pulse 1.6s ease-in-out ${d.toFixed(2)}s infinite`,
           }}
         />
       ))}
@@ -1096,8 +1103,9 @@ function PixelSlot() {
             rx={0.5}
             fill="currentColor"
             style={{
-              animation: `pixel-on 1.8s ease-in-out ${((x * 5 + y * 3) % 9) * 0.18}s infinite`,
-              opacity: 0.15,
+              transformBox: "fill-box",
+              transformOrigin: "center",
+              animation: `coin-pulse 1.6s ease-in-out ${((x * 37 + y * 61) % 17) / 10}s infinite`,
             }}
           />
         );
