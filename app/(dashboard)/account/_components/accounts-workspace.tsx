@@ -469,7 +469,7 @@ export function AccountsWorkspace() {
                       tab: "Pending",
                       label: "Pending",
                       n: count("Pending"),
-                      color: "var(--color-blue-400)",
+                      color: "var(--color-orange-400)",
                     },
                     {
                       tab: "Frozen",
@@ -843,7 +843,7 @@ function Status({ account: a }: { account: Account }) {
     a.status === "Active"
       ? "border-transparent bg-[var(--ok-bg)] text-[var(--ok-fg)]"
       : a.status === "Pending"
-        ? "border-transparent bg-blue-400/12 text-blue-300"
+        ? "border-transparent bg-orange-400/14 text-orange-300"
         : a.status === "Frozen"
           ? "border-sky-300/25 bg-sky-400/10 text-sky-200"
           : "border-transparent bg-white/[0.05] text-neutral-500";
@@ -1825,6 +1825,11 @@ function StatusMix({
   const [hover, setHover] = useState<Tab | null>(null);
   const fmt = (n: number) => n.toLocaleString("en-US");
   const live = parts[0];
+  const shown = parts.filter((p) => p.n > 0);
+  const H = 262; // the column of stacked shares, and the key beside it, share this height
+  // Hovered share turns to pixels, Gravv's pattern: its colour in a 4px checker.
+  const pixel = (color: string) =>
+    `repeating-conic-gradient(${color} 0 25%, color-mix(in oklab, ${color} 28%, transparent) 0 50%) 0 0 / 4px 4px`;
   return (
     <section>
       <div className="text-[13px] text-neutral-500">Active accounts</div>
@@ -1836,55 +1841,70 @@ function StatusMix({
           of {fmt(total)}
         </span>
       </div>
-      {/* One bar, every status in its share — hover a word below to find its part */}
-      <div className="mt-4 flex h-1.5 gap-[2px] overflow-hidden rounded-full">
-        {parts
-          .filter((p) => p.n > 0)
-          .map((p) => (
-            <span
+
+      <div className="mt-6 flex gap-5" style={{ height: H }}>
+        {/* Every status stacked by its share, top to bottom */}
+        <div
+          className="flex w-3.5 shrink-0 flex-col gap-[3px]"
+          onMouseLeave={() => setHover(null)}
+        >
+          {shown.map((p) => (
+            <button
               key={p.tab}
-              className="h-full transition-opacity first:rounded-l-full last:rounded-r-full"
+              type="button"
+              aria-label={`${p.label}: ${fmt(p.n)}`}
+              onMouseEnter={() => setHover(p.tab)}
+              onClick={() => onPick(active === p.tab ? "All" : p.tab)}
+              className="w-full rounded-[3px] transition-[opacity,transform] duration-200"
               style={{
-                width: `${(p.n / Math.max(total, 1)) * 100}%`,
-                background: p.color,
+                flexGrow: p.n,
+                flexBasis: 0,
+                minHeight: 6,
+                background: hover === p.tab ? pixel(p.color) : p.color,
                 opacity: hover && hover !== p.tab ? 0.25 : 1,
+                transform: hover === p.tab ? "scaleX(1.35)" : undefined,
               }}
             />
           ))}
+        </div>
+
+        {/* The key, spread to the same height so the two read as one */}
+        <ul className="flex min-w-0 flex-1 flex-col justify-between">
+          {parts.map((p) => {
+            const on = active === p.tab;
+            const lit = hover === p.tab;
+            return (
+              <li key={p.tab}>
+                <button
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => onPick(on ? "All" : p.tab)}
+                  onMouseEnter={() => setHover(p.tab)}
+                  onMouseLeave={() => setHover(null)}
+                  className={`-mx-2 w-[calc(100%+1rem)] rounded-lg px-2 py-1.5 text-left transition-[background-color,opacity] hover:bg-white/[0.04] ${on ? "bg-white/[0.05]" : ""} ${hover && !lit ? "opacity-45" : ""}`}
+                >
+                  <span className="flex items-center gap-2 text-[12.5px] text-neutral-500">
+                    <span
+                      aria-hidden
+                      className="size-2 shrink-0 rounded-[2px]"
+                      style={{ background: lit ? pixel(p.color) : p.color }}
+                    />
+                    <span className={on ? "text-white" : ""}>{p.label}</span>
+                  </span>
+                  <span className="mt-0.5 flex items-baseline justify-between gap-3 pl-4">
+                    <span className="text-[15px] font-medium tracking-[-0.01em] text-white tabular-nums">
+                      {fmt(p.n)}
+                    </span>
+                    <span className="text-[12px] text-neutral-500 tabular-nums">
+                      {total ? Math.round((p.n / total) * 100) : 0}%
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       </div>
-      {/* The key: what each colour in the bar is. Each row filters the table. */}
-      <ul className="mt-3">
-        {parts.map((p) => {
-          const on = active === p.tab;
-          return (
-            <li key={p.tab}>
-              <button
-                type="button"
-                aria-pressed={on}
-                onClick={() => onPick(on ? "All" : p.tab)}
-                onMouseEnter={() => setHover(p.tab)}
-                onMouseLeave={() => setHover(null)}
-                className={`-mx-2 flex w-[calc(100%+1rem)] items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors hover:bg-white/[0.04] ${on ? "bg-white/[0.05]" : ""}`}
-              >
-                <span
-                  aria-hidden
-                  className="h-2.5 w-[3px] shrink-0 rounded-full"
-                  style={{ background: p.color }}
-                />
-                <span className={on ? "text-white" : "text-neutral-300"}>
-                  {p.label}
-                </span>
-                <span className="ml-auto text-neutral-200 tabular-nums">
-                  {fmt(p.n)}
-                </span>
-                <span className="w-9 text-right text-[12px] text-neutral-500 tabular-nums">
-                  {total ? Math.round((p.n / total) * 100) : 0}%
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
     </section>
   );
 }
@@ -1930,34 +1950,53 @@ function RowMenu({
     fn();
   };
   const live = a.status === "Active" || a.status === "Frozen";
-  // While the bank is still opening it: look, don't act.
+  // Pending (the bank is still opening it) and Frozen: look, don't act.
   const items =
-    a.status === "Pending"
+    a.status === "Frozen"
       ? [
           { label: "View details", icon: Eye, onClick: onDetails },
-          { label: "View application", icon: FileText, onClick: onApplication },
           {
             label: "View transactions",
             icon: ArrowLeftRight,
             onClick: onTransactions,
           },
         ]
-      : [
-          { label: "Copy account details", icon: Copy, onClick: onCopy },
-          ...(a.status === "Active"
-            ? [{ label: "Transfer", icon: ArrowLeftRight, onClick: onTransfer }]
-            : []),
-          { label: "Rename", icon: Pencil, onClick: onRename },
-          ...(live
-            ? [
-                {
-                  label: a.status === "Frozen" ? "Unfreeze" : "Freeze",
-                  icon: Snowflake,
-                  onClick: onFreeze,
-                },
-              ]
-            : []),
-        ];
+      : a.status === "Pending"
+        ? [
+            { label: "View details", icon: Eye, onClick: onDetails },
+            {
+              label: "View application",
+              icon: FileText,
+              onClick: onApplication,
+            },
+            {
+              label: "View transactions",
+              icon: ArrowLeftRight,
+              onClick: onTransactions,
+            },
+          ]
+        : [
+            { label: "Copy account details", icon: Copy, onClick: onCopy },
+            ...(a.status === "Active"
+              ? [
+                  {
+                    label: "Transfer",
+                    icon: ArrowLeftRight,
+                    onClick: onTransfer,
+                  },
+                ]
+              : []),
+            { label: "Rename", icon: Pencil, onClick: onRename },
+            ...(live
+              ? [
+                  {
+                    label: "Freeze",
+                    icon: Snowflake,
+                    onClick: onFreeze,
+                  },
+                ]
+              : []),
+          ];
   return (
     <div ref={root} className="relative">
       <button
@@ -1991,7 +2030,7 @@ function RowMenu({
               {it.label}
             </button>
           ))}
-          {a.status !== "Closed" && a.status !== "Pending" && (
+          {a.status === "Active" && (
             <div className="mt-1 border-t border-white/8 pt-1">
               <button
                 type="button"

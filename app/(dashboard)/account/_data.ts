@@ -272,16 +272,21 @@ function make(i: number, only?: Currency): Account {
   const { bank, routing } = pick(BANKS[currency]);
   // The newest accounts are the ones still being provisioned, like the live list.
   const s = rand();
+  // The first page shows every state: a few pending, then frozen and closed mixed in.
   const status: AccountStatus =
-    i < 5
-      ? "Pending"
-      : s < 0.12
-        ? "Pending"
-        : s < 0.9
-          ? "Active"
-          : s < 0.95
-            ? "Frozen"
-            : "Closed";
+    i === 6 || i === 13
+      ? "Frozen"
+      : i === 9 || i === 17
+        ? "Closed"
+        : i < 5
+          ? "Pending"
+          : s < 0.12
+            ? "Pending"
+            : s < 0.9
+              ? "Active"
+              : s < 0.95
+                ? "Frozen"
+                : "Closed";
   const age = i < 5 ? i * 0.4 : 1 + i * 0.12 + rand() * 6;
   // Provisioning takes days, not months — waiting accounts were opened recently.
   const createdAt = new Date(
