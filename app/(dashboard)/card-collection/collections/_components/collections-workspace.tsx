@@ -477,7 +477,7 @@ export function CollectionsWorkspace({ initial }: { initial: Collection[] }) {
             <col className="w-12" />
           </colgroup>
           <thead>
-            <tr className="bg-white/[0.025] text-left text-[12px] font-medium text-neutral-400">
+            <tr className="bg-white/[0.055] text-left text-[12px] font-medium text-neutral-400">
               <th className="py-3 pl-3 font-medium">
                 <Check
                   on={allChecked}
