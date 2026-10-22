@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 // Local font files from the `geist` package, so dev and builds never depend on reaching Google Fonts.
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
@@ -25,7 +26,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           }}
         />
       </head>
-      <body className="min-h-full font-sans">{children}</body>
+      <body className="min-h-full font-sans">
+        {children}
+        {/* Quality feedback widget, on every page. */}
+        <Script
+          src="https://embed.usequality.app/loader.js"
+          data-site-id="qs_live_d3db91d0be7dfc050054f5d0"
+          data-api-origin="https://server.usequality.app"
+          strategy="afterInteractive"
+        />
+      </body>
     </html>
   );
 }
