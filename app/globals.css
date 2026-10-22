@@ -32,8 +32,8 @@
   --flow-in: var(--brand);
   --flow-out: #5e5e5e;
   /* Success chip: readable text on a soft tint, tuned per theme. */
-  --ok-fg: #43e8b4;
-  --ok-bg: rgb(0 255 180 / 0.08);
+  --ok-fg: #5cf2c2;
+  --ok-bg: rgb(0 255 180 / 0.14);
   color-scheme: dark;
 }
 
@@ -129,8 +129,9 @@ body {
   --brand: #0fb468;
   --flow-in: var(--brand);
   --flow-out: #b4b4b4;
-  --ok-fg: #0b6b45;
-  --ok-bg: #edf6f1;
+  /* A real green, not a wash: reads on paper white, text passes AA on it. */
+  --ok-fg: #04603a;
+  --ok-bg: #d6f0e1;
 
   --color-white: #0a0a0a;
   --color-black: #fbfaf7;
