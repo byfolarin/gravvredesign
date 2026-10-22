@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Check, ChevronRight, Search, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  Globe,
+  Search,
+  X,
+} from "lucide-react";
 import {
   DiscardConfirm,
   useDiscardGuard,
@@ -715,15 +722,24 @@ export function OpenAccountFlow({
               New account
             </div>
             <div className="mt-4 flex items-center gap-3">
-              {/* The flag only once there's a currency, so the text stays aligned until then */}
-              {currency && (
-                <span className="text-[22px] leading-none">
+              {/* Placeholder mark until a currency is picked, then its flag */}
+              {currency ? (
+                <span className="orbit-pop flex size-7 shrink-0 items-center justify-center text-[22px] leading-none">
                   {FLAGS[currency]}
+                </span>
+              ) : (
+                <span
+                  aria-hidden
+                  className="flex size-7 shrink-0 items-center justify-center rounded-full border border-dashed border-white/20 text-neutral-500"
+                >
+                  <Globe size={14} strokeWidth={1.75} />
                 </span>
               )}
               <span className="min-w-0">
-                <span className="block truncate text-[15px] text-white">
-                  {currency ? `${currency} account` : "Choose a currency"}
+                <span
+                  className={`block truncate text-[15px] ${currency ? "text-white" : "text-neutral-500"}`}
+                >
+                  {currency ? `${currency} account` : "Currency not set"}
                 </span>
                 <span className="block truncate text-[12px] text-neutral-500">
                   {holder ? holder.name : "Account holder not chosen"}
