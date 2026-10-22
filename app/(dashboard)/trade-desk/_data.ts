@@ -504,45 +504,91 @@ export const dateFmt = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
-export type Range = "24H" | "7D" | "30D";
-export const RANGES: {
-  id: Range;
-  points: number;
-  stepMs: number;
-  changeScale: number;
-}[] = [
-  { id: "24H", points: 48, stepMs: 30 * 60_000, changeScale: 1 },
-  { id: "7D", points: 84, stepMs: 2 * 3600_000, changeScale: 2.4 },
-  { id: "30D", points: 120, stepMs: 6 * 3600_000, changeScale: 4.1 },
+export type Range = "1H" | "1D" | "7D" | "30D";
+/** Each preset: how far back, and how long one candle is. */
+export const RANGES: { id: Range; spanMs: number; stepMs: number }[] = [
+  { id: "1H", spanMs: 3600_000, stepMs: 2 * 60_000 },
+  { id: "1D", spanMs: 24 * 3600_000, stepMs: 30 * 60_000 },
+  { id: "7D", spanMs: 7 * 24 * 3600_000, stepMs: 4 * 3600_000 },
+  { id: "30D", spanMs: 30 * 24 * 3600_000, stepMs: 24 * 3600_000 },
 ];
+/** How far back the custom date picker can go. */
+export const HISTORY_DAYS = 90;
+
+/** Candle length for a custom span: short spans get finer candles. */
+export function stepFor(spanMs: number) {
+  const hour = 3600_000;
+  return spanMs <= 24 * hour
+    ? 30 * 60_000
+    : spanMs <= 72 * hour
+      ? 2 * hour
+      : spanMs <= 14 * 24 * hour
+        ? 6 * hour
+        : 24 * hour;
+}
+
+export type Candle = { t: number; o: number; h: number; l: number; c: number };
 
 /**
- * Seeded rate history for a pair and range, ending at `rate` (the live rate) and starting
- * `change` percent lower/higher. A random walk around the trend line, so it looks traded.
+ * One seeded price path per pair, so every range and custom window shows the same history.
+ * Layered waves (weeks down to minutes) plus a drift set so that 24h ago the rate really was
+ * `change24h` lower/higher; it ends exactly on the live rate.
  */
-export function seriesFor(
+function pathFor(pair: Pair, rate: number) {
+  const seed = pair.id.split("").reduce((s, c) => s + c.charCodeAt(0), 0);
+  const vol = pair.sell === "USD" && pair.get === "USDC" ? 0.00012 : 0.0011;
+  const DAY = 24 * 3600_000;
+  const waves = [
+    [20 * DAY, 6],
+    [5 * DAY, 3],
+    [DAY, 1.6],
+    [3 * 3600_000, 0.8],
+    [25 * 60_000, 0.4],
+    [6 * 60_000, 0.25],
+  ].map(([period, amp], i) => ({
+    period,
+    amp: amp * vol,
+    phase: ((seed * (i + 3) * 7919) % 628) / 100,
+  }));
+  const S = (t: number) =>
+    waves.reduce(
+      (sum, w) =>
+        sum + w.amp * Math.sin((2 * Math.PI * t) / w.period + w.phase),
+      0,
+    );
+  const sNow = S(AS_OF);
+  // Drift that is steady over the last day and fades further back, so long ranges don't run away.
+  const g = (t: number) =>
+    -(1 - Math.exp(-(AS_OF - t) / DAY)) / (1 - Math.exp(-1));
+  // Solve its size so price(AS_OF - 1 day) = rate / (1 + change24h).
+  const k = 1 + S(AS_OF - DAY) - sNow - 1 / (1 + pair.change24h / 100);
+  const jitter = (t: number) => {
+    const x = Math.sin(t / 997 + seed) * 43758.5453;
+    return (x - Math.floor(x) - 0.5) * vol * 0.35;
+  };
+  return (t: number) =>
+    rate * (1 + k * g(t) + S(t) - sNow + (t < AS_OF ? jitter(t) : 0));
+}
+
+/** Candles from `from` to `to`, `stepMs` each. The last one closes on the live rate. */
+export function candlesFor(
   pair: Pair,
-  range: Range,
   rate: number,
-): { t: number; v: number }[] {
-  const r = RANGES.find((x) => x.id === range)!;
-  const change =
-    (pair.change24h || 0.03) * r.changeScale * (pair.change24h === 0 ? 0 : 1);
-  const start = rate / (1 + change / 100);
-  let x =
-    pair.id.split("").reduce((s, c) => s + c.charCodeAt(0), 0) * (r.points + 7);
-  const rand = () => (x = (x * 9301 + 49297) % 233280) / 233280 - 0.5;
-  const vol =
-    rate * (pair.sell === "USD" && pair.get === "USDC" ? 0.00012 : 0.0011);
-  const out: { t: number; v: number }[] = [];
-  let walk = 0;
-  for (let i = 0; i < r.points; i++) {
-    walk = walk * 0.82 + rand() * vol;
-    const trend = start + ((rate - start) * i) / (r.points - 1);
-    out.push({
-      t: AS_OF - (r.points - 1 - i) * r.stepMs,
-      v: trend + walk * Math.min(1, (r.points - 1 - i) / 6), // walk eases out into the live rate,
-    });
+  from: number,
+  to: number,
+  stepMs: number,
+): Candle[] {
+  const price = pathFor(pair, rate);
+  const n = Math.max(2, Math.round((to - from) / stepMs));
+  const out: Candle[] = [];
+  for (let i = 0; i < n; i++) {
+    const t0 = to - (n - i) * stepMs;
+    const ticks = Array.from({ length: 9 }, (_, j) =>
+      price(t0 + (j / 8) * stepMs),
+    );
+    const o = ticks[0],
+      c = ticks[8];
+    out.push({ t: t0, o, c, h: Math.max(...ticks), l: Math.min(...ticks) });
   }
   return out;
 }
