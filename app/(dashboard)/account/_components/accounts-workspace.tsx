@@ -1080,7 +1080,7 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
   return (
     <>
       {/* The way in. Reading order: headline → the one thing to do now → what follows */}
-      <section className="mt-12 max-w-[880px]">
+      <section className="mt-12">
         <h2 className="text-[26px] leading-tight font-medium tracking-[-0.025em] text-white">
           Get your first account open
         </h2>
@@ -1093,7 +1093,7 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
         <ol className="relative mt-10 grid gap-8 sm:grid-cols-3 sm:gap-6">
           <span
             aria-hidden
-            className="absolute top-3 right-[calc(33%-1rem)] left-3 hidden h-px bg-white/10 sm:block"
+            className="absolute top-3 right-[calc(33.333%-0.75rem)] left-3 hidden h-px bg-white/10 sm:block"
           />
           {steps.map((st, i) => {
             const now = i === 0;
@@ -1114,7 +1114,7 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
                   {st.title}
                 </div>
                 <p
-                  className={`mt-1 max-w-[240px] text-[13px] leading-relaxed ${now ? "text-neutral-400" : "text-neutral-500"}`}
+                  className={`mt-1 max-w-[340px] text-[13px] leading-relaxed ${now ? "text-neutral-400" : "text-neutral-500"}`}
                 >
                   {st.line}
                 </p>
