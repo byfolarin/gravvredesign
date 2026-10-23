@@ -942,7 +942,7 @@ function Hint({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Same as the app's pill tabs: the chosen one in brand mint, the rest plain text. */
+/** Same as the app's pill tabs: the chosen one in ink, the rest plain text. */
 function Segmented<T extends string>({
   value,
   options,
@@ -963,7 +963,7 @@ function Segmented<T extends string>({
           onClick={() => onChange(o.value)}
           className={`h-8 rounded-full px-3.5 text-[13px] transition-colors ${
             value === o.value
-              ? "bg-[var(--ok-bg)] font-medium text-[var(--ok-fg)]"
+              ? "bg-[var(--color-white)] font-medium text-[var(--color-black)]"
               : "text-neutral-500 hover:bg-white/[0.04] hover:text-neutral-200"
           }`}
         >
