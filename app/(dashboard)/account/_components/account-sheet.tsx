@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Check, X } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Check,
+  Download,
+  FileText,
+  X,
+} from "lucide-react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { AS_OF, PROVISION_STEPS, accountMeta, type Account } from "../_data";
-import { FLAGS, NAMES } from "./currency";
+import { FLAGS, NAMES, SYMBOL } from "./currency";
 
 const dateFmt = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -21,6 +28,133 @@ function ago(iso: string) {
 }
 
 const short = (v: string) => `${v.slice(0, 8)}…${v.slice(-6)}`;
+const DAY = 86_400_000;
+const dayFmt = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+});
+const monthFmt = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  year: "numeric",
+});
+
+/** Seeded from the account id, so the same account always shows the same history. */
+function seeded(id: string) {
+  let h = 2166136261;
+  for (const ch of id) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  return () => {
+    h =
+      (Math.imul(h ^ (h >>> 15), 2246822507) ^
+        Math.imul(h ^ (h >>> 13), 3266489909)) >>>
+      0;
+    return (h % 10000) / 10000;
+  };
+}
+
+const PAYERS = [
+  "Northwind Logistics",
+  "Meridian Trade Co",
+  "Atlas Relief Foundation",
+  "Kite & Kettle Ltd",
+  "Brightpath Studio",
+  "Lumen Labs Inc",
+];
+const PAYEES = [
+  "Payout to wallet",
+  "Supplier payment",
+  "Card funding",
+  "Payroll run",
+];
+
+type Move = {
+  id: string;
+  at: number;
+  who: string;
+  how: string;
+  amount: number;
+};
+
+/** The account's recent money in and out, and its 30-day balance path ending at today's. */
+function historyOf(a: Account) {
+  const r = seeded(a.id);
+  const rails =
+    a.currency === "USD"
+      ? ["ACH", "Wire"]
+      : a.currency === "EUR"
+        ? ["SEPA", "SEPA Instant"]
+        : a.currency === "GBP"
+          ? ["Faster Payments"]
+          : ["Bank transfer"];
+  const typical = Math.max(a.balance * 0.08, 50);
+  const moves: Move[] = Array.from({ length: 6 }, (_, i) => {
+    const inbound = r() < 0.65;
+    return {
+      id: `${a.id.slice(0, 4)}${i}`,
+      at: AS_OF - (i * 2.3 + r() * 2) * DAY,
+      who: inbound
+        ? PAYERS[Math.floor(r() * PAYERS.length)]
+        : PAYEES[Math.floor(r() * PAYEES.length)],
+      how: rails[Math.floor(r() * rails.length)],
+      amount:
+        ((inbound ? 1 : -1) * Math.round(typical * (0.4 + r() * 1.6) * 100)) /
+        100,
+    };
+  });
+  const trend: number[] = [];
+  let v = a.balance;
+  for (let d = 0; d < 30; d++) {
+    trend.unshift(v);
+    v = Math.max(0, v - (r() - 0.42) * typical * 0.9);
+  }
+  return { moves, trend };
+}
+
+/** A printable letter confirming the account: opens in a new tab, ready to print or save as PDF. */
+function openLetter(a: Account, numberLabel: string) {
+  const today = new Date(AS_OF).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  const html = `<!doctype html><meta charset="utf-8"><title>Proof of account — ${a.label}</title>
+<style>body{font:15px/1.6 -apple-system,Helvetica,Arial,sans-serif;color:#111;max-width:620px;margin:64px auto;padding:0 24px}
+h1{font-size:20px;font-weight:600;margin:0 0 4px}.muted{color:#666}table{border-collapse:collapse;width:100%;margin:24px 0}
+td{padding:8px 0;border-bottom:1px solid #eee}td:first-child{color:#666;width:44%}.sign{margin-top:48px}</style>
+<p class="muted">${today}</p><h1>Proof of account</h1><p class="muted">Issued by Kredete through Gravv</p>
+<p>This letter confirms that the account below is held in the name of <b>${a.customer.name}</b> and is open to receive payments.</p>
+<table><tr><td>Account holder</td><td>${a.customer.name}</td></tr><tr><td>Bank</td><td>${a.bank}</td></tr>
+<tr><td>${numberLabel}</td><td>${a.accountNumber}</td></tr><tr><td>${a.routing.label}</td><td>${a.routing.value}</td></tr>
+<tr><td>Currency</td><td>${NAMES[a.currency]} (${a.currency})</td></tr><tr><td>Opened</td><td>${dateFmt.format(new Date(a.createdAt))}</td></tr></table>
+<p class="sign">Kredete Operations<br><span class="muted">Reference ${a.id}</span></p>
+<script>setTimeout(()=>print(),300)</script>`;
+  const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+  window.open(url, "_blank", "noopener");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** A month's statement as CSV: opening and closing balance and every movement. */
+function downloadStatement(a: Account, month: Date, moves: Move[]) {
+  const rows = [
+    ["Date", "Description", "Method", "Amount", "Currency"],
+    ...moves.map((m) => [
+      new Date(m.at).toISOString().slice(0, 10),
+      m.who,
+      m.how,
+      m.amount.toFixed(2),
+      a.currency,
+    ]),
+  ];
+  const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${a.label.replace(/[^a-z0-9]+/gi, "-")}-${month.toISOString().slice(0, 7)}.csv`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+const money = (c: Account["currency"], v: number) =>
+  `${SYMBOL[c]}${Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /**
  * Everything about one account: what it holds and whether that number is fresh, how to
@@ -42,6 +176,33 @@ export function AccountSheet({
   const meta = accountMeta(a);
   const pending = a.status === "Pending";
   const sync = meta.sync;
+  const { moves, trend } = historyOf(a);
+  // Where money that lands goes; editable here, saved for this visit.
+  const [inflow, setInflow] = useState(meta.inflow);
+  const [saved, setSaved] = useState(false);
+  const pickInflow = (v: typeof inflow) => {
+    if (v === inflow) return;
+    setInflow(v);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2400);
+  };
+  const lo = Math.min(...trend),
+    hi = Math.max(...trend);
+  const path = trend
+    .map(
+      (v, i) =>
+        `${i ? "L" : "M"}${(i / (trend.length - 1)) * 100},${36 - ((v - lo) / (hi - lo || 1)) * 32}`,
+    )
+    .join("");
+  const change = trend[0] ? (a.balance - trend[0]) / trend[0] : 0;
+  const months = [0, 1, 2].map(
+    (i) =>
+      new Date(
+        new Date(AS_OF).getFullYear(),
+        new Date(AS_OF).getMonth() - i,
+        1,
+      ),
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -111,6 +272,35 @@ export function AccountSheet({
                 {balance}
               </div>
             )}
+            {!pending && a.balance > 0 && (
+              <div className="mt-4 flex items-end gap-3">
+                <svg
+                  viewBox="0 0 100 40"
+                  preserveAspectRatio="none"
+                  className="h-10 flex-1"
+                  aria-hidden
+                >
+                  <path
+                    d={`${path}L100,40L0,40Z`}
+                    fill="var(--flow-in)"
+                    fillOpacity="0.1"
+                  />
+                  <path
+                    d={path}
+                    fill="none"
+                    stroke="var(--flow-in)"
+                    strokeWidth="1.5"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
+                <span
+                  className={`shrink-0 text-[12px] tabular-nums ${change >= 0 ? "text-[var(--ok-fg)]" : "text-neutral-400"}`}
+                >
+                  {change >= 0 ? "+" : "−"}
+                  {Math.abs(change * 100).toFixed(1)}% · 30d
+                </span>
+              </div>
+            )}
             {!pending && (
               <div className="mt-2 text-[12px] text-neutral-500">
                 {sync.kind === "live"
@@ -126,7 +316,7 @@ export function AccountSheet({
 
           <div className="mt-5 flex items-center gap-2">
             <Link
-              href="/transactions"
+              href={`/transactions?q=${encodeURIComponent(a.customer.name)}`}
               className="flex h-8 items-center gap-1 rounded-full border border-white/12 pr-2.5 pl-3 text-[13px] text-neutral-200 transition-colors hover:border-white/30 hover:text-white"
             >
               View transactions
@@ -202,6 +392,158 @@ export function AccountSheet({
             </Group>
           )}
 
+          {!pending && (
+            <Group
+              title="Recent activity"
+              action={
+                <Link
+                  href={`/transactions?q=${encodeURIComponent(a.customer.name)}`}
+                  className="text-[12px] text-neutral-400 hover:text-white"
+                >
+                  View all
+                </Link>
+              }
+            >
+              <ul>
+                {moves.map((m) => (
+                  <li
+                    key={m.id}
+                    className="flex items-center gap-3 border-b border-white/6 py-2.5 last:border-0"
+                  >
+                    <span
+                      className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
+                        m.amount > 0
+                          ? "bg-[var(--ok-bg)] text-[var(--ok-fg)]"
+                          : "bg-white/[0.06] text-neutral-400"
+                      }`}
+                    >
+                      {m.amount > 0 ? (
+                        <ArrowDownLeft size={13} strokeWidth={2} />
+                      ) : (
+                        <ArrowUpRight size={13} strokeWidth={2} />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] text-neutral-100">
+                        {m.who}
+                      </span>
+                      <span className="block text-[11.5px] text-neutral-500">
+                        {m.how} · {dayFmt.format(m.at)}
+                      </span>
+                    </span>
+                    <span
+                      className={`amount shrink-0 text-[13px] tabular-nums ${m.amount > 0 ? "text-[var(--ok-fg)]" : "text-neutral-200"}`}
+                    >
+                      {m.amount > 0 ? "+" : "−"}
+                      {money(a.currency, m.amount)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Group>
+          )}
+
+          {!pending && (
+            <Group title="Where incoming money goes">
+              <div role="radiogroup" className="grid grid-cols-2 gap-2 pt-1">
+                {(
+                  [
+                    [
+                      "Settle",
+                      "Settle to wallet",
+                      "Converted to USDC and sent on",
+                    ],
+                    ["Hold", "Hold here", `Stays in ${a.currency}`],
+                  ] as const
+                ).map(([v, t, line]) => {
+                  const on = inflow === v;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => pickInflow(v)}
+                      className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                        on
+                          ? "border-white/30 bg-white/[0.04]"
+                          : "border-white/8 hover:border-white/20"
+                      }`}
+                    >
+                      <span
+                        className={`block text-[13px] ${on ? "text-white" : "text-neutral-300"}`}
+                      >
+                        {t}
+                      </span>
+                      <span className="block text-[11.5px] text-neutral-500">
+                        {line}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 min-h-4 text-[12px] text-neutral-500">
+                {saved ? (
+                  <span className="text-[var(--ok-fg)]">
+                    Saved — applies to the next deposit.
+                  </span>
+                ) : inflow === "Settle" ? (
+                  "Each deposit moves to the linked wallet as it lands."
+                ) : (
+                  "Deposits build up here until you move them."
+                )}
+              </p>
+            </Group>
+          )}
+
+          {!pending && (
+            <Group title="Statements and letters">
+              <ul>
+                {months.map((m) => (
+                  <li
+                    key={m.toISOString()}
+                    className="flex items-center justify-between gap-3 border-b border-white/6 py-2.5"
+                  >
+                    <span className="text-[13px] text-neutral-100">
+                      {monthFmt.format(m)}
+                      {m.getMonth() === new Date(AS_OF).getMonth() && (
+                        <span className="ml-2 text-[11.5px] text-neutral-500">
+                          so far
+                        </span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => downloadStatement(a, m, moves)}
+                      className="flex items-center gap-1 text-[12px] text-neutral-400 hover:text-white"
+                    >
+                      <Download size={13} strokeWidth={1.75} />
+                      CSV
+                    </button>
+                  </li>
+                ))}
+                <li className="flex items-center justify-between gap-3 py-2.5">
+                  <span className="min-w-0">
+                    <span className="block text-[13px] text-neutral-100">
+                      Proof of account
+                    </span>
+                    <span className="block text-[11.5px] text-neutral-500">
+                      A signed letter with the holder and bank details
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => openLetter(a, numberLabel)}
+                    className="flex shrink-0 items-center gap-1 text-[12px] text-neutral-400 hover:text-white"
+                  >
+                    <FileText size={13} strokeWidth={1.75} />
+                    Open letter
+                  </button>
+                </li>
+              </ul>
+            </Group>
+          )}
+
           <Group title="Bank details">
             <Field label="Account holder" value={a.customer.name} copy />
             <Field
@@ -223,15 +565,7 @@ export function AccountSheet({
             <Field label="Account type" value={meta.type} />
             <Field label="Category" value={meta.tier} />
             <Field label="Holder" value={a.category} />
-            <Field
-              label="Inflow behaviour"
-              value={meta.inflow}
-              hint={
-                meta.inflow === "Settle"
-                  ? "Deposits move to the linked wallet"
-                  : "Deposits stay in this account"
-              }
-            />
+
             <Field
               label="Opened"
               value={dateFmt.format(new Date(a.createdAt))}
@@ -269,14 +603,19 @@ export function AccountSheet({
 
 function Group({
   title,
+  action,
   children,
 }: {
   title: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section>
-      <h3 className="mb-1.5 text-xs text-neutral-500">{title}</h3>
+      <div className="mb-1.5 flex items-center justify-between">
+        <h3 className="text-xs text-neutral-500">{title}</h3>
+        {action}
+      </div>
       <div>{children}</div>
     </section>
   );
