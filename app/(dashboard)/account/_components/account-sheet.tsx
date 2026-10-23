@@ -174,6 +174,7 @@ export function AccountSheet({
   // Where money that lands goes; editable here, saved for this visit.
   const [inflow, setInflow] = useState(meta.inflow);
   const [saved, setSaved] = useState(false);
+  const [day, setDay] = useState<number | null>(null);
   const pickInflow = (v: typeof inflow) => {
     if (v === inflow) return;
     setInflow(v);
@@ -182,12 +183,6 @@ export function AccountSheet({
   };
   const lo = Math.min(...trend),
     hi = Math.max(...trend);
-  const path = trend
-    .map(
-      (v, i) =>
-        `${i ? "L" : "M"}${(i / (trend.length - 1)) * 100},${36 - ((v - lo) / (hi - lo || 1)) * 32}`,
-    )
-    .join("");
   const change = trend[0] ? (a.balance - trend[0]) / trend[0] : 0;
   const months = [0, 1, 2].map(
     (i) =>
@@ -267,32 +262,63 @@ export function AccountSheet({
               </div>
             )}
             {!pending && a.balance > 0 && (
-              <div className="mt-4 flex items-end gap-3">
-                <svg
-                  viewBox="0 0 100 40"
-                  preserveAspectRatio="none"
-                  className="h-10 flex-1"
-                  aria-hidden
+              <div className="mt-5">
+                {/* The figure first, then the bars across the full width */}
+                <div className="flex items-baseline justify-between text-[12px] text-neutral-500">
+                  <span>Last 30 days</span>
+                  <span
+                    className={`text-right tabular-nums ${day !== null ? "text-neutral-300" : change >= 0 ? "text-[var(--ok-fg)]" : "text-neutral-400"}`}
+                  >
+                    {day !== null ? (
+                      <>
+                        {money(a.currency, trend[day])}
+                        <span className="text-neutral-500">
+                          {" "}
+                          ·{" "}
+                          {dayFmt.format(
+                            AS_OF - (trend.length - 1 - day) * DAY,
+                          )}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {change >= 0 ? "+" : "−"}
+                        {Math.abs(change * 100).toFixed(1)}% · 30d
+                      </>
+                    )}
+                  </span>
+                </div>
+                <div
+                  className="mt-2 flex h-14 w-full items-end gap-[2px]"
+                  onMouseLeave={() => setDay(null)}
                 >
-                  <path
-                    d={`${path}L100,40L0,40Z`}
-                    fill="var(--flow-in)"
-                    fillOpacity="0.1"
-                  />
-                  <path
-                    d={path}
-                    fill="none"
-                    stroke="var(--flow-in)"
-                    strokeWidth="1.5"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </svg>
-                <span
-                  className={`shrink-0 text-[12px] tabular-nums ${change >= 0 ? "text-[var(--ok-fg)]" : "text-neutral-400"}`}
-                >
-                  {change >= 0 ? "+" : "−"}
-                  {Math.abs(change * 100).toFixed(1)}% · 30d
-                </span>
+                  {trend.map((v, i) => {
+                    const today = i === trend.length - 1;
+                    const on = day === i;
+                    return (
+                      // The whole column is the hover target, not just the bar.
+                      <span
+                        key={i}
+                        onMouseEnter={() => setDay(i)}
+                        className="flex h-full flex-1 items-end"
+                      >
+                        <span
+                          className="w-full rounded-[1.5px] transition-opacity"
+                          style={{
+                            height: `${Math.max(10, ((v - lo) / (hi - lo || 1)) * 100)}%`,
+                            background: "var(--flow-in)",
+                            opacity:
+                              on || (day === null && today)
+                                ? 1
+                                : day === null
+                                  ? 0.35
+                                  : 0.2,
+                          }}
+                        />
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
             )}
             {!pending && (
