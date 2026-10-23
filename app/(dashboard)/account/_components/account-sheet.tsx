@@ -2,14 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  Check,
-  Download,
-  FileText,
-  X,
-} from "lucide-react";
+import { ArrowUpRight, Check, Download, FileText, X } from "lucide-react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { AS_OF, PROVISION_STEPS, accountMeta, type Account } from "../_data";
@@ -343,7 +336,7 @@ export function AccountSheet({
           </div>
         )}
 
-        <div className="space-y-6 px-6 py-5">
+        <div className="space-y-6 px-6 pt-6 pb-8">
           {pending && a.step !== undefined && (
             <Group title="Setting up">
               <ol className="pt-1">
@@ -411,19 +404,6 @@ export function AccountSheet({
                     key={m.id}
                     className="flex items-center gap-3 border-b border-white/6 py-2.5 last:border-0"
                   >
-                    <span
-                      className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
-                        m.amount > 0
-                          ? "bg-[var(--ok-bg)] text-[var(--ok-fg)]"
-                          : "bg-white/[0.06] text-neutral-400"
-                      }`}
-                    >
-                      {m.amount > 0 ? (
-                        <ArrowDownLeft size={13} strokeWidth={2} />
-                      ) : (
-                        <ArrowUpRight size={13} strokeWidth={2} />
-                      )}
-                    </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] text-neutral-100">
                         {m.who}
@@ -591,9 +571,11 @@ function Group({
   children: React.ReactNode;
 }) {
   return (
-    <section>
-      <div className="mb-1.5 flex items-center justify-between">
-        <h3 className="text-xs text-neutral-500">{title}</h3>
+    <section className="border-t border-white/8 pt-5 first:border-0 first:pt-0">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-[13.5px] font-medium tracking-[-0.01em] text-white">
+          {title}
+        </h3>
         {action}
       </div>
       <div>{children}</div>
