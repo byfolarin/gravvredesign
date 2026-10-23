@@ -11,15 +11,9 @@ import {
 import { compactMoney } from "../_lib/format";
 
 const OPEN_KEY = "gravv-cards-where-open";
-const OTHER = "Other";
-/**
- * One ink, stepped by rank: the biggest merchant darkest, fading down the list, "Other"
- * faintest. Spend is money out, and money out reads ink; the 2px gaps keep merchants apart.
- */
-const INK = [88, 66, 50, 38, 28];
-const ink = (pct: number) =>
-  `color-mix(in srgb, var(--color-white) ${pct}%, transparent)`;
-const H = 200;
+/** Plot height, and the room kept above the tallest bar for its callout. */
+const H = 230;
+const HEADROOM = 44;
 
 const whole = (v: number) =>
   new Intl.NumberFormat("en-US", {
@@ -35,10 +29,11 @@ function niceStep(raw: number) {
 }
 
 /**
- * Where card money went, month by month: a year of spend stacked by merchant (top five
- * plus Other), this month's column solid for what's spent and hatched up to where the pace
- * ends it. Hover a month for its breakdown; pick a merchant to see it alone — and the table
- * narrows to the cards that pay it. Collapses to one sentence.
+ * Where card money went, month by month — the way Transactions marks its biggest moves:
+ * one bar per month for what cards spent, and above each one the two merchants that took
+ * the most that month. This month is solid for what's spent and hatched up to its pace.
+ * Hover a month for its full ranking; pick a merchant to follow it alone (the table narrows
+ * to the cards that pay it). Collapses to one sentence.
  */
 export function WhereItWent({
   merchants,
@@ -69,30 +64,17 @@ export function WhereItWent({
   const [range, setRange] = useState<6 | 12>(12);
   const [hover, setHover] = useState<number | null>(null);
 
-  const top = merchants.slice(0, 5);
-  const rest = merchants.slice(5);
-  const color = (k: string) =>
-    k === merchant
-      ? ink(88)
-      : k === OTHER
-        ? ink(16)
-        : ink(INK[top.findIndex((m) => m.merchant === k)]);
-  // Pointing at a merchant in the legend picks it out in every month.
-  const [peek, setPeek] = useState<string | null>(null);
   const history = useMemo(() => merchantHistory(merchants), [merchants]);
   const months = history.slice(12 - range).map((h) => {
-    const segs = [
-      ...top.map((m) => ({ key: m.merchant, v: h.values[m.merchant] ?? 0 })),
-      {
-        key: OTHER,
-        v: rest.reduce((s, m) => s + (h.values[m.merchant] ?? 0), 0),
-      },
-    ];
-    return { ...h, segs, total: segs.reduce((s, x) => s + x.v, 0) };
+    const ranked = merchants
+      .map((m) => ({ key: m.merchant, v: h.values[m.merchant] ?? 0 }))
+      .filter((s) => s.v > 0)
+      .sort((a, b) => b.v - a.v);
+    return { ...h, ranked, total: ranked.reduce((s, x) => s + x.v, 0) };
   });
-  const isolated = merchant && top.some((m) => m.merchant === merchant);
-  const valueOf = (m: (typeof months)[number]) =>
-    isolated ? (m.segs.find((s) => s.key === merchant)?.v ?? 0) : m.total;
+  type Month = (typeof months)[number];
+  const valueOf = (m: Month) =>
+    merchant ? (m.ranked.find((s) => s.key === merchant)?.v ?? 0) : m.total;
   // This month is partial: the pace says where it lands.
   const project = (v: number) => (v * MONTH_DAYS) / SPEND_DAY;
   const last = months.length - 1;
@@ -103,26 +85,20 @@ export function WhereItWent({
   const step = niceStep(max / 3);
   const ceil = Math.ceil(max / step) * step;
   const ticks = [0, 1, 2, 3].map((k) => k * step).filter((t) => t <= ceil);
-  const px = (v: number) => (v / ceil) * H;
+  const px = (v: number) => (v / ceil) * (H - HEADROOM);
 
   // The sentence: the peak month and who drove it — or the picked merchant's story.
   const full = months.slice(0, last);
-  const peakI = full.reduce(
-    (b, m, i) => (valueOf(m) > valueOf(full[b]) ? i : b),
-    0,
+  const peak = full.reduce<Month | undefined>(
+    (b, m) => (!b || valueOf(m) > valueOf(b) ? m : b),
+    undefined,
   );
-  const peak = full[peakI];
-  const leader = peak?.segs
-    .filter((s) => s.key !== OTHER)
-    .sort((a, b) => b.v - a.v)[0];
   const thisMonth = months[last];
   const sentence = !peak
     ? null
-    : isolated
+    : merchant
       ? `${merchant}: most in ${peak.month} ${peak.year} (${compactMoney(valueOf(peak))}). This month ${compactMoney(valueOf(thisMonth))} so far, on pace for ${compactMoney(project(valueOf(thisMonth)))}.`
-      : `Most in ${peak.month} ${peak.year} — ${compactMoney(peak.total)}, led by ${leader?.key}. This month is on pace for ${compactMoney(project(thisMonth.total))}.`;
-
-  const focus = months[hover ?? last];
+      : `Most in ${peak.month} ${peak.year} — ${compactMoney(peak.total)}, led by ${peak.ranked[0]?.key}. This month is on pace for ${compactMoney(project(thisMonth.total))}.`;
 
   return (
     <section className="mt-10 border-t border-white/8 pt-7">
@@ -168,45 +144,31 @@ export function WhereItWent({
 
       {open && (
         <>
-          {/* Legend = the ranking, for the month in focus; click to see one merchant alone */}
+          {/* Follow one merchant: the bars become its spend, the table its cards */}
           <div className="mt-5 flex flex-wrap items-center gap-1">
-            {[
-              ...top.map((m) => m.merchant),
-              ...(rest.length ? [OTHER] : []),
-            ].map((k) => {
-              const on = merchant === k;
-              const v = focus.segs.find((s) => s.key === k)?.v ?? 0;
-              const pickable = k !== OTHER;
+            <button
+              type="button"
+              aria-pressed={!merchant}
+              onClick={() => onMerchant(null)}
+              className={`h-8 rounded-full px-3 text-[12.5px] transition-colors ${!merchant ? "bg-white/[0.08] text-white" : "text-neutral-400 hover:bg-white/[0.05] hover:text-white"}`}
+            >
+              All merchants
+            </button>
+            {merchants.map((m) => {
+              const on = merchant === m.merchant;
               return (
                 <button
-                  key={k}
+                  key={m.merchant}
                   type="button"
                   aria-pressed={on}
-                  onMouseEnter={() => setPeek(k)}
-                  onMouseLeave={() => setPeek(null)}
-                  disabled={!pickable}
-                  title={
-                    pickable
-                      ? on
-                        ? "Show every merchant"
-                        : `See ${k} alone and its cards`
-                      : rest.map((m) => m.merchant).join(", ")
-                  }
-                  onClick={() => onMerchant(on ? null : k)}
-                  className={`flex h-8 items-center gap-2 rounded-full px-3 text-[12.5px] transition-[background-color,opacity] ${on ? "bg-white/[0.08] text-white" : "text-neutral-300 enabled:hover:bg-white/[0.05]"} ${isolated && !on ? "opacity-45" : ""} disabled:cursor-default`}
+                  onClick={() => onMerchant(on ? null : m.merchant)}
+                  className={`h-8 rounded-full px-3 text-[12.5px] transition-colors ${on ? "bg-white/[0.08] text-white" : "text-neutral-400 hover:bg-white/[0.05] hover:text-white"}`}
                 >
-                  <span
-                    className="size-2 rounded-[2px]"
-                    style={{ background: color(k) }}
-                  />
-                  {k === OTHER ? `${rest.length} others` : k}
-                  <span className="amount text-neutral-500 tabular-nums">
-                    {whole(v)}
-                  </span>
+                  {m.merchant}
                 </button>
               );
             })}
-            {isolated && (
+            {merchant && (
               <span className="ml-2 text-[12px] text-neutral-500">
                 Table shows the cards that pay {merchant}
               </span>
@@ -215,7 +177,6 @@ export function WhereItWent({
 
           {/* Plot */}
           <div className="relative mt-4 flex gap-3">
-            {/* Value axis */}
             <div
               className="relative w-12 shrink-0 text-right text-[11px] text-neutral-500 tabular-nums"
               style={{ height: H }}
@@ -224,7 +185,7 @@ export function WhereItWent({
                 <span
                   key={t}
                   className="absolute right-0 translate-y-1/2"
-                  style={{ bottom: px(t) - 0 }}
+                  style={{ bottom: px(t) }}
                 >
                   {t === 0 ? "$0" : compactMoney(t)}
                 </span>
@@ -247,53 +208,69 @@ export function WhereItWent({
                 <div className="absolute inset-0 flex items-end">
                   {months.map((m, i) => {
                     const partial = i === last;
-                    const segs = isolated
-                      ? m.segs.filter((s) => s.key === merchant)
-                      : m.segs;
                     const v = valueOf(m);
                     const ahead = partial ? project(v) - v : 0;
                     const dim = hover !== null && hover !== i;
-                    const shown = segs.filter((s) => s.v > 0);
+                    const rank = merchant
+                      ? m.ranked.findIndex((s) => s.key === merchant) + 1
+                      : 0;
                     return (
                       <div
                         key={`${m.month}${m.year}`}
-                        className="flex h-full flex-1 cursor-crosshair items-end justify-center"
+                        className="flex h-full min-w-0 flex-1 cursor-crosshair flex-col items-center justify-end"
                         onMouseEnter={() => setHover(i)}
                       >
-                        <div
-                          className={`flex w-[56%] max-w-[44px] flex-col-reverse gap-[2px] transition-opacity ${dim ? "opacity-40" : ""}`}
+                        {/* The month's top two, like Transactions marks its biggest moves */}
+                        <span
+                          className={`mb-1.5 rounded-md bg-surface px-1.5 py-1 text-[10.5px] leading-[1.35] whitespace-nowrap ring-1 ring-white/10 transition-opacity ${hover !== null ? "opacity-0" : ""}`}
                         >
-                          {shown.map((s, k) => (
-                            <span
-                              key={s.key}
-                              className={`block transition-[height,opacity] duration-500 ${k === shown.length - 1 && !ahead ? "rounded-t-[3px]" : ""} ${peek && !isolated && peek !== s.key ? "opacity-25" : ""}`}
-                              style={{
-                                height: Math.max(1, px(s.v) - 2),
-                                background: color(s.key),
-                              }}
-                            />
-                          ))}
+                          {merchant ? (
+                            <span className="block text-neutral-300 tabular-nums">
+                              {rank ? `#${rank} that month` : "Not paid"}
+                            </span>
+                          ) : (
+                            m.ranked.slice(0, 2).map((s) => (
+                              <span
+                                key={s.key}
+                                title={`${s.key} ${whole(s.v)}`}
+                                className="flex items-baseline justify-between gap-2"
+                              >
+                                <span className="text-neutral-400">
+                                  {s.key.split(" ")[0]}
+                                </span>
+                                <span className="amount text-neutral-200 tabular-nums">
+                                  {compactMoney(s.v).replace("$", "")}
+                                </span>
+                              </span>
+                            ))
+                          )}
+                        </span>
+                        <div
+                          className={`flex w-[56%] max-w-[44px] flex-col transition-opacity ${dim ? "opacity-40" : ""}`}
+                        >
                           {ahead > 0 && (
                             <span
-                              className="hatch-soft block rounded-t-[3px] border border-b-0 border-dashed border-white/25"
+                              className="hatch-soft block rounded-t-[4px] border border-b-0 border-dashed border-white/25"
                               style={{ height: px(ahead) }}
                               title="Where this month's pace ends"
                             />
                           )}
+                          <span
+                            className={`block bg-[color-mix(in_srgb,var(--color-white)_62%,transparent)] transition-[height] duration-500 ${ahead > 0 ? "" : "rounded-t-[4px]"}`}
+                            style={{ height: Math.max(1, px(v)) }}
+                          />
                         </div>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* The month in focus, broken down */}
                 {hover !== null && (
                   <Tip
                     month={months[hover]}
                     prev={months[hover - 1]}
                     partial={hover === last}
-                    color={color}
-                    only={isolated ? merchant : null}
+                    only={merchant}
                     project={project}
                     left={(hover + 0.5) / months.length}
                   />
@@ -330,7 +307,6 @@ function Tip({
   month: m,
   prev,
   partial,
-  color,
   only,
   project,
   left,
@@ -339,28 +315,24 @@ function Tip({
     month: string;
     year: number;
     total: number;
-    segs: { key: string; v: number }[];
+    ranked: { key: string; v: number }[];
   };
-  prev?: { total: number; segs: { key: string; v: number }[] };
+  prev?: { total: number; ranked: { key: string; v: number }[] };
   partial: boolean;
-  color: (k: string) => string;
   only: string | null;
   project: (v: number) => number;
   left: number;
 }) {
-  const rows = (only ? m.segs.filter((s) => s.key === only) : m.segs)
-    .filter((s) => s.v > 0)
-    .sort((a, b) => b.v - a.v);
-  const total = only ? (rows[0]?.v ?? 0) : m.total;
-  const before = prev
-    ? only
-      ? (prev.segs.find((s) => s.key === only)?.v ?? 0)
-      : prev.total
-    : 0;
+  const pick = (x: { total: number; ranked: { key: string; v: number }[] }) =>
+    only ? (x.ranked.find((s) => s.key === only)?.v ?? 0) : x.total;
+  const total = pick(m);
+  const before = prev ? pick(prev) : 0;
   const change = before && !partial ? (total - before) / before : null;
+  const shown = m.ranked.slice(0, 5);
+  const others = m.ranked.slice(5);
   return (
     <div
-      className="pointer-events-none absolute top-0 z-10 w-[230px] rounded-xl border border-white/10 bg-raised p-3 text-[12px] shadow-[0_16px_40px_-12px_rgb(0_0_0/0.5)]"
+      className="pointer-events-none absolute top-0 z-10 w-[240px] rounded-xl border border-white/10 bg-raised p-3 text-[12px] shadow-[0_16px_40px_-12px_rgb(0_0_0/0.5)]"
       style={{
         left: `${left * 100}%`,
         transform: `translateX(${left > 0.7 ? "calc(-100% - 28px)" : "28px"})`,
@@ -370,6 +342,7 @@ function Tip({
         <span className="text-neutral-400">
           {m.month} {m.year}
           {partial && " · so far"}
+          {only && ` · ${only}`}
         </span>
         <span className="amount text-[13px] font-medium text-white tabular-nums">
           {whole(total)}
@@ -382,14 +355,18 @@ function Tip({
             ? `${change >= 0 ? "↑" : "↓"} ${Math.abs(change * 100).toFixed(0)}% vs the month before`
             : " "}
       </div>
-      <ul className="mt-2 space-y-1 border-t border-white/8 pt-2">
-        {rows.map((s) => (
-          <li key={s.key} className="flex items-center gap-2">
+      <ol className="mt-2 space-y-1 border-t border-white/8 pt-2">
+        {shown.map((s, i) => (
+          <li
+            key={s.key}
+            className={`flex items-center gap-2 ${only && s.key !== only ? "opacity-45" : ""}`}
+          >
+            <span className="w-3 shrink-0 text-right text-neutral-600 tabular-nums">
+              {i + 1}
+            </span>
             <span
-              className="size-2 shrink-0 rounded-[2px]"
-              style={{ background: color(s.key) }}
-            />
-            <span className="min-w-0 flex-1 truncate text-neutral-300">
+              className={`min-w-0 flex-1 truncate ${s.key === only ? "text-white" : "text-neutral-300"}`}
+            >
               {s.key}
             </span>
             <span className="amount text-neutral-200 tabular-nums">
@@ -397,7 +374,18 @@ function Tip({
             </span>
           </li>
         ))}
-      </ul>
+        {others.length > 0 && (
+          <li className="flex items-center gap-2 text-neutral-500">
+            <span className="w-3 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">
+              {others.length} more
+            </span>
+            <span className="amount tabular-nums">
+              {whole(others.reduce((s, x) => s + x.v, 0))}
+            </span>
+          </li>
+        )}
+      </ol>
     </div>
   );
 }
