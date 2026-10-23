@@ -2335,7 +2335,7 @@ function CloseDialog({
   }, [onCancel]);
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         aria-hidden
         onClick={onCancel}
@@ -2345,7 +2345,7 @@ function CloseDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="close-title"
-        className="orbit-pop absolute top-[14vh] left-1/2 w-[460px] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-2xl border border-white/10 bg-raised p-6 shadow-[0_24px_80px_-12px_rgb(0_0_0/0.6)]"
+        className="orbit-pop relative w-[460px] max-w-full rounded-2xl border border-white/10 bg-raised p-6 shadow-[0_24px_80px_-12px_rgb(0_0_0/0.6)]"
       >
         <div className="flex items-start justify-between gap-4">
           <div>

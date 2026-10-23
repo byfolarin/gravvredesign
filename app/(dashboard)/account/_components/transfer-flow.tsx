@@ -294,7 +294,10 @@ export function TransferFlow({
   };
 
   return (
-    <div className="fixed inset-0 z-50" data-transfer>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      data-transfer
+    >
       <div
         aria-hidden
         onClick={() => (result ? onClose() : guard.requestClose())}
@@ -305,7 +308,7 @@ export function TransferFlow({
         aria-modal="true"
         aria-labelledby="transfer-title"
         onInputCapture={guard.markDirty}
-        className="orbit-pop absolute top-[7vh] left-1/2 w-[560px] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-2xl border border-white/10 bg-raised shadow-[0_24px_80px_-12px_rgb(0_0_0/0.6)]"
+        className="orbit-pop relative w-[560px] max-w-full rounded-2xl border border-white/10 bg-raised shadow-[0_24px_80px_-12px_rgb(0_0_0/0.6)]"
       >
         {result ? (
           <Done result={result} onAgain={again} onClose={onClose} />
