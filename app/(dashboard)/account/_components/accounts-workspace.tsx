@@ -1079,22 +1079,47 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
   ];
   return (
     <>
-      <div className="mt-8 grid gap-x-8 gap-y-8 lg:grid-cols-[minmax(0,1fr)_300px]">
-        {/* Balance: zero, and a chart that starts today */}
+      {/* The filled page's own pieces, at zero: balance panel left, the two fact cards right */}
+      <div className="mt-8 grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <section className="min-w-0 pt-1 pr-4">
-          <div className="text-[13px] text-neutral-500">Balance</div>
-          <div className="mt-3 text-[34px] leading-none font-medium tracking-[-0.035em] text-white tabular-nums">
-            $0
-            <sub className="ml-px text-[0.5em] font-normal text-neutral-500">
-              .00
-            </sub>
+          <div className="flex items-start justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-2 text-[13px] text-neutral-500">
+                <span>Balance</span>
+                <span className="flex rounded-full bg-white/[0.06] p-0.5">
+                  <span className="h-6 rounded-full bg-surface px-2 text-[11px] leading-6 font-medium text-white shadow-[0_1px_2px_rgb(0_0_0/0.25)]">
+                    USD
+                  </span>
+                </span>
+              </div>
+              <div className="mt-3 text-[34px] leading-none font-medium tracking-[-0.035em] text-white tabular-nums">
+                $0
+                <sub className="ml-px text-[0.5em] font-normal tracking-normal text-neutral-500">
+                  .00
+                </sub>
+              </div>
+              <div className="mt-2.5 flex h-5 items-center text-[12px] text-neutral-500">
+                No accounts yet — the balance and its trend show here once money
+                lands.
+              </div>
+            </div>
+            <div
+              aria-hidden
+              className="flex shrink-0 rounded-full bg-white/[0.07] p-0.5 opacity-40"
+            >
+              {["7D", "30D", "90D"].map((p) => (
+                <span
+                  key={p}
+                  className={`h-7 rounded-full px-2.5 text-xs leading-7 tabular-nums ${p === "30D" ? "bg-surface font-medium text-white" : "text-neutral-500"}`}
+                >
+                  {p}
+                </span>
+              ))}
+            </div>
           </div>
-          <div className="mt-2.5 text-[12px] text-neutral-500">
-            Nothing has landed yet
-          </div>
-          <div className="relative mt-6 h-[214px]">
-            {/* Faint guides, a flat line along zero, and a mark at today */}
-            {[0.25, 0.5, 0.75].map((y) => (
+          {/* The chart area, waiting: faint guides and a flat line along zero to today */}
+          <div className="relative mt-6 h-[150px]">
+            {[0.2, 0.5, 0.8].map((y) => (
               <span
                 key={y}
                 aria-hidden
@@ -1104,59 +1129,38 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
             ))}
             <span
               aria-hidden
-              className="absolute inset-x-0 bottom-9 h-[2px] rounded-full bg-gradient-to-r from-transparent via-white/10 to-[var(--flow-in)]"
+              className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-gradient-to-r from-transparent via-white/10 to-[var(--flow-in)]"
             />
             <span
               aria-hidden
-              className="absolute right-0 bottom-9 size-2.5 translate-x-1/2 translate-y-[4px] rounded-full bg-[var(--flow-in)] ring-4 ring-[var(--ok-bg)]"
+              className="absolute right-0 bottom-0 size-2.5 translate-x-1/2 translate-y-[4px] rounded-full bg-[var(--flow-in)] ring-4 ring-[var(--ok-bg)]"
             />
-            <div className="absolute inset-x-0 bottom-0 flex justify-between text-[11px] text-neutral-500">
-              <span>Your balance builds from here</span>
-              <span>Today</span>
-            </div>
+          </div>
+          <div className="mt-[52px] flex justify-between text-[11px] text-neutral-500">
+            <span>Starts when your first account opens</span>
+            <span>Today</span>
           </div>
         </section>
-
-        {/* Status: the column's outline, waiting to fill */}
-        <section className="pt-1 lg:border-l lg:border-white/[0.06] lg:pl-8">
-          <div className="text-[13px] text-neutral-500">Active accounts</div>
-          <div className="mt-1.5 flex items-baseline gap-1.5">
-            <span className="text-[28px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
-              0
-            </span>
-            <span className="text-[13px] text-neutral-500">of 0</span>
-          </div>
-          <div className="mt-6 flex h-[214px] gap-5">
-            <div
-              aria-hidden
-              className="w-3.5 shrink-0 rounded-[3px] border border-dashed border-white/15"
-            />
-            <ul className="flex min-w-0 flex-1 flex-col justify-between">
-              {(
-                [
-                  ["Active", "var(--flow-in)"],
-                  ["Pending", "var(--color-amber-400)"],
-                  ["Frozen", "var(--color-sky-300)"],
-                  ["Closed", "var(--color-neutral-600)"],
-                ] as const
-              ).map(([label, color]) => (
-                <li key={label}>
-                  <span className="flex items-center gap-2 text-[12.5px] text-neutral-500">
-                    <span
-                      aria-hidden
-                      className="size-2 shrink-0 rounded-[2px] opacity-40"
-                      style={{ background: color }}
-                    />
-                    {label}
-                  </span>
-                  <span className="mt-0.5 block pl-4 text-[15px] font-medium text-neutral-500 tabular-nums">
-                    0
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
+        <div className="grid gap-3">
+          <SideFact
+            label="Active accounts"
+            value={
+              <>
+                0
+                <span className="ml-1.5 text-[14px] font-normal tracking-normal text-neutral-500">
+                  of 0
+                </span>
+              </>
+            }
+            share={0}
+            note="0 frozen · 0 closed"
+          />
+          <SideFact
+            label="Being provisioned"
+            value="0"
+            note="Nothing waiting on a bank"
+          />
+        </div>
       </div>
 
       {/* The way in: three steps, the first one is a button */}
