@@ -723,10 +723,14 @@ html {
   color: var(--color-neutral-400);
 }
 
-/* Selected pill tabs carry the brand mint (the one place the brand colour marks "you are here"). */
+/* Selected pill tabs are ink — black on paper, white on dark. Mint stays for money in / success. */
 .content-theme [role="tab"][aria-selected="true"].rounded-full {
-  background: var(--ok-bg);
-  color: var(--ok-fg);
+  background: var(--color-white);
+  color: var(--color-black);
+}
+.content-theme [role="tab"][aria-selected="true"].rounded-full > span.tabular-nums {
+  color: inherit;
+  opacity: 0.6;
 }
 
 /* Counts in tabs sit on the label's line at the label's size — only the colour is quieter. */
