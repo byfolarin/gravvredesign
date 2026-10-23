@@ -1058,86 +1058,213 @@ const OFFER: {
 ];
 
 /** A new business: what an account is, what they can open, and the one button to do it. */
+/**
+ * A new business, shown honestly: the page's real layout with real zeros — an empty chart
+ * waiting at today, an outline where the status column will fill — then the way in.
+ */
 function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
+  const steps = [
+    {
+      title: "Open an account",
+      line: "Pick a currency and a bank. It's ready in minutes to two days.",
+    },
+    {
+      title: "Share the details",
+      line: "Send the routing number or IBAN to whoever pays the holder.",
+    },
+    {
+      title: "First money lands",
+      line: "Balances, trend and daily change start filling this page.",
+    },
+  ];
   return (
-    <div className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-      {/* The invitation is the one place this page gets colour: mint, money that will land */}
-      <div
-        className="relative isolate overflow-hidden rounded-2xl border border-white/8 p-8 pb-28"
-        style={wash("mint", "100% 100%", 22)}
-      >
-        <PixelField
-          seed="no-accounts"
-          className="right-0 bottom-0 h-[34%] w-[70%]"
-          solid={0.25}
-          cols={40}
-          rows={9}
-        />
-        <h2 className="text-[22px] font-medium tracking-[-0.02em] text-white">
-          No accounts yet
-        </h2>
-        <p className="mt-3 max-w-[420px] text-[14px] leading-relaxed text-neutral-400">
-          Give each customer a bank account in their own name and currency.
-          Money that lands in it shows up here, with its balance, and can settle
-          straight to a wallet.
-        </p>
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => onOpen()}
-            className="flex h-9 items-center gap-1.5 rounded-full bg-white pr-4 pl-3 text-[13px] font-medium text-black hover:bg-neutral-200"
-          >
-            <Plus size={14} strokeWidth={2} />
-            Open your first account
-          </button>
-          <span className="flex items-center gap-1 text-[12px] text-neutral-500">
-            or with the API:{" "}
-            <span className="font-mono text-neutral-300">
-              POST /v1/accounts
+    <>
+      <div className="mt-8 grid gap-x-8 gap-y-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+        {/* Balance: zero, and a chart that starts today */}
+        <section className="min-w-0 pt-1 pr-4">
+          <div className="text-[13px] text-neutral-500">Balance</div>
+          <div className="mt-3 text-[34px] leading-none font-medium tracking-[-0.035em] text-white tabular-nums">
+            $0
+            <sub className="ml-px text-[0.5em] font-normal text-neutral-500">
+              .00
+            </sub>
+          </div>
+          <div className="mt-2.5 text-[12px] text-neutral-500">
+            Nothing has landed yet
+          </div>
+          <div className="relative mt-6 h-[214px]">
+            {/* Faint guides, a flat line along zero, and a mark at today */}
+            {[0.25, 0.5, 0.75].map((y) => (
+              <span
+                key={y}
+                aria-hidden
+                className="absolute inset-x-0 border-t border-dashed border-white/[0.07]"
+                style={{ top: `${y * 100}%` }}
+              />
+            ))}
+            <span
+              aria-hidden
+              className="absolute inset-x-0 bottom-9 h-[2px] rounded-full bg-gradient-to-r from-transparent via-white/10 to-[var(--flow-in)]"
+            />
+            <span
+              aria-hidden
+              className="absolute right-0 bottom-9 size-2.5 translate-x-1/2 translate-y-[4px] rounded-full bg-[var(--flow-in)] ring-4 ring-[var(--ok-bg)]"
+            />
+            <div className="absolute inset-x-0 bottom-0 flex justify-between text-[11px] text-neutral-500">
+              <span>Your balance builds from here</span>
+              <span>Today</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Status: the column's outline, waiting to fill */}
+        <section className="pt-1 lg:border-l lg:border-white/[0.06] lg:pl-8">
+          <div className="text-[13px] text-neutral-500">Active accounts</div>
+          <div className="mt-1.5 flex items-baseline gap-1.5">
+            <span className="text-[28px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
+              0
             </span>
-            <CopyButton value="POST /v1/accounts" label="Copy endpoint" />
-          </span>
-        </div>
+            <span className="text-[13px] text-neutral-500">of 0</span>
+          </div>
+          <div className="mt-6 flex h-[214px] gap-5">
+            <div
+              aria-hidden
+              className="w-3.5 shrink-0 rounded-[3px] border border-dashed border-white/15"
+            />
+            <ul className="flex min-w-0 flex-1 flex-col justify-between">
+              {(
+                [
+                  ["Active", "var(--flow-in)"],
+                  ["Pending", "var(--color-amber-400)"],
+                  ["Frozen", "var(--color-sky-300)"],
+                  ["Closed", "var(--color-neutral-600)"],
+                ] as const
+              ).map(([label, color]) => (
+                <li key={label}>
+                  <span className="flex items-center gap-2 text-[12.5px] text-neutral-500">
+                    <span
+                      aria-hidden
+                      className="size-2 shrink-0 rounded-[2px] opacity-40"
+                      style={{ background: color }}
+                    />
+                    {label}
+                  </span>
+                  <span className="mt-0.5 block pl-4 text-[15px] font-medium text-neutral-500 tabular-nums">
+                    0
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
       </div>
-      <div>
-        <div className="text-[12px] text-neutral-500">What you can open</div>
-        <ul className="mt-2 divide-y divide-white/6 border-y border-white/8">
-          {OFFER.map((o) => (
-            <li key={o.currency}>
-              <button
-                type="button"
-                onClick={() => onOpen(o.currency)}
-                className="group flex w-full items-center gap-4 py-3.5 text-left"
+
+      {/* The way in: three steps, the first one is a button */}
+      <section className="mt-12 border-t border-white/8 pt-8">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="text-[19px] font-medium tracking-[-0.015em] text-white">
+              Get your first account open
+            </h2>
+            <p className="mt-1 text-[13px] text-neutral-500">
+              Each customer gets a bank account in their own name and currency.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1 text-[12px] text-neutral-500">
+              or with the API:{" "}
+              <span className="font-mono text-neutral-300">
+                POST /v1/accounts
+              </span>
+              <CopyButton value="POST /v1/accounts" label="Copy endpoint" />
+            </span>
+            <button
+              type="button"
+              onClick={() => onOpen()}
+              className="flex h-9 items-center gap-1.5 rounded-full bg-white pr-4 pl-3 text-[13px] font-medium text-black hover:bg-neutral-200"
+            >
+              <Plus size={14} strokeWidth={2} />
+              Open your first account
+            </button>
+          </div>
+        </div>
+        <ol className="mt-7 grid gap-6 sm:grid-cols-3">
+          {steps.map((st, i) => (
+            <li key={st.title} className="flex gap-3">
+              <span
+                className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11.5px] font-medium tabular-nums ${
+                  i === 0
+                    ? "bg-white text-black"
+                    : "text-neutral-500 ring-1 ring-white/15"
+                }`}
               >
-                <Flag currency={o.currency} />
-                <span className="w-10 text-[13px] font-medium text-white">
-                  {o.currency}
+                {i + 1}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13.5px] text-white">
+                  {st.title}
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] text-neutral-200">
-                    {o.bank}
-                  </span>
-                  <span className="block truncate text-[12px] text-neutral-500">
-                    {o.rails}
-                  </span>
+                <span className="mt-0.5 block text-[12.5px] leading-relaxed text-neutral-500">
+                  {st.line}
                 </span>
-                <span className="shrink-0 text-[12px] text-neutral-500">
-                  {o.time}
-                </span>
-                <ChevronRight
-                  size={14}
-                  strokeWidth={1.75}
-                  className="shrink-0 text-neutral-600 transition-colors group-hover:text-white"
-                />
-              </button>
+              </span>
             </li>
           ))}
-        </ul>
-        <p className="mt-3 text-[12px] text-neutral-500">
+        </ol>
+      </section>
+
+      {/* What you can open, in the page's table style: a row starts the flow */}
+      <section className="mt-12">
+        <h3 className="text-[13px] text-neutral-500">What you can open</h3>
+        <table className="mt-3 w-full table-fixed text-[13px]">
+          <colgroup>
+            <col className="w-[120px]" />
+            <col />
+            <col />
+            <col className="w-[180px]" />
+            <col className="w-10" />
+          </colgroup>
+          <thead>
+            <tr className="text-left text-xs text-neutral-500">
+              <th className="py-2.5 pl-3 font-normal">Currency</th>
+              <th className="py-2.5 font-normal">Bank</th>
+              <th className="py-2.5 font-normal">Receives by</th>
+              <th className="py-2.5 font-normal">Ready in</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {OFFER.map((o) => (
+              <tr
+                key={o.currency}
+                onClick={() => onOpen(o.currency)}
+                className="group cursor-pointer border-b border-white/6 transition-colors hover:bg-white/[0.02]"
+              >
+                <td className="py-3.5 pl-3">
+                  <span className="flex items-center gap-2.5">
+                    <Flag currency={o.currency} />
+                    <span className="font-medium text-white">{o.currency}</span>
+                  </span>
+                </td>
+                <td className="py-3.5 text-neutral-200">{o.bank}</td>
+                <td className="py-3.5 text-neutral-500">{o.rails}</td>
+                <td className="py-3.5 text-neutral-500">{o.time}</td>
+                <td className="py-3.5 pr-3 text-right">
+                  <ChevronRight
+                    size={14}
+                    strokeWidth={1.75}
+                    className="ml-auto text-neutral-600 transition-colors group-hover:text-white"
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="mt-3 pl-3 text-[12px] text-neutral-500">
           Plus JPY, CAD, AUD and more when you open one.
         </p>
-      </div>
-    </div>
+      </section>
+    </>
   );
 }
 
