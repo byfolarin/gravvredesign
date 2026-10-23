@@ -30,6 +30,7 @@ import {
   AS_OF,
   PROVISION_STEPS,
   accounts as ALL,
+  freezeOf,
   applications as APPLICATIONS,
   type Account,
   type AccountStatus,
@@ -40,6 +41,12 @@ import {
 import { NAMES, SYMBOL } from "./currency";
 import { OpenAccountFlow } from "./open-account-flow";
 import { AccountSheet } from "./account-sheet";
+import {
+  FreezeDialog,
+  FreezeNotice,
+  UnfreezeDialog,
+  freezeShort,
+} from "./freeze";
 import { UpdateNotice } from "@/app/_components/updates";
 import { PixelField, wash, type WashTone } from "@/app/_components/pixel-field";
 
@@ -209,6 +216,9 @@ export function AccountsWorkspace() {
 
   // The account being closed (confirm step), if any.
   const [closing, setClosing] = useState<string | null>(null);
+  // Freezing (or editing a freeze) and unfreezing, each a confirm step.
+  const [freezing, setFreezing] = useState<string | null>(null);
+  const [unfreezing, setUnfreezing] = useState<string | null>(null);
   // The row whose label is being edited in place.
   const [renaming, setRenaming] = useState<string | null>(null);
   const update = (id: string, patch: Partial<Account>) =>
@@ -738,7 +748,7 @@ export function AccountsWorkspace() {
                           )}
                         </td>
                         <td className="py-3">
-                          <Status account={a} />
+                          <Status account={a} withNote />
                         </td>
                         <td
                           className="py-3 pr-3"
@@ -758,17 +768,12 @@ export function AccountsWorkspace() {
                               setToast("Transfers between accounts are next")
                             }
                             onRename={() => setRenaming(a.id)}
-                            onFreeze={() => {
-                              update(a.id, {
-                                status:
-                                  a.status === "Frozen" ? "Active" : "Frozen",
-                              });
-                              setToast(
-                                a.status === "Frozen"
-                                  ? "Account unfrozen"
-                                  : "Account frozen — no money in or out",
-                              );
-                            }}
+                            onFreeze={() =>
+                              a.status === "Frozen"
+                                ? setUnfreezing(a.id)
+                                : setFreezing(a.id)
+                            }
+                            onEditFreeze={() => setFreezing(a.id)}
                             onClose={() => setClosing(a.id)}
                           />
                         </td>
@@ -782,6 +787,8 @@ export function AccountsWorkspace() {
                               onClose={() => setOpenId(null)}
                               onFix={() => fix(a)}
                               onRetry={retrySync}
+                              onEditFreeze={() => setFreezing(a.id)}
+                              onUnfreeze={() => setUnfreezing(a.id)}
                             />
                           </td>
                         </tr>
@@ -815,6 +822,18 @@ export function AccountsWorkspace() {
           chip={<Status account={sheet} />}
           balance={<Money value={sheet.balance} currency={sheet.currency} />}
           onClose={() => setSheetId(null)}
+          notice={
+            freezeOf(sheet) && (
+              <FreezeNotice
+                account={sheet}
+                freeze={freezeOf(sheet)!}
+                onEdit={() => setFreezing(sheet.id)}
+                onUnfreeze={() => setUnfreezing(sheet.id)}
+                stacked
+                className="mt-5 rounded-xl border border-white/8 px-4 py-3.5"
+              />
+            )
+          }
         />
       )}
 
@@ -842,6 +861,68 @@ export function AccountsWorkspace() {
           }}
         />
       )}
+
+      {freezing &&
+        (() => {
+          const acct = list.find((x) => x.id === freezing);
+          if (!acct) return null;
+          const editing = freezeOf(acct);
+          return (
+            <FreezeDialog
+              account={acct}
+              editing={editing}
+              onCancel={() => setFreezing(null)}
+              onConfirm={(f) => {
+                update(acct.id, { status: "Frozen", freeze: f });
+                setFreezing(null);
+                setToast(
+                  editing
+                    ? `Freeze on ${acct.label} updated`
+                    : `${acct.label} frozen · ${f.scope === "all" ? "nothing moves in or out" : "money out stopped"}${f.told ? ` · ${acct.customer.name} emailed` : ""}`,
+                );
+              }}
+            />
+          );
+        })()}
+
+      {unfreezing &&
+        (() => {
+          const acct = list.find((x) => x.id === unfreezing);
+          const f = acct && freezeOf(acct);
+          if (!acct || !f) return null;
+          return (
+            <UnfreezeDialog
+              account={acct}
+              freeze={f}
+              onCancel={() => setUnfreezing(null)}
+              onConfirm={(send) => {
+                update(acct.id, {
+                  status: "Active",
+                  freeze: undefined,
+                  balance:
+                    acct.balance +
+                    f.held -
+                    (send && f.waiting.count ? f.waiting.amount : 0),
+                });
+                setUnfreezing(null);
+                const fmt = (v: number) =>
+                  `${SYMBOL[acct.currency]}${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                setToast(
+                  [
+                    `${acct.label} unfrozen`,
+                    f.held > 0 && `${fmt(f.held)} added`,
+                    f.waiting.count > 0 &&
+                      (send
+                        ? `${f.waiting.count} payment${f.waiting.count === 1 ? "" : "s"} sending`
+                        : `${f.waiting.count} payment${f.waiting.count === 1 ? "" : "s"} cancelled`),
+                  ]
+                    .filter(Boolean)
+                    .join(" · "),
+                );
+              }}
+            />
+          );
+        })()}
 
       {closing &&
         (() => {
@@ -890,7 +971,14 @@ export function AccountsWorkspace() {
 }
 
 /** Same chip system as the rest of the platform. Pending reads as "Provisioning" — that's what's happening. */
-function Status({ account: a }: { account: Account }) {
+function Status({
+  account: a,
+  withNote = false,
+}: {
+  account: Account;
+  /** Table rows say what a freeze is doing under the chip. */
+  withNote?: boolean;
+}) {
   if (a.problem?.kind === "needs-info" || a.problem?.kind === "rejected")
     return (
       <span
@@ -912,19 +1000,25 @@ function Status({ account: a }: { account: Account }) {
         : a.status === "Frozen"
           ? "border-sky-300/25 bg-sky-400/10 text-sky-200"
           : "border-transparent bg-white/[0.05] text-neutral-500";
+  const f = freezeOf(a);
   return (
-    <span
-      className={`inline-flex h-6 items-center rounded-full border px-2.5 text-xs leading-none font-medium ${tone}`}
-    >
-      {label}
-    </span>
+    <>
+      <span
+        className={`inline-flex h-6 items-center rounded-full border px-2.5 text-xs leading-none font-medium ${tone}`}
+      >
+        {label}
+      </span>
+      {f && withNote && (
+        <div className="mt-1 text-[11px] whitespace-nowrap text-neutral-500">
+          {freezeShort(f)}
+        </div>
+      )}
+    </>
   );
 }
 
 function Flag({ currency }: { currency: Currency }) {
-  return (
-    <CurrencyFlag code={currency} />
-  );
+  return <CurrencyFlag code={currency} />;
 }
 
 /** Bank details with copy, and — while it's being set up — where provisioning is. */
@@ -934,12 +1028,16 @@ function Preview({
   onClose,
   onFix,
   onRetry,
+  onEditFreeze,
+  onUnfreeze,
 }: {
   account: Account;
   onViewAll: () => void;
   onClose: () => void;
   onFix: () => void;
   onRetry: () => void;
+  onEditFreeze: () => void;
+  onUnfreeze: () => void;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -948,8 +1046,18 @@ function Preview({
   }, [onClose]);
   const pending = a.status === "Pending";
   const p = a.problem;
+  const f = freezeOf(a);
   return (
     <div className="orbit-pop rounded-xl border border-white/8 bg-surface">
+      {f && (
+        <FreezeNotice
+          account={a}
+          freeze={f}
+          onEdit={onEditFreeze}
+          onUnfreeze={onUnfreeze}
+          className="border-b border-white/6 px-5 py-3.5"
+        />
+      )}
       {p && (
         <div className="flex items-start gap-3 border-b border-white/6 px-5 py-3.5">
           <AlertTriangle
@@ -1980,6 +2088,7 @@ function RowMenu({
   onTransfer,
   onRename,
   onFreeze,
+  onEditFreeze,
   onClose,
 }: {
   account: Account;
@@ -1987,6 +2096,7 @@ function RowMenu({
   onTransfer: () => void;
   onRename: () => void;
   onFreeze: () => void;
+  onEditFreeze: () => void;
   onClose: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -2020,11 +2130,14 @@ function RowMenu({
     ...(live
       ? [
           {
-            label: a.status === "Frozen" ? "Unfreeze" : "Freeze",
+            label: a.status === "Frozen" ? "Unfreeze…" : "Freeze…",
             icon: Snowflake,
             onClick: onFreeze,
           },
         ]
+      : []),
+    ...(a.status === "Frozen"
+      ? [{ label: "Edit freeze", icon: Pencil, onClick: onEditFreeze }]
       : []),
   ];
   return (

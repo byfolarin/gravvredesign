@@ -438,9 +438,7 @@ export function OpenAccountFlow({
                     options={ALL_CURRENCIES.map((c) => ({
                       value: c,
                       label: `${c} · ${NAMES[c]}`,
-                      icon: (
-                        <CurrencyFlag code={c} />
-                      ),
+                      icon: <CurrencyFlag code={c} />,
                     }))}
                     onChange={(v) => pickCurrency(v as Currency)}
                     className="w-full"
@@ -947,7 +945,7 @@ function Hint({ children }: { children: React.ReactNode }) {
 }
 
 /** Same as the app's pill tabs: the chosen one in ink, the rest plain text. */
-function Segmented<T extends string>({
+export function Segmented<T extends string>({
   value,
   options,
   onChange,

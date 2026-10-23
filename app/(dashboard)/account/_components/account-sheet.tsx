@@ -159,9 +159,12 @@ export function AccountSheet({
   account: a,
   chip,
   balance,
+  notice,
   onClose,
 }: {
   account: Account;
+  /** Shown under the identity: a freeze, with its actions. */
+  notice?: React.ReactNode;
   /** The status chip, as the table shows it. */
   chip: React.ReactNode;
   /** The balance, formatted the way the table formats money. */
@@ -245,6 +248,8 @@ export function AccountSheet({
               </button>
             </div>
           </div>
+
+          {notice}
 
           {/* Balance, and how fresh it is */}
           <div className="mt-6">

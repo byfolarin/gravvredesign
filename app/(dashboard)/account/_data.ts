@@ -81,7 +81,35 @@ export type Account = {
     kind: "needs-info" | "rejected" | "stale";
     text: string;
     since?: string;
-  };
+  }; /** Frozen only: what was stopped, why, by whom — see `freezeOf` for seeded ones. */
+  freeze?: Freeze;
+};
+
+/** "out": nothing leaves, money still lands. "all": nothing moves; money that arrives is held. */
+export type FreezeScope = "out" | "all";
+export const FREEZE_REASONS = [
+  "Suspected fraud",
+  "Customer asked",
+  "Compliance review",
+  "Account details exposed",
+  "Dispute in progress",
+  "Other",
+] as const;
+export type FreezeReason = (typeof FREEZE_REASONS)[number];
+export type Freeze = {
+  scope: FreezeScope;
+  reason: FreezeReason;
+  note?: string;
+  by: string;
+  at: string;
+  /** Unfreezes by itself then; none = until someone unfreezes it. */
+  until?: string;
+  /** Money that arrived while frozen (scope "all"), added back on unfreeze. */
+  held: number;
+  /** Scheduled payments out that are waiting on the freeze. */
+  waiting: { count: number; amount: number };
+  /** The holder was emailed. */
+  told: boolean;
 };
 
 export type ApplicationStatus =
@@ -462,5 +490,68 @@ export function accountMeta(a: Account): AccountMeta {
     applicationRef: ref(),
     customerRef: ref(),
     sync,
+  };
+}
+
+const FREEZE_NOTES: Partial<Record<FreezeReason, string>> = {
+  "Suspected fraud": "Three payouts to a new recipient within ten minutes.",
+  "Customer asked":
+    "Holder asked us to pause it while they change signatories.",
+  "Compliance review": "Bank asked for proof of address before more payouts.",
+  "Account details exposed":
+    "Account number was shared in a public invoice thread.",
+  "Dispute in progress":
+    "Holding while the Visa chargeback on PAY-4471 is open.",
+};
+const FREEZERS = [
+  "Chioma Eze",
+  "Folarin Folarin",
+  "Adaeze Okoro",
+  "Tunde Bakare",
+];
+
+/** What's waiting on an account if it's frozen now: scheduled payouts out. */
+export function waitingOn(a: Account): Freeze["waiting"] {
+  let h = 7;
+  for (const ch of a.id) h = Math.imul(h ^ ch.charCodeAt(0), 2246822519) >>> 0;
+  const r = seeded(h);
+  const count = a.balance > 0 ? Math.floor(r() * 4) : 0;
+  return {
+    count,
+    amount: count
+      ? Math.round(
+          Math.min(a.balance * 0.6, (0.05 + r() * 0.3) * a.balance) * 100,
+        ) / 100
+      : 0,
+  };
+}
+
+/** The freeze on a frozen account — set when frozen here, seeded for the rest. */
+export function freezeOf(a: Account): Freeze | undefined {
+  if (a.status !== "Frozen") return undefined;
+  if (a.freeze) return a.freeze;
+  let h = 3;
+  for (const ch of a.id) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  const r = seeded(h);
+  const reason = FREEZE_REASONS[Math.floor(r() * 5)];
+  const scope: FreezeScope =
+    reason === "Suspected fraud" || r() < 0.3 ? "all" : "out";
+  const days = 0.1 + r() * 9;
+  const timed = reason === "Customer asked" || r() < 0.25;
+  return {
+    scope,
+    reason,
+    note: FREEZE_NOTES[reason],
+    by: FREEZERS[Math.floor(r() * FREEZERS.length)],
+    at: new Date(AS_OF - days * DAY).toISOString(),
+    until: timed
+      ? new Date(AS_OF + (1 + Math.floor(r() * 6)) * DAY).toISOString()
+      : undefined,
+    held:
+      scope === "all" && a.balance > 0
+        ? Math.round(a.balance * (0.02 + r() * 0.1) * 100) / 100
+        : 0,
+    waiting: waitingOn(a),
+    told: reason === "Customer asked" || reason === "Account details exposed",
   };
 }
