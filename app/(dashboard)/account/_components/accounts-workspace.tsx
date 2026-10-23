@@ -618,7 +618,7 @@ export function AccountsWorkspace() {
               </div>
             </div>
 
-            <table className="mt-3 w-full table-fixed border-t border-white/15 text-[13px]">
+            <table className="mt-6 w-full table-fixed border-t border-white/15 text-[13px]">
               <colgroup>
                 <col className="w-[180px]" />
                 <col />
