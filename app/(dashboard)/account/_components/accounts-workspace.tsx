@@ -1,5 +1,6 @@
 "use client";
 
+import { CurrencyFlag } from "@/app/_components/currency-flag";
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -36,7 +37,7 @@ import {
   type Category,
   type Currency,
 } from "../_data";
-import { FLAGS, NAMES, SYMBOL } from "./currency";
+import { NAMES, SYMBOL } from "./currency";
 import { OpenAccountFlow } from "./open-account-flow";
 import { AccountSheet } from "./account-sheet";
 import { UpdateNotice } from "@/app/_components/updates";
@@ -581,7 +582,8 @@ export function AccountsWorkspace() {
                   placeholder="Currency"
                   options={CURRENCIES.map((c) => ({
                     value: c,
-                    label: c === "All" ? "All currencies" : `${FLAGS[c]}  ${c}`,
+                    label: c === "All" ? "All currencies" : c,
+                    icon: c === "All" ? undefined : <CurrencyFlag code={c} />,
                   }))}
                   onChange={(v) => {
                     setCurrency(v);
@@ -921,9 +923,7 @@ function Status({ account: a }: { account: Account }) {
 
 function Flag({ currency }: { currency: Currency }) {
   return (
-    <span aria-hidden className="text-[16px] leading-none">
-      {FLAGS[currency]}
-    </span>
+    <CurrencyFlag code={currency} />
   );
 }
 
@@ -1827,7 +1827,7 @@ function CurrencyEditor({
           locked && !on ? "cursor-default opacity-40" : "hover:bg-white/[0.06]"
         }`}
       >
-        <span className="text-[15px] leading-none">{FLAGS[c]}</span>
+        <CurrencyFlag code={c} />
         <span className="w-9 font-medium text-white">{c}</span>
         <span className="min-w-0 flex-1 truncate text-neutral-500">
           {NAMES[c]}

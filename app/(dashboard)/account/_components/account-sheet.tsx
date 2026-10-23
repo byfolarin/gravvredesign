@@ -1,12 +1,13 @@
 "use client";
 
+import { CurrencyFlag } from "@/app/_components/currency-flag";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Check, Download, FileText, X } from "lucide-react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { Dropdown } from "@/app/_components/dropdown";
 import { AS_OF, PROVISION_STEPS, accountMeta, type Account } from "../_data";
-import { FLAGS, NAMES, SYMBOL } from "./currency";
+import { NAMES, SYMBOL } from "./currency";
 
 const dateFmt = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -224,9 +225,7 @@ export function AccountSheet({
         <div className="border-b border-white/8 px-6 pt-5 pb-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
-              <span aria-hidden className="text-[26px] leading-none">
-                {FLAGS[a.currency]}
-              </span>
+              <CurrencyFlag code={a.currency} size={28} />
               <div className="min-w-0">
                 <div className="truncate text-[15px] text-white">{a.label}</div>
                 <div className="truncate text-[12px] text-neutral-500">

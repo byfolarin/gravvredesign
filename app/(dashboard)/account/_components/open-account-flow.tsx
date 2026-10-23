@@ -1,5 +1,6 @@
 "use client";
 
+import { CurrencyFlag } from "@/app/_components/currency-flag";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, ChevronRight, Search, X } from "lucide-react";
 import {
@@ -16,7 +17,7 @@ import {
   type Currency,
 } from "../_data";
 import { ChainMark } from "./chain-mark";
-import { FLAGS, NAMES } from "./currency";
+import { NAMES } from "./currency";
 import {
   ACCOUNT_TYPES,
   BUSINESS,
@@ -438,9 +439,7 @@ export function OpenAccountFlow({
                       value: c,
                       label: `${c} · ${NAMES[c]}`,
                       icon: (
-                        <span className="text-[15px] leading-none">
-                          {FLAGS[c]}
-                        </span>
+                        <CurrencyFlag code={c} />
                       ),
                     }))}
                     onChange={(v) => pickCurrency(v as Currency)}
@@ -630,7 +629,12 @@ export function OpenAccountFlow({
                   />
                   <ReviewRow
                     label="Currency"
-                    value={`${FLAGS[currency]}  ${NAMES[currency]} (${currency})`}
+                    value={
+                      <span className="flex items-center gap-2">
+                        <CurrencyFlag code={currency} />
+                        {NAMES[currency]} ({currency})
+                      </span>
+                    }
                     onEdit={() => setStep("account")}
                   />
                   <ReviewRow
@@ -720,9 +724,9 @@ export function OpenAccountFlow({
               {currency ? (
                 <span
                   key={currency}
-                  className="orbit-pop flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-[26px] leading-none"
+                  className="orbit-pop flex size-8 shrink-0 items-center justify-center"
                 >
-                  {FLAGS[currency]}
+                  <CurrencyFlag code={currency} size={32} />
                 </span>
               ) : (
                 <PixelCoin />
