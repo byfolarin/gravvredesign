@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { CopyButton } from "@/app/_components/copy-button";
+import { Dropdown } from "@/app/_components/dropdown";
 import { AS_OF, PROVISION_STEPS, accountMeta, type Account } from "../_data";
 import { FLAGS, NAMES, SYMBOL } from "./currency";
 
@@ -444,55 +445,34 @@ export function AccountSheet({
           )}
 
           {!pending && (
-            <Group title="Where incoming money goes">
-              <div role="radiogroup" className="grid grid-cols-2 gap-2 pt-1">
-                {(
-                  [
-                    [
-                      "Settle",
-                      "Settle to wallet",
-                      "Converted to USDC and sent on",
-                    ],
-                    ["Hold", "Hold here", `Stays in ${a.currency}`],
-                  ] as const
-                ).map(([v, t, line]) => {
-                  const on = inflow === v;
-                  return (
-                    <button
-                      key={v}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      onClick={() => pickInflow(v)}
-                      className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                        on
-                          ? "border-white/30 bg-white/[0.04]"
-                          : "border-white/8 hover:border-white/20"
-                      }`}
-                    >
-                      <span
-                        className={`block text-[13px] ${on ? "text-white" : "text-neutral-300"}`}
-                      >
-                        {t}
-                      </span>
-                      <span className="block text-[11.5px] text-neutral-500">
-                        {line}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="mt-2 min-h-4 text-[12px] text-neutral-500">
-                {saved ? (
-                  <span className="text-[var(--ok-fg)]">
-                    Saved — applies to the next deposit.
+            <Group title="Settings">
+              <div className="flex items-center justify-between gap-4 py-2">
+                <span className="min-w-0">
+                  <span className="block text-[13px] text-neutral-100">
+                    Incoming money
                   </span>
-                ) : inflow === "Settle" ? (
-                  "Each deposit moves to the linked wallet as it lands."
-                ) : (
-                  "Deposits build up here until you move them."
-                )}
-              </p>
+                  <span
+                    className={`block text-[11.5px] ${saved ? "text-[var(--ok-fg)]" : "text-neutral-500"}`}
+                  >
+                    {saved
+                      ? "Saved — applies to the next deposit"
+                      : inflow === "Settle"
+                        ? "Converted to USDC and sent to the linked wallet"
+                        : `Stays in this account, in ${a.currency}`}
+                  </span>
+                </span>
+                <Dropdown
+                  label="Incoming money"
+                  variant="compact"
+                  align="right"
+                  value={inflow}
+                  options={[
+                    { value: "Settle", label: "Settle to wallet" },
+                    { value: "Hold", label: "Hold here" },
+                  ]}
+                  onChange={pickInflow}
+                />
+              </div>
             </Group>
           )}
 
