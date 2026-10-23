@@ -315,3 +315,59 @@ export function merchantSpend(list: Card[]): MerchantSpend[] {
     })
     .sort((a, b) => b.amount - a.amount);
 }
+
+export type MonthSpend = {
+  /** e.g. "Jan" */
+  month: string;
+  year: number;
+  /** This month: only the days so far. */
+  partial: boolean;
+  values: Record<string, number>;
+};
+
+/**
+ * The last 12 months of card spend by merchant, ending with this month so far. Built back from
+ * September's same-day figures: each merchant has its own trend, ads run hotter over the
+ * holidays, and a couple of merchants only start partway through the year.
+ */
+export function merchantHistory(ms: MerchantSpend[]): MonthSpend[] {
+  const months = [
+    ["Nov", 2025],
+    ["Dec", 2025],
+    ["Jan", 2026],
+    ["Feb", 2026],
+    ["Mar", 2026],
+    ["Apr", 2026],
+    ["May", 2026],
+    ["Jun", 2026],
+    ["Jul", 2026],
+    ["Aug", 2026],
+    ["Sep", 2026],
+    ["Oct", 2026],
+  ] as const;
+  const series = ms.map((m) => {
+    let h = 17;
+    for (const ch of m.merchant) h = (h * 37 + ch.charCodeAt(0)) % 10007;
+    const trend = 0.95 + (h % 13) / 100; // monthly growth 0.95–1.07
+    const startsAt = h % 4 === 0 ? 3 + (h % 5) : 0; // some start partway through the year
+    const sep = (m.lastMonth * 30) / SPEND_DAY;
+    return months.map(([mon], i) => {
+      if (i === 11) return m.amount;
+      if (i < startsAt) return 0;
+      const back = 10 - i;
+      const wobble =
+        0.82 + ((((Math.sin((i + 1) * (h % 97)) * 10000) % 1) + 1) % 1) * 0.36;
+      const holiday =
+        m.kind === "Ads" && (mon === "Nov" || mon === "Dec") ? 1.35 : 1;
+      return (
+        Math.round((sep / Math.pow(trend, back)) * wobble * holiday * 100) / 100
+      );
+    });
+  });
+  return months.map(([month, year], i) => ({
+    month,
+    year,
+    partial: i === 11,
+    values: Object.fromEntries(ms.map((m, k) => [m.merchant, series[k][i]])),
+  }));
+}

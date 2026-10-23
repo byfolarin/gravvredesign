@@ -38,14 +38,13 @@ import {
   type CardStatus,
   type CardTxn,
   type FundingSource,
-  type MerchantSpend,
   merchantSpend,
 } from "../_data";
-import { toneClass, toneFor } from "@/app/_components/tone";
 import { Roll } from "@/app/_components/roll";
 import { TablePager, usePager } from "@/app/_components/table-pager";
 import { CardsOnboarding, type CardsRequest } from "./cards-onboarding";
 import { WaitingForFirstCard } from "./waiting-for-card";
+import { WhereItWent } from "./where-it-went";
 import {
   compactMoney,
   dateFmt,
@@ -338,22 +337,13 @@ export function CardsWorkspace({
         </div>
 
         {/* Spend this month, drawn; the other figures beside it filter the table */}
-        <div
-          key={revealKey}
-          className="mt-8 grid gap-y-8 border-t border-white/8 pt-7 lg:grid-cols-[minmax(0,1fr)_300px]"
-        >
+        <div key={revealKey} className="mt-8 border-t border-white/8 pt-7">
           <SpendPanel
             spent={spent}
             limit={spend.limit}
             daily={fresh ? null : daily}
-            merchants={merchants}
-            merchant={merchantFilter}
-            onMerchant={(m) => {
-              setMerchantFilter(m);
-              pager.setPage(1);
-            }}
           />
-          <div className="flex flex-col border-white/8 lg:border-l lg:pl-8">
+          <div className="mt-7 grid grid-cols-1 border-t border-white/8 pt-5 sm:grid-cols-3 sm:divide-x sm:divide-white/8">
             <SideFact
               label="Cards"
               value={<Roll value={String(cards.length)} />}
@@ -417,6 +407,17 @@ export function CardsWorkspace({
             />
           </div>
         </div>
+
+        {!fresh && (
+          <WhereItWent
+            merchants={merchants}
+            merchant={merchantFilter}
+            onMerchant={(m) => {
+              setMerchantFilter(m);
+              pager.setPage(1);
+            }}
+          />
+        )}
 
         {/* Tabs + tools, same as Payment links and Customers */}
         <div className="mt-12 flex flex-wrap items-center justify-between gap-4">
@@ -780,18 +781,11 @@ function SpendPanel({
   spent,
   limit,
   daily,
-  merchants,
-  merchant,
-  onMerchant,
 }: {
   spent: number;
   limit: number;
   daily: { thisMonth: number[]; lastMonth: number[] } | null;
-  merchants: MerchantSpend[];
-  merchant: string | null;
-  onMerchant: (m: string | null) => void;
 }) {
-  const [all, setAll] = useState(false);
   const today = daily?.thisMonth.length ?? SPEND_DAY;
   const lastSoFar = daily
     ? daily.lastMonth.slice(0, today).reduce((s, v) => s + v, 0)
@@ -802,11 +796,9 @@ function SpendPanel({
   const passes = pace > limit;
   const passDay = passes ? Math.ceil(limit / perDay) : null;
   const at = (v: number) => `${Math.min(100, (v / limit) * 100)}%`;
-  const top = merchants[0]?.amount || 1;
-  const shown = all ? merchants : merchants.slice(0, 5);
 
   return (
-    <section className="min-w-0 pt-1 lg:pr-8">
+    <section className="min-w-0 pt-1">
       <div className="text-[13px] text-neutral-500">Spent this month</div>
       <div className="amount mt-3 text-[34px] leading-none font-medium tracking-[-0.035em] text-white">
         <Money value={spent} roll />
@@ -825,20 +817,21 @@ function SpendPanel({
 
       {/* The month against the program limit */}
       <div className="mt-6">
-        <div className="relative h-2.5 rounded-full bg-white/[0.07]">
+        {/* One bar in three pieces with space between: spent (fill), the rest of this
+            month's pace (stroke), and what's left under the limit (plain). */}
+        <div className="flex h-2.5 gap-[3px]" aria-hidden>
           <span
-            className="hatch-pace absolute inset-y-0 left-0 rounded-full"
-            style={{ width: at(pace) }}
-          />
-          <span
-            className="absolute inset-y-0 left-0 rounded-full bg-[var(--flow-in)]"
+            className="h-full rounded-full bg-[var(--flow-in)]"
             style={{ width: at(spent) }}
           />
-          {passes && passDay && (
-            <span
-              className="absolute -inset-y-1 right-0 w-px bg-rose-300"
-              aria-hidden
-            />
+          <span
+            className={`h-full rounded-full border ${passes ? "hatch-over border-rose-300/70" : "hatch-pace border-[color-mix(in_srgb,var(--flow-in)_60%,transparent)]"}`}
+            style={{
+              width: `calc(${at(Math.min(pace, limit) - spent)} - 3px)`,
+            }}
+          />
+          {!passes && (
+            <span className="h-full flex-1 rounded-full bg-white/[0.07]" />
           )}
         </div>
         <div className="relative mt-2 h-9 text-[11.5px] tabular-nums">
@@ -888,103 +881,6 @@ function SpendPanel({
           )}
         </p>
       </div>
-
-      {/* Where it went */}
-      {merchants.length > 0 && (
-        <div className="mt-8">
-          <div className="flex items-baseline justify-between text-[13px]">
-            <span className="font-medium text-white">Where it went</span>
-            {merchant ? (
-              <button
-                type="button"
-                onClick={() => onMerchant(null)}
-                className="text-neutral-400 hover:text-white"
-              >
-                Show every card
-              </button>
-            ) : (
-              <span className="text-neutral-500">
-                {merchants.length} merchants · click one for its cards
-              </span>
-            )}
-          </div>
-          <ul className="mt-2">
-            {shown.map((m) => {
-              const on = merchant === m.merchant;
-              const change = m.lastMonth
-                ? (m.amount - m.lastMonth) / m.lastMonth
-                : 0;
-              return (
-                <li key={m.merchant}>
-                  <button
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => onMerchant(on ? null : m.merchant)}
-                    className={`grid w-full grid-cols-[minmax(0,180px)_minmax(0,1fr)_88px_44px_92px_76px] items-center gap-4 rounded-lg px-2 py-2 text-left transition-colors ${on ? "bg-white/[0.07]" : "hover:bg-white/[0.04]"} ${merchant && !on ? "opacity-45" : ""}`}
-                  >
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <span
-                        className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-medium ${toneClass(toneFor(m.merchant))}`}
-                      >
-                        {m.merchant[0]}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-[13.5px] font-medium text-white">
-                          {m.merchant}
-                        </span>
-                        <span className="block truncate text-[12px] text-neutral-500">
-                          {m.kind}
-                        </span>
-                      </span>
-                    </span>
-                    <span className="h-1.5 rounded-full bg-white/[0.05]">
-                      <span
-                        className="block h-full rounded-full bg-white/55"
-                        style={{ width: `${(m.amount / top) * 100}%` }}
-                      />
-                    </span>
-                    <span className="amount text-right text-[13px] text-neutral-100 tabular-nums">
-                      {wholeMoney(m.amount)}
-                    </span>
-                    <span className="text-right text-[12px] text-neutral-500 tabular-nums">
-                      {Math.round((m.amount / Math.max(1, spent)) * 100)}%
-                    </span>
-                    <span className="flex items-center justify-end gap-1.5 text-[12px] text-neutral-500">
-                      <span className="flex -space-x-1.5">
-                        {m.cards.slice(0, 3).map((c) => (
-                          <span
-                            key={c.id}
-                            className="rounded-full ring-2 ring-[var(--surface)]"
-                          >
-                            <Avatar name={c.holder} photo={c.photo} size={18} />
-                          </span>
-                        ))}
-                      </span>
-                      {m.cards.length}
-                    </span>
-                    <span
-                      className={`text-right text-[12px] tabular-nums ${Math.abs(change) < 0.03 ? "text-neutral-500" : change > 0 ? "text-neutral-200" : "text-neutral-500"}`}
-                    >
-                      {Math.abs(change) < 0.03
-                        ? "flat"
-                        : `${change > 0 ? "↑" : "↓"} ${Math.round(Math.abs(change) * 100)}% vs Sep`}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          {merchants.length > 5 && (
-            <button
-              type="button"
-              onClick={() => setAll((v) => !v)}
-              className="mt-1 px-2 text-[12.5px] text-neutral-400 hover:text-white"
-            >
-              {all ? "Show fewer" : `${merchants.length - 5} more merchants`}
-            </button>
-          )}
-        </div>
-      )}
     </section>
   );
 }
@@ -1012,9 +908,9 @@ function SideFact({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className="group border-b border-white/8 py-4 text-left first:pt-0 last:border-b-0 last:pb-0"
+      className="group py-1 text-left sm:px-7 sm:first:pl-0 sm:last:pr-0"
     >
-      <div className="flex items-center justify-between text-[13px]">
+      <div className="flex items-center justify-between text-[12.5px]">
         <span className={active ? "text-white" : "text-neutral-500"}>
           {label}
         </span>
@@ -1025,7 +921,7 @@ function SideFact({
         </span>
       </div>
       <div className="mt-1.5 flex items-center justify-between gap-3">
-        <span className="text-[24px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
+        <span className="text-[22px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
           {value}
         </span>
         {children && (
@@ -1034,7 +930,7 @@ function SideFact({
           </span>
         )}
       </div>
-      <div className="mt-2 truncate text-xs text-neutral-500 tabular-nums">
+      <div className="mt-1.5 truncate text-[12px] text-neutral-500 tabular-nums">
         {meta}
       </div>
     </button>

@@ -34,6 +34,13 @@
   /* Success chip: readable text on a soft tint, tuned per theme. */
   --ok-fg: #5cf2c2;
   --ok-bg: rgb(0 255 180 / 0.14);
+  /* Categorical series (merchants on Cards), validated for colour-blind separation; fixed order. */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #9085e9;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-other: #4a4a48;
   color-scheme: dark;
 }
 
@@ -132,6 +139,12 @@ body {
   /* A real green, not a wash: reads on paper white, text passes AA on it. */
   --ok-fg: #04603a;
   --ok-bg: #d6f0e1;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #4a3aa7;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-other: #cfcdc7;
 
   --color-white: #0a0a0a;
   --color-black: #fbfaf7;
@@ -749,6 +762,14 @@ sub {
   background-image: repeating-linear-gradient(
     135deg,
     color-mix(in srgb, var(--flow-in) 55%, transparent) 0 1.5px,
+    transparent 1.5px 5px
+  );
+}
+/* Cards: the pace runs past the program limit. */
+.hatch-over {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgb(253 164 175 / 0.55) 0 1.5px,
     transparent 1.5px 5px
   );
 }
