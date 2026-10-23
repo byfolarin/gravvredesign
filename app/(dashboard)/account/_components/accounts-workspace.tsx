@@ -205,6 +205,8 @@ export function AccountsWorkspace() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // The row whose label is being edited in place.
+  const [renaming, setRenaming] = useState<string | null>(null);
   const update = (id: string, patch: Partial<Account>) =>
     setList((all) => all.map((a) => (a.id === id ? { ...a, ...patch } : a)));
 
@@ -671,9 +673,23 @@ export function AccountsWorkspace() {
                           </span>
                         </td>
                         <td className="py-3 pr-4">
-                          <div className="truncate text-[13.5px] font-medium text-white">
-                            {a.label}
-                          </div>
+                          {renaming === a.id ? (
+                            <RenameField
+                              value={a.label}
+                              onSave={(label) => {
+                                setRenaming(null);
+                                if (label && label !== a.label) {
+                                  update(a.id, { label });
+                                  setToast(`Renamed to “${label}”`);
+                                }
+                              }}
+                              onCancel={() => setRenaming(null)}
+                            />
+                          ) : (
+                            <div className="truncate text-[13.5px] font-medium text-white">
+                              {a.label}
+                            </div>
+                          )}
                           {/* Who holds it, and whether it's yours or a customer's */}
                           <div className="truncate text-[11px] text-neutral-500">
                             {a.customer.name} ·{" "}
@@ -736,7 +752,7 @@ export function AccountsWorkspace() {
                             onTransfer={() =>
                               setToast("Transfers between accounts are next")
                             }
-                            onRename={() => setToast("Rename is next")}
+                            onRename={() => setRenaming(a.id)}
                             onFreeze={() => {
                               update(a.id, {
                                 status:
@@ -2063,4 +2079,35 @@ function exportCsv(rows: Account[]) {
   el.download = "accounts.csv";
   el.click();
   URL.revokeObjectURL(href);
+}
+
+/** The label, editable in the row: Enter or leaving saves, Esc puts it back. */
+function RenameField({
+  value,
+  onSave,
+  onCancel,
+}: {
+  value: string;
+  onSave: (v: string) => void;
+  onCancel: () => void;
+}) {
+  const [v, setV] = useState(value);
+  return (
+    <input
+      autoFocus
+      value={v}
+      maxLength={60}
+      aria-label="Account name"
+      onChange={(e) => setV(e.target.value)}
+      onFocus={(e) => e.currentTarget.select()}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") onSave(v.trim());
+        if (e.key === "Escape") onCancel();
+      }}
+      onBlur={() => onSave(v.trim())}
+      className="-my-1 h-7 w-full rounded-md border border-white/25 bg-transparent px-2 text-[13.5px] font-medium text-white outline-none focus:border-white/45"
+    />
+  );
 }
