@@ -12,14 +12,13 @@ import { compactMoney } from "../_lib/format";
 
 const OPEN_KEY = "gravv-cards-where-open";
 const OTHER = "Other";
-/** Fixed categorical order (validated for colour-blind separation); "Other" stays grey. */
-const SERIES = [
-  "var(--series-1)",
-  "var(--series-2)",
-  "var(--series-3)",
-  "var(--series-4)",
-  "var(--series-5)",
-];
+/**
+ * One ink, stepped by rank: the biggest merchant darkest, fading down the list, "Other"
+ * faintest. Spend is money out, and money out reads ink; the 2px gaps keep merchants apart.
+ */
+const INK = [88, 66, 50, 38, 28];
+const ink = (pct: number) =>
+  `color-mix(in srgb, var(--color-white) ${pct}%, transparent)`;
 const H = 200;
 
 const whole = (v: number) =>
@@ -73,9 +72,13 @@ export function WhereItWent({
   const top = merchants.slice(0, 5);
   const rest = merchants.slice(5);
   const color = (k: string) =>
-    k === OTHER
-      ? "var(--series-other)"
-      : SERIES[top.findIndex((m) => m.merchant === k)];
+    k === merchant
+      ? ink(88)
+      : k === OTHER
+        ? ink(16)
+        : ink(INK[top.findIndex((m) => m.merchant === k)]);
+  // Pointing at a merchant in the legend picks it out in every month.
+  const [peek, setPeek] = useState<string | null>(null);
   const history = useMemo(() => merchantHistory(merchants), [merchants]);
   const months = history.slice(12 - range).map((h) => {
     const segs = [
@@ -179,6 +182,8 @@ export function WhereItWent({
                   key={k}
                   type="button"
                   aria-pressed={on}
+                  onMouseEnter={() => setPeek(k)}
+                  onMouseLeave={() => setPeek(null)}
                   disabled={!pickable}
                   title={
                     pickable
@@ -261,7 +266,7 @@ export function WhereItWent({
                           {shown.map((s, k) => (
                             <span
                               key={s.key}
-                              className={`block transition-[height] duration-500 ${k === shown.length - 1 && !ahead ? "rounded-t-[3px]" : ""}`}
+                              className={`block transition-[height,opacity] duration-500 ${k === shown.length - 1 && !ahead ? "rounded-t-[3px]" : ""} ${peek && !isolated && peek !== s.key ? "opacity-25" : ""}`}
                               style={{
                                 height: Math.max(1, px(s.v) - 2),
                                 background: color(s.key),
