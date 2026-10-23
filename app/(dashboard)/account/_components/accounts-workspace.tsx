@@ -41,6 +41,7 @@ import {
 import { NAMES, SYMBOL } from "./currency";
 import { OpenAccountFlow } from "./open-account-flow";
 import { AccountSheet } from "./account-sheet";
+import { TransferFlow } from "./transfer-flow";
 import {
   FreezeDialog,
   FreezeNotice,
@@ -216,6 +217,8 @@ export function AccountsWorkspace() {
 
   // The account being closed (confirm step), if any.
   const [closing, setClosing] = useState<string | null>(null);
+  // Move money: open with the account it starts from (or the default).
+  const [transfer, setTransfer] = useState<{ from?: string } | null>(null);
   // Freezing (or editing a freeze) and unfreezing, each a confirm step.
   const [freezing, setFreezing] = useState<string | null>(null);
   const [unfreezing, setUnfreezing] = useState<string | null>(null);
@@ -337,7 +340,7 @@ export function AccountsWorkspace() {
             />
             <button
               type="button"
-              onClick={() => setToast("Transfers between accounts are next")}
+              onClick={() => setTransfer({})}
               className="flex h-9 items-center gap-1.5 rounded-full border border-white/12 px-3.5 text-[13px] text-neutral-200 transition-colors hover:border-white/30"
             >
               <ArrowLeftRight size={14} strokeWidth={1.75} />
@@ -764,9 +767,7 @@ export function AccountsWorkspace() {
                                 .catch(() => {});
                               setToast("Account details copied");
                             }}
-                            onTransfer={() =>
-                              setToast("Transfers between accounts are next")
-                            }
+                            onTransfer={() => setTransfer({ from: a.id })}
                             onRename={() => setRenaming(a.id)}
                             onFreeze={() =>
                               a.status === "Frozen"
@@ -857,6 +858,29 @@ export function AccountsWorkspace() {
             setOpening(null);
             setToast(
               `${a.currency} account requested — ${a.bank} is setting it up`,
+            );
+          }}
+        />
+      )}
+
+      {transfer && (
+        <TransferFlow
+          accounts={list}
+          initialFrom={
+            transfer.from ? list.find((x) => x.id === transfer.from) : undefined
+          }
+          onClose={() => setTransfer(null)}
+          onDone={(r) => {
+            // Waiting on approval or a date: nothing moves yet.
+            if (r.approval || r.when !== "now") return;
+            setList((all) =>
+              all.map((x) =>
+                x.id === r.from.id
+                  ? { ...x, balance: x.balance - r.amount }
+                  : x.id === r.to.id
+                    ? { ...x, balance: x.balance + r.gets }
+                    : x,
+              ),
             );
           }}
         />

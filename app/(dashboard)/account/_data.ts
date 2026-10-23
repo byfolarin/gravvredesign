@@ -29,7 +29,7 @@ export const ALL_CURRENCIES: Currency[] = [
   "AED",
 ];
 /** Rough units per USD, so seeded balances look right in each currency. */
-const FX: Record<Currency, number> = {
+export const FX: Record<Currency, number> = {
   USD: 1,
   EUR: 1,
   GBP: 1,
