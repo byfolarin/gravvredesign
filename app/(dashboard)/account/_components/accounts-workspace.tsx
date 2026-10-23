@@ -1066,7 +1066,7 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
   const steps = [
     {
       title: "Open an account",
-      line: "Pick a currency and a bank. It's ready in minutes to two days.",
+      line: "Pick a currency and a bank. Ready in minutes to two days.",
     },
     {
       title: "Share the details",
@@ -1079,55 +1079,67 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
   ];
   return (
     <>
-      {/* The way in: three steps (the header's Open an account is the one button) */}
-      <section className="mt-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h2 className="text-[19px] font-medium tracking-[-0.015em] text-white">
-              Get your first account open
-            </h2>
-            <p className="mt-1 text-[13px] text-neutral-500">
-              Each customer gets a bank account in their own name and currency.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1 text-[12px] text-neutral-500">
-              or with the API:{" "}
-              <span className="font-mono text-neutral-300">
-                POST /v1/accounts
-              </span>
-              <CopyButton value="POST /v1/accounts" label="Copy endpoint" />
-            </span>
-          </div>
-        </div>
-        <ol className="mt-7 grid gap-6 sm:grid-cols-3">
-          {steps.map((st, i) => (
-            <li key={st.title} className="flex gap-3">
-              <span
-                className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11.5px] font-medium tabular-nums ${
-                  i === 0
-                    ? "bg-white text-black"
-                    : "text-neutral-500 ring-1 ring-white/15"
-                }`}
-              >
-                {i + 1}
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[13.5px] text-white">
+      {/* The way in. Reading order: headline → the one thing to do now → what follows */}
+      <section className="mt-12 max-w-[880px]">
+        <h2 className="text-[26px] leading-tight font-medium tracking-[-0.025em] text-white">
+          Get your first account open
+        </h2>
+        <p className="mt-2 max-w-[520px] text-[14px] leading-relaxed text-neutral-500">
+          Each customer gets a bank account in their own name and currency.
+          Money that lands in it shows here, with its balance and trend.
+        </p>
+
+        {/* A path, not a list: one line runs through the steps; only step 1 is lit */}
+        <ol className="relative mt-10 grid gap-8 sm:grid-cols-3 sm:gap-6">
+          <span
+            aria-hidden
+            className="absolute top-3 right-[calc(33%-1rem)] left-3 hidden h-px bg-white/10 sm:block"
+          />
+          {steps.map((st, i) => {
+            const now = i === 0;
+            return (
+              <li key={st.title} className="relative">
+                <span
+                  className={`relative flex size-6 items-center justify-center rounded-full text-[11.5px] font-medium tabular-nums ${
+                    now
+                      ? "bg-white text-black"
+                      : "bg-surface text-neutral-500 ring-1 ring-white/15"
+                  }`}
+                >
+                  {i + 1}
+                </span>
+                <div
+                  className={`mt-4 text-[15px] font-medium tracking-[-0.01em] ${now ? "text-white" : "text-neutral-400"}`}
+                >
                   {st.title}
-                </span>
-                <span className="mt-0.5 block text-[12.5px] leading-relaxed text-neutral-500">
+                </div>
+                <p
+                  className={`mt-1 max-w-[240px] text-[13px] leading-relaxed ${now ? "text-neutral-400" : "text-neutral-500"}`}
+                >
                   {st.line}
-                </span>
-              </span>
-            </li>
-          ))}
+                </p>
+              </li>
+            );
+          })}
         </ol>
+
+        <p className="mt-8 flex items-center gap-1 text-[12px] text-neutral-500">
+          Opening accounts from your own product? Use{" "}
+          <span className="font-mono text-neutral-300">POST /v1/accounts</span>
+          <CopyButton value="POST /v1/accounts" label="Copy endpoint" />
+        </p>
       </section>
 
       {/* What you can open, in the page's table style: a row starts the flow */}
-      <section className="mt-12">
-        <h3 className="text-[13px] text-neutral-500">What you can open</h3>
+      <section className="mt-14 border-t border-white/8 pt-8">
+        <div className="flex items-baseline gap-2">
+          <h3 className="text-[15px] font-medium tracking-[-0.01em] text-white">
+            What you can open
+          </h3>
+          <span className="text-[13px] text-neutral-500 tabular-nums">
+            {OFFER.length} currencies today
+          </span>
+        </div>
         <table className="mt-3 w-full table-fixed text-[13px]">
           <colgroup>
             <col className="w-[120px]" />
