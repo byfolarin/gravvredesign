@@ -1079,55 +1079,56 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
   ];
   return (
     <>
-      {/* The way in. Reading order: headline → the one thing to do now → what follows */}
-      <section className="mt-12">
-        <h2 className="text-[26px] leading-tight font-medium tracking-[-0.025em] text-white">
-          Get your first account open
-        </h2>
-        <p className="mt-2 max-w-[520px] text-[14px] leading-relaxed text-neutral-500">
-          Each customer gets a bank account in their own name and currency.
-          Money that lands in it shows here, with its balance and trend.
-        </p>
+      {/* The way in: what this is on the left, the three steps stacked on the right */}
+      <section className="mt-12 grid gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+        <div>
+          <h2 className="text-[26px] leading-tight font-medium tracking-[-0.025em] text-white">
+            Get your first account open
+          </h2>
+          <p className="mt-2.5 max-w-[440px] text-[14px] leading-relaxed text-neutral-500">
+            Each customer gets a bank account in their own name and currency.
+            Money that lands in it shows here, with its balance and trend.
+          </p>
+          <p className="mt-8 flex flex-wrap items-center gap-1 text-[12px] text-neutral-500">
+            Opening accounts from your own product? Use{" "}
+            <span className="font-mono text-neutral-300">
+              POST /v1/accounts
+            </span>
+            <CopyButton value="POST /v1/accounts" label="Copy endpoint" />
+          </p>
+        </div>
 
-        {/* A path, not a list: one line runs through the steps; only step 1 is lit */}
-        <ol className="relative mt-10 grid gap-8 sm:grid-cols-3 sm:gap-6">
-          <span
-            aria-hidden
-            className="absolute top-3 right-[calc(33.333%-0.75rem)] left-3 hidden h-px bg-white/10 sm:block"
-          />
+        {/* Steps as rows; only the one to do now is lit */}
+        <ol className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
           {steps.map((st, i) => {
             const now = i === 0;
             return (
-              <li key={st.title} className="relative">
+              <li key={st.title} className="flex gap-4 py-4">
                 <span
-                  className={`relative flex size-6 items-center justify-center rounded-full text-[11.5px] font-medium tabular-nums ${
+                  className={`mt-px flex size-6 shrink-0 items-center justify-center rounded-full text-[11.5px] font-medium tabular-nums ${
                     now
                       ? "bg-white text-black"
-                      : "bg-surface text-neutral-500 ring-1 ring-white/15"
+                      : "text-neutral-500 ring-1 ring-white/15"
                   }`}
                 >
                   {i + 1}
                 </span>
-                <div
-                  className={`mt-4 text-[15px] font-medium tracking-[-0.01em] ${now ? "text-white" : "text-neutral-400"}`}
-                >
-                  {st.title}
-                </div>
-                <p
-                  className={`mt-1 max-w-[340px] text-[13px] leading-relaxed ${now ? "text-neutral-400" : "text-neutral-500"}`}
-                >
-                  {st.line}
-                </p>
+                <span className="min-w-0">
+                  <span
+                    className={`block text-[14.5px] font-medium tracking-[-0.01em] ${now ? "text-white" : "text-neutral-400"}`}
+                  >
+                    {st.title}
+                  </span>
+                  <span
+                    className={`mt-0.5 block text-[13px] leading-relaxed ${now ? "text-neutral-400" : "text-neutral-500"}`}
+                  >
+                    {st.line}
+                  </span>
+                </span>
               </li>
             );
           })}
         </ol>
-
-        <p className="mt-8 flex items-center gap-1 text-[12px] text-neutral-500">
-          Opening accounts from your own product? Use{" "}
-          <span className="font-mono text-neutral-300">POST /v1/accounts</span>
-          <CopyButton value="POST /v1/accounts" label="Copy endpoint" />
-        </p>
       </section>
 
       {/* What you can open, in the page's table style: a row starts the flow */}
