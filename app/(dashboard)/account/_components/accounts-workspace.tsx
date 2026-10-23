@@ -1099,7 +1099,7 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
         </div>
 
         {/* Steps as rows; only the one to do now is lit */}
-        <ol className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
+        <ol className="divide-y divide-white/[0.07] border-b border-white/[0.07]">
           {steps.map((st, i) => {
             const now = i === 0;
             return (
