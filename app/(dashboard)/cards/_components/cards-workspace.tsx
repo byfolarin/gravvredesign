@@ -38,7 +38,10 @@ import {
   type CardStatus,
   type CardTxn,
   type FundingSource,
+  type MerchantSpend,
+  merchantSpend,
 } from "../_data";
+import { toneClass, toneFor } from "@/app/_components/tone";
 import { Roll } from "@/app/_components/roll";
 import { TablePager, usePager } from "@/app/_components/table-pager";
 import { CardsOnboarding, type CardsRequest } from "./cards-onboarding";
@@ -131,6 +134,8 @@ export function CardsWorkspace({
   const [toast, setToast] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<"All" | Card["type"]>("All");
   const [onlyNearLimit, setOnlyNearLimit] = useState(false);
+  // "Where it went": the merchant whose cards the table shows.
+  const [merchantFilter, setMerchantFilter] = useState<string | null>(null);
   const [assetFilter, setAssetFilter] = useState<"All" | "USDC">("All");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -254,7 +259,16 @@ export function CardsWorkspace({
   const frozenCount = cards.filter((c) => c.status === "Frozen").length;
   const inactiveCount = cards.filter((c) => c.status === "Inactive").length;
   const usdcCount = cards.filter((c) => c.funding.asset === "USDC").length;
+  const merchants = merchantSpend(cards);
+  const payers = merchantFilter
+    ? new Set(
+        merchants
+          .find((m) => m.merchant === merchantFilter)
+          ?.cards.map((c) => c.id) ?? [],
+      )
+    : null;
   const anyFilter =
+    merchantFilter !== null ||
     filter !== "All" ||
     onlyNearLimit ||
     assetFilter !== "All" ||
@@ -265,6 +279,7 @@ export function CardsWorkspace({
     .filter((c) => typeFilter === "All" || c.type === typeFilter)
     .filter((c) => !onlyNearLimit || nearLimit(c))
     .filter((c) => assetFilter === "All" || c.funding.asset === assetFilter)
+    .filter((c) => !payers || payers.has(c.id))
     .sort((a, b) =>
       sortDir === "desc"
         ? b.spentThisMonth - a.spentThisMonth
@@ -331,6 +346,12 @@ export function CardsWorkspace({
             spent={spent}
             limit={spend.limit}
             daily={fresh ? null : daily}
+            merchants={merchants}
+            merchant={merchantFilter}
+            onMerchant={(m) => {
+              setMerchantFilter(m);
+              pager.setPage(1);
+            }}
           />
           <div className="flex flex-col border-white/8 lg:border-l lg:pl-8">
             <SideFact
@@ -342,6 +363,7 @@ export function CardsWorkspace({
               onClick={() => {
                 setFilter("All");
                 setOnlyNearLimit(false);
+                setMerchantFilter(null);
                 setAssetFilter("All");
                 setTypeFilter("All");
                 setQuery("");
@@ -748,231 +770,220 @@ export function CardsWorkspace({
   );
 }
 
-/** Smooth path that never overshoots the data (monotone cubic), same as the Account balance chart. */
-function smooth(pts: [number, number][]) {
-  if (pts.length < 2) return "";
-  const n = pts.length;
-  const d = pts
-    .slice(0, -1)
-    .map(([x, y], k) => (pts[k + 1][1] - y) / (pts[k + 1][0] - x));
-  const m = pts.map((_, k) =>
-    k === 0
-      ? d[0]
-      : k === n - 1
-        ? d[n - 2]
-        : d[k - 1] * d[k] <= 0
-          ? 0
-          : (d[k - 1] + d[k]) / 2,
-  );
-  let path = `M${pts[0][0]},${pts[0][1]}`;
-  for (let k = 0; k < n - 1; k++) {
-    const h = (pts[k + 1][0] - pts[k][0]) / 3;
-    path += `C${pts[k][0] + h},${pts[k][1] + m[k] * h} ${pts[k + 1][0] - h},${pts[k + 1][1] - m[k + 1] * h} ${pts[k + 1][0]},${pts[k + 1][1]}`;
-  }
-  return path;
-}
-
 /**
- * Spend this month, drawn the way Account draws balance: the running total in mint, the same
- * days last month dashed behind it, and daily spend as a strip of bars. Hovering moves the
- * headline to that day.
+ * Spend this month, said as pace rather than plotted: one track against the program limit —
+ * what's spent (solid), where this pace ends the month (hatched), the limit at the end — and
+ * then where the money went, merchant by merchant. Clicking a merchant shows the cards that
+ * pay it.
  */
 function SpendPanel({
   spent,
   limit,
   daily,
+  merchants,
+  merchant,
+  onMerchant,
 }: {
   spent: number;
   limit: number;
   daily: { thisMonth: number[]; lastMonth: number[] } | null;
+  merchants: MerchantSpend[];
+  merchant: string | null;
+  onMerchant: (m: string | null) => void;
 }) {
-  const [hover, setHover] = useState<number | null>(null);
+  const [all, setAll] = useState(false);
   const today = daily?.thisMonth.length ?? SPEND_DAY;
-  const run = (xs: number[]) =>
-    xs.reduce<number[]>((a, v) => [...a, (a[a.length - 1] ?? 0) + v], []);
-  const current = daily ? run(daily.thisMonth) : [];
-  const previous = daily ? run(daily.lastMonth).slice(0, today) : [];
-  const n = current.length;
-  const i = hover ?? n - 1;
-  // Resting on today, the headline is the exact total; hovering reads the running total that day.
-  const shown = hover === null || !n ? spent : current[i];
-  const vsPrev = previous[n - 1]
-    ? (spent - previous[n - 1]) / previous[n - 1]
+  const lastSoFar = daily
+    ? daily.lastMonth.slice(0, today).reduce((s, v) => s + v, 0)
     : 0;
-  const pace = today ? (spent / today) * MONTH_DAYS : 0;
-
-  const W = 1000;
-  const H = 150;
-  const hi = Math.max(...current, ...previous, 1);
-  const top = hi * 1.12;
-  const X = (k: number) => (n < 2 ? 0 : (k / (n - 1)) * W);
-  const Y = (v: number) => ((top - v) / top) * H;
-  const cur = smooth(current.map((v, k) => [X(k), Y(v)]));
-  const prev = smooth(previous.map((v, k) => [X(k), Y(v)]));
-  const area = `${cur}L${W},${H}L0,${H}Z`;
-  const maxDay = Math.max(...(daily?.thisMonth ?? [1]), 1);
-  const pct = (k: number) => `${(X(k) / W) * 100}%`;
+  const vsPrev = lastSoFar ? (spent - lastSoFar) / lastSoFar : 0;
+  const perDay = today ? spent / today : 0;
+  const pace = perDay * MONTH_DAYS;
+  const passes = pace > limit;
+  const passDay = passes ? Math.ceil(limit / perDay) : null;
+  const at = (v: number) => `${Math.min(100, (v / limit) * 100)}%`;
+  const top = merchants[0]?.amount || 1;
+  const shown = all ? merchants : merchants.slice(0, 5);
 
   return (
     <section className="min-w-0 pt-1 lg:pr-8">
       <div className="text-[13px] text-neutral-500">Spent this month</div>
       <div className="amount mt-3 text-[34px] leading-none font-medium tracking-[-0.035em] text-white">
-        <Money value={shown} roll={hover === null} />
+        <Money value={spent} roll />
       </div>
-      <div className="mt-2.5 flex h-5 items-center gap-2 text-[12px] text-neutral-500 tabular-nums">
-        {!daily ? (
-          <span>
-            {((spent / limit) * 100).toFixed(1)}% of {compactMoney(limit)}{" "}
-            program limit
-          </span>
-        ) : hover === null ? (
+      <p className="mt-2.5 text-[13px] text-neutral-400">
+        {daily && lastSoFar > 0 && (
           <>
-            <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 font-medium text-neutral-300">
-              {vsPrev >= 0 ? "+" : "−"}
-              {Math.abs(vsPrev * 100).toFixed(1)}%
-            </span>
-            <span>
-              vs Sep 1–{today} · {((spent / limit) * 100).toFixed(1)}% of{" "}
-              {compactMoney(limit)} program limit · on pace for{" "}
-              {compactMoney(pace)}
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="text-neutral-300">Oct {i + 1}</span>
-            <span>·</span>
-            <span className="text-neutral-300">
-              {money(daily.thisMonth[i])} that day
-            </span>
-            <span>
-              · Sep {i + 1} {money(previous[i])}
-            </span>
+            {Math.abs(vsPrev * 100).toFixed(1)}%{" "}
+            {vsPrev >= 0 ? "faster" : "slower"} than September ·{" "}
           </>
         )}
-      </div>
+        on pace for{" "}
+        <span className="amount text-neutral-200">{compactMoney(pace)}</span> by
+        Oct {MONTH_DAYS}
+      </p>
 
-      {daily && (
-        <>
-          {/* Plot */}
-          <div className="relative mt-6" onMouseLeave={() => setHover(null)}>
-            <div className="relative" style={{ height: H }}>
-              <svg
-                viewBox={`0 0 ${W} ${H}`}
-                preserveAspectRatio="none"
-                className="absolute inset-0 h-full w-full overflow-visible"
-                aria-hidden
-              >
-                <defs>
-                  <linearGradient
-                    id="card-spend-fill"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor="var(--flow-in)"
-                      stopOpacity="0.18"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="var(--flow-in)"
-                      stopOpacity="0"
-                    />
-                  </linearGradient>
-                </defs>
-                <path
-                  d={prev}
-                  fill="none"
-                  stroke="currentColor"
-                  className="text-neutral-500"
-                  strokeOpacity={0.6}
-                  strokeWidth={1.25}
-                  strokeDasharray="3 4"
-                  vectorEffect="non-scaling-stroke"
-                />
-                <path d={area} fill="url(#card-spend-fill)" />
-                <path
-                  d={cur}
-                  fill="none"
-                  stroke="var(--flow-in)"
-                  strokeWidth={2}
-                  vectorEffect="non-scaling-stroke"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              {hover !== null && (
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--flow-in)] ring-[3px] ring-[var(--surface)]"
-                  style={{ left: pct(i), top: `${(Y(shown) / H) * 100}%` }}
-                />
-              )}
-            </div>
-
-            {/* Daily spend, from a shared baseline */}
-            <div
-              className="relative mt-3 flex h-9 items-end gap-px"
+      {/* The month against the program limit */}
+      <div className="mt-6">
+        <div className="relative h-2.5 rounded-full bg-white/[0.07]">
+          <span
+            className="hatch-pace absolute inset-y-0 left-0 rounded-full"
+            style={{ width: at(pace) }}
+          />
+          <span
+            className="absolute inset-y-0 left-0 rounded-full bg-[var(--flow-in)]"
+            style={{ width: at(spent) }}
+          />
+          {passes && passDay && (
+            <span
+              className="absolute -inset-y-1 right-0 w-px bg-rose-300"
               aria-hidden
+            />
+          )}
+        </div>
+        <div className="relative mt-2 h-9 text-[11.5px] tabular-nums">
+          <span
+            className="absolute top-0 -translate-x-1/2 text-center whitespace-nowrap text-neutral-300"
+            style={{ left: at(spent) }}
+          >
+            Today
+            <span className="amount block text-neutral-500">
+              {compactMoney(spent)}
+            </span>
+          </span>
+          {!passes && pace - spent > limit * 0.08 && (
+            <span
+              className="absolute top-0 -translate-x-1/2 text-center whitespace-nowrap text-neutral-400"
+              style={{ left: at(pace) }}
             >
-              <span className="absolute inset-x-0 bottom-0 h-px bg-white/[0.08]" />
-              {daily.thisMonth.map((v, k) => (
-                <span
-                  key={k}
-                  className="relative flex h-full flex-1 flex-col justify-end"
-                >
-                  <span
-                    className={`mx-auto w-[60%] max-w-[6px] rounded-t-[1px] bg-[var(--flow-in)] transition-opacity ${
-                      hover !== null && hover !== k ? "opacity-35" : ""
-                    }`}
-                    style={{ height: Math.max(1.5, (v / maxDay) * 32) }}
-                  />
-                </span>
-              ))}
-            </div>
-
-            {/* Crosshair across both, and the hover targets */}
-            {hover !== null && (
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-y-0 w-px bg-white/20"
-                style={{ left: pct(i) }}
-              />
-            )}
-            <div className="absolute inset-0 flex">
-              {current.map((_, k) => (
-                <span
-                  key={k}
-                  className="h-full flex-1 cursor-crosshair"
-                  onMouseEnter={() => setHover(k)}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-3 flex items-center justify-between text-[11px] text-neutral-500 tabular-nums">
-            <span>Oct 1</span>
-            <span className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5">
-                <span className="h-[2px] w-3 rounded-full bg-[var(--flow-in)]" />
-                Spend
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 border-t border-dashed border-neutral-500" />
-                Same days in Sep
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="flex items-end gap-px">
-                  <span className="h-1.5 w-1 rounded-[1px] bg-[var(--flow-in)]" />
-                  <span className="h-2.5 w-1 rounded-[1px] bg-[var(--flow-in)]" />
-                </span>
-                Daily spend
+              Oct {MONTH_DAYS} at this pace
+              <span className="amount block text-neutral-500">
+                {compactMoney(pace)}
               </span>
             </span>
-            <span>Today</span>
+          )}
+          <span className="absolute top-0 right-0 text-right whitespace-nowrap text-neutral-400">
+            Program limit
+            <span className="amount block text-neutral-500">
+              {compactMoney(limit)}
+            </span>
+          </span>
+        </div>
+        <p
+          className={`mt-2 text-[13px] ${passes ? "text-rose-300" : "text-neutral-400"}`}
+        >
+          {passes ? (
+            <>
+              At this pace cards pass the {compactMoney(limit)} limit on Oct{" "}
+              {passDay} — anything after that declines. Raise the limit or slow
+              the biggest cards.
+            </>
+          ) : (
+            <>
+              <span className="amount text-neutral-200">
+                {compactMoney(limit - pace)}
+              </span>{" "}
+              of headroom left at this pace.
+            </>
+          )}
+        </p>
+      </div>
+
+      {/* Where it went */}
+      {merchants.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-baseline justify-between text-[13px]">
+            <span className="font-medium text-white">Where it went</span>
+            {merchant ? (
+              <button
+                type="button"
+                onClick={() => onMerchant(null)}
+                className="text-neutral-400 hover:text-white"
+              >
+                Show every card
+              </button>
+            ) : (
+              <span className="text-neutral-500">
+                {merchants.length} merchants · click one for its cards
+              </span>
+            )}
           </div>
-        </>
+          <ul className="mt-2">
+            {shown.map((m) => {
+              const on = merchant === m.merchant;
+              const change = m.lastMonth
+                ? (m.amount - m.lastMonth) / m.lastMonth
+                : 0;
+              return (
+                <li key={m.merchant}>
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => onMerchant(on ? null : m.merchant)}
+                    className={`grid w-full grid-cols-[minmax(0,180px)_minmax(0,1fr)_88px_44px_92px_76px] items-center gap-4 rounded-lg px-2 py-2 text-left transition-colors ${on ? "bg-white/[0.07]" : "hover:bg-white/[0.04]"} ${merchant && !on ? "opacity-45" : ""}`}
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <span
+                        className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-medium ${toneClass(toneFor(m.merchant))}`}
+                      >
+                        {m.merchant[0]}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13.5px] font-medium text-white">
+                          {m.merchant}
+                        </span>
+                        <span className="block truncate text-[12px] text-neutral-500">
+                          {m.kind}
+                        </span>
+                      </span>
+                    </span>
+                    <span className="h-1.5 rounded-full bg-white/[0.05]">
+                      <span
+                        className="block h-full rounded-full bg-white/55"
+                        style={{ width: `${(m.amount / top) * 100}%` }}
+                      />
+                    </span>
+                    <span className="amount text-right text-[13px] text-neutral-100 tabular-nums">
+                      {wholeMoney(m.amount)}
+                    </span>
+                    <span className="text-right text-[12px] text-neutral-500 tabular-nums">
+                      {Math.round((m.amount / Math.max(1, spent)) * 100)}%
+                    </span>
+                    <span className="flex items-center justify-end gap-1.5 text-[12px] text-neutral-500">
+                      <span className="flex -space-x-1.5">
+                        {m.cards.slice(0, 3).map((c) => (
+                          <span
+                            key={c.id}
+                            className="rounded-full ring-2 ring-[var(--surface)]"
+                          >
+                            <Avatar name={c.holder} photo={c.photo} size={18} />
+                          </span>
+                        ))}
+                      </span>
+                      {m.cards.length}
+                    </span>
+                    <span
+                      className={`text-right text-[12px] tabular-nums ${Math.abs(change) < 0.03 ? "text-neutral-500" : change > 0 ? "text-neutral-200" : "text-neutral-500"}`}
+                    >
+                      {Math.abs(change) < 0.03
+                        ? "flat"
+                        : `${change > 0 ? "↑" : "↓"} ${Math.round(Math.abs(change) * 100)}% vs Sep`}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {merchants.length > 5 && (
+            <button
+              type="button"
+              onClick={() => setAll((v) => !v)}
+              className="mt-1 px-2 text-[12.5px] text-neutral-400 hover:text-white"
+            >
+              {all ? "Show fewer" : `${merchants.length - 5} more merchants`}
+            </button>
+          )}
+        </div>
       )}
     </section>
   );

@@ -256,3 +256,62 @@ export const dailySpend = {
     (v) => Math.round((v / lastSum) * LAST_MONTH_TOTAL * 100) / 100,
   ),
 };
+
+/** What kind of spend each merchant is, in a word. */
+export const MERCHANT_KIND: Record<string, string> = {
+  Facebook: "Ads",
+  Instagram: "Ads",
+  Slack: "Software",
+  Behance: "Design tools",
+  Netflix: "Streaming",
+  "YouTube Music": "Streaming",
+  Tinder: "Subscription",
+  Coub: "Video",
+};
+
+export type MerchantSpend = {
+  merchant: string;
+  kind: string;
+  amount: number;
+  /** Same days last month. */
+  lastMonth: number;
+  cards: Card[];
+};
+
+/**
+ * This month's spend by merchant: each card's spend split across the merchants it actually
+ * paid (its settled and pending transactions), so the merchants add up to the headline.
+ */
+export function merchantSpend(list: Card[]): MerchantSpend[] {
+  const by = new Map<string, { amount: number; cards: Card[] }>();
+  for (const c of list) {
+    if (c.spentThisMonth <= 0) continue;
+    const paid = c.transactions.filter((t) => t.status !== "Failed");
+    const sum = paid.reduce((s, t) => s + t.amount, 0);
+    if (!sum) continue;
+    const share = new Map<string, number>();
+    for (const t of paid)
+      share.set(t.merchant, (share.get(t.merchant) ?? 0) + t.amount);
+    for (const [m, v] of share) {
+      const e = by.get(m) ?? { amount: 0, cards: [] };
+      e.amount += (v / sum) * c.spentThisMonth;
+      e.cards.push(c);
+      by.set(m, e);
+    }
+  }
+  return [...by.entries()]
+    .map(([merchant, e]) => {
+      let h = 7;
+      for (const ch of merchant) h = (h * 31 + ch.charCodeAt(0)) % 9973;
+      // Last month at the same point: a stable ±30% around this month.
+      const f = 0.72 + ((h % 100) / 100) * 0.6;
+      return {
+        merchant,
+        kind: MERCHANT_KIND[merchant] ?? "Other",
+        amount: Math.round(e.amount * 100) / 100,
+        lastMonth: Math.round((e.amount / f) * 100) / 100,
+        cards: e.cards,
+      };
+    })
+    .sort((a, b) => b.amount - a.amount);
+}

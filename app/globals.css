@@ -743,3 +743,12 @@ sub {
   bottom: 0;
   vertical-align: baseline;
 }
+
+/* Cards: where this month's pace ends — hatched mint ahead of the solid spend. */
+.hatch-pace {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--flow-in) 55%, transparent) 0 1.5px,
+    transparent 1.5px 5px
+  );
+}
