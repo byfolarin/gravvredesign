@@ -1028,44 +1028,31 @@ function Detail({
 const OFFER: {
   currency: Currency;
   bank: string;
-  /** How money reaches it, fastest first. */
-  rails: { name: string; speed: string }[];
-  /** What the holder gets to share. */
-  details: string;
+  rails: string;
   time: string;
 }[] = [
   {
     currency: "USD",
     bank: "Lead Bank",
-    rails: [
-      { name: "Wire", speed: "same day" },
-      { name: "ACH", speed: "1–3 days" },
-    ],
-    details: "Routing + account number",
+    rails: "ACH and wire, with a routing number",
     time: "Usually same day",
   },
   {
     currency: "EUR",
     bank: "Banking Circle",
-    rails: [
-      { name: "SEPA Instant", speed: "seconds" },
-      { name: "SEPA", speed: "next day" },
-    ],
-    details: "IBAN in their name",
+    rails: "SEPA, with an IBAN in their name",
     time: "1–2 business days",
   },
   {
     currency: "GBP",
     bank: "Clear Junction",
-    rails: [{ name: "Faster Payments", speed: "seconds" }],
-    details: "Sort code + account number",
+    rails: "Faster Payments, with a sort code",
     time: "1–2 business days",
   },
   {
     currency: "NGN",
     bank: "Access Bank",
-    rails: [{ name: "NIP", speed: "instant" }],
-    details: "NUBAN (10 digits)",
+    rails: "NIP transfers, with a NUBAN",
     time: "In minutes",
   },
 ];
@@ -1154,21 +1141,21 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
             {OFFER.length} currencies today
           </span>
         </div>
-        <table className="mt-4 w-full table-fixed text-[13px]">
+        <table className="mt-3 w-full table-fixed text-[13px]">
           <colgroup>
-            <col className="w-[190px]" />
-            <col className="w-[170px]" />
+            <col className="w-[120px]" />
             <col />
-            <col className="w-[200px]" />
-            <col className="w-[170px]" />
+            <col />
+            <col className="w-[180px]" />
+            <col className="w-10" />
           </colgroup>
           <thead>
             <tr className="text-left text-xs text-neutral-500">
               <th className="py-2.5 pl-3 font-normal">Currency</th>
               <th className="py-2.5 font-normal">Bank</th>
               <th className="py-2.5 font-normal">Receives by</th>
-              <th className="py-2.5 font-normal">They get</th>
-              <th className="py-2.5 pr-3 text-right font-normal">Ready in</th>
+              <th className="py-2.5 font-normal">Ready in</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -1176,81 +1163,31 @@ function EmptyAccounts({ onOpen }: { onOpen: (c?: Currency) => void }) {
               <tr
                 key={o.currency}
                 onClick={() => onOpen(o.currency)}
-                className="group cursor-pointer border-b border-white/6 transition-colors hover:bg-white/[0.025]"
+                className="group cursor-pointer border-b border-white/6 transition-colors hover:bg-white/[0.02]"
               >
                 <td className="py-3.5 pl-3">
-                  <span className="flex items-center gap-3">
-                    <span className="text-[22px] leading-none">
-                      {FLAGS[o.currency]}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-[13.5px] font-medium text-white">
-                        {o.currency}
-                      </span>
-                      <span className="block truncate text-[12px] text-neutral-500">
-                        {NAMES[o.currency]}
-                      </span>
-                    </span>
+                  <span className="flex items-center gap-2.5">
+                    <Flag currency={o.currency} />
+                    <span className="font-medium text-white">{o.currency}</span>
                   </span>
                 </td>
                 <td className="py-3.5 text-neutral-200">{o.bank}</td>
-                <td className="py-3.5">
-                  <span className="flex flex-wrap gap-x-4 gap-y-1">
-                    {o.rails.map((r) => (
-                      <span key={r.name} className="whitespace-nowrap">
-                        <span className="text-neutral-200">{r.name}</span>{" "}
-                        <span
-                          className={
-                            /second|instant/.test(r.speed)
-                              ? "text-[var(--ok-fg)]"
-                              : "text-neutral-500"
-                          }
-                        >
-                          {r.speed}
-                        </span>
-                      </span>
-                    ))}
-                  </span>
-                </td>
-                <td className="py-3.5 text-neutral-500">{o.details}</td>
+                <td className="py-3.5 text-neutral-500">{o.rails}</td>
+                <td className="py-3.5 text-neutral-500">{o.time}</td>
                 <td className="py-3.5 pr-3 text-right">
-                  {/* The time, or on hover, what clicking does */}
-                  <span className="text-neutral-500 group-hover:hidden">
-                    {o.time}
-                  </span>
-                  <span className="hidden items-center justify-end gap-1 font-medium text-white group-hover:flex">
-                    Open {o.currency} account
-                    <ChevronRight size={14} strokeWidth={2} />
-                  </span>
+                  <ChevronRight
+                    size={14}
+                    strokeWidth={1.75}
+                    className="ml-auto text-neutral-600 transition-colors group-hover:text-white"
+                  />
                 </td>
               </tr>
             ))}
-            <tr
-              onClick={() => onOpen()}
-              className="group cursor-pointer transition-colors hover:bg-white/[0.025]"
-            >
-              <td colSpan={4} className="py-3.5 pl-3">
-                <span className="flex items-center gap-3">
-                  <span className="flex -space-x-1.5 text-[18px] leading-none">
-                    {(["JPY", "CAD", "AUD"] as Currency[]).map((c) => (
-                      <span key={c}>{FLAGS[c]}</span>
-                    ))}
-                  </span>
-                  <span className="text-neutral-300">More currencies</span>
-                  <span className="text-neutral-500">
-                    JPY, CAD, AUD, CHF, KES, GHS, ZAR, AED
-                  </span>
-                </span>
-              </td>
-              <td className="py-3.5 pr-3 text-right">
-                <span className="inline-flex items-center gap-1 text-neutral-500 transition-colors group-hover:text-white">
-                  Choose a currency
-                  <ChevronRight size={14} strokeWidth={2} />
-                </span>
-              </td>
-            </tr>
           </tbody>
         </table>
+        <p className="mt-3 pl-3 text-[12px] text-neutral-500">
+          Plus JPY, CAD, AUD and more when you open one.
+        </p>
       </section>
     </>
   );
