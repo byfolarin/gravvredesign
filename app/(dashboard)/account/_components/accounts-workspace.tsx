@@ -13,6 +13,7 @@ import {
   Plus,
   Search,
   Snowflake,
+  X,
   XCircle,
 } from "lucide-react";
 import { CopyButton } from "@/app/_components/copy-button";
@@ -205,6 +206,8 @@ export function AccountsWorkspace() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // The account being closed (confirm step), if any.
+  const [closing, setClosing] = useState<string | null>(null);
   // The row whose label is being edited in place.
   const [renaming, setRenaming] = useState<string | null>(null);
   const update = (id: string, patch: Partial<Account>) =>
@@ -764,10 +767,7 @@ export function AccountsWorkspace() {
                                   : "Account frozen — no money in or out",
                               );
                             }}
-                            onClose={() => {
-                              update(a.id, { status: "Closed", balance: 0 });
-                              setToast("Account closed");
-                            }}
+                            onClose={() => setClosing(a.id)}
                           />
                         </td>
                       </tr>
@@ -840,6 +840,40 @@ export function AccountsWorkspace() {
           }}
         />
       )}
+
+      {closing &&
+        (() => {
+          const acct = list.find((x) => x.id === closing);
+          if (!acct) return null;
+          return (
+            <CloseDialog
+              account={acct}
+              destinations={list.filter(
+                (x) =>
+                  x.id !== acct.id &&
+                  x.status === "Active" &&
+                  x.currency === acct.currency &&
+                  x.customer.name === acct.customer.name,
+              )}
+              onCancel={() => setClosing(null)}
+              onConfirm={(to) => {
+                if (to && to.kind === "account")
+                  update(to.id, {
+                    balance:
+                      (list.find((x) => x.id === to.id)?.balance ?? 0) +
+                      acct.balance,
+                  });
+                update(acct.id, { status: "Closed", balance: 0 });
+                setClosing(null);
+                setToast(
+                  acct.balance > 0 && to
+                    ? `${acct.label} closed · ${SYMBOL[acct.currency]}${acct.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} moved to ${to.label}`
+                    : `${acct.label} closed`,
+                );
+              }}
+            />
+          );
+        })()}
 
       {toast && (
         <div
@@ -2109,5 +2143,163 @@ function RenameField({
       onBlur={() => onSave(v.trim())}
       className="-my-1 h-7 w-full rounded-md border border-white/25 bg-transparent px-2 text-[13.5px] font-medium text-white outline-none focus:border-white/45"
     />
+  );
+}
+
+const CLOSE_REASONS = [
+  "No longer needed",
+  "Customer offboarded",
+  "Duplicate account",
+  "Moving to another bank",
+  "Other",
+] as const;
+
+type CloseTo = { kind: "account" | "wallet"; id: string; label: string };
+
+/**
+ * Closing without surprises: say what's in it and where it goes, what stops working, and
+ * why — then one red button. An account with money in it can't close until the money has a home.
+ */
+function CloseDialog({
+  account: a,
+  destinations,
+  onCancel,
+  onConfirm,
+}: {
+  account: Account;
+  /** The holder's other active accounts in the same currency. */
+  destinations: Account[];
+  onCancel: () => void;
+  onConfirm: (to: CloseTo | null) => void;
+}) {
+  const options: CloseTo[] = [
+    ...destinations.map((d) => ({
+      kind: "account" as const,
+      id: d.id,
+      label: d.label,
+    })),
+    { kind: "wallet", id: "wallet", label: "Linked wallet (as USDC)" },
+  ];
+  const [to, setTo] = useState(options[0].id);
+  const [reason, setReason] = useState<(typeof CLOSE_REASONS)[number]>(
+    CLOSE_REASONS[0],
+  );
+  const has = a.balance > 0;
+  const fmt = (v: number) =>
+    `${SYMBOL[a.currency]}${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopImmediatePropagation();
+      onCancel();
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [onCancel]);
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div
+        aria-hidden
+        onClick={onCancel}
+        className="scrim-in absolute inset-0 bg-black/55"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="close-title"
+        className="orbit-pop absolute top-[14vh] left-1/2 w-[460px] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-2xl border border-white/10 bg-raised p-6 shadow-[0_24px_80px_-12px_rgb(0_0_0/0.6)]"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 id="close-title" className="text-[17px] font-medium text-white">
+              Close {a.label}?
+            </h2>
+            <p className="mt-1 text-[13px] text-neutral-400">
+              {a.customer.name} · {a.bank} ••{a.accountNumber.slice(-4)}
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Cancel"
+            onClick={onCancel}
+            className="flex size-8 shrink-0 items-center justify-center rounded-full text-neutral-500 hover:bg-white/8 hover:text-white"
+          >
+            <X size={15} strokeWidth={1.75} />
+          </button>
+        </div>
+
+        {/* What's in it, and where it goes */}
+        <div className="mt-6 flex items-baseline justify-between border-y border-white/8 py-3">
+          <span className="text-[13px] text-neutral-400">Balance</span>
+          <span className="amount text-[15px] font-medium text-white tabular-nums">
+            {fmt(a.balance)}
+          </span>
+        </div>
+        {has && (
+          <div className="mt-4">
+            <div className="text-[12px] text-neutral-400">
+              Move the balance to
+            </div>
+            <div className="mt-1.5">
+              <Dropdown
+                label="Move the balance to"
+                value={to}
+                options={options.map((o) => ({ value: o.id, label: o.label }))}
+                onChange={setTo}
+                className="[&>button]:h-10 [&>button]:w-full [&>button]:justify-between [&>button]:rounded-lg"
+              />
+            </div>
+            <p className="mt-1.5 text-[12px] text-neutral-500">
+              {to === "wallet"
+                ? "Converted to USDC and sent to the account's linked wallet."
+                : "Moved in full before the account closes."}
+            </p>
+          </div>
+        )}
+
+        {/* What stops */}
+        <ul className="mt-5 space-y-1.5 text-[12.5px] leading-relaxed text-neutral-400">
+          <li>
+            ••{a.accountNumber.slice(-4)} stops accepting money. Anything sent
+            to it later goes back to the sender.
+          </li>
+          <li>Statements and history stay available under Closed.</li>
+          <li>
+            This can&apos;t be undone — open a new account to use it again.
+          </li>
+        </ul>
+
+        <div className="mt-5 text-[12px] text-neutral-400">Reason</div>
+        <div className="mt-1.5">
+          <Dropdown
+            label="Reason"
+            value={reason}
+            options={CLOSE_REASONS.map((r) => ({ value: r, label: r }))}
+            onChange={setReason}
+            className="[&>button]:h-10 [&>button]:w-full [&>button]:justify-between [&>button]:rounded-lg"
+          />
+        </div>
+
+        <div className="mt-7 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="h-9 rounded-full px-4 text-[13px] text-neutral-300 hover:bg-white/[0.06] hover:text-white"
+          >
+            Keep account
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              onConfirm(has ? (options.find((o) => o.id === to) ?? null) : null)
+            }
+            className="h-9 rounded-full bg-rose-600 px-4 text-[13px] font-medium text-white hover:bg-rose-500"
+          >
+            {has ? `Move ${fmt(a.balance)} and close` : "Close account"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
