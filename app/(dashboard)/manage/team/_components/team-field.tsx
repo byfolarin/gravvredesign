@@ -2,13 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { photoOf } from "@/app/_components/person-avatar";
-import type { Member } from "../../roles/_data";
+import { ROLES, reachOf, type Invite, type Member } from "../../roles/_data";
 
 const DEEP = "#0D1906";
 const CREAM = "#FFFCCC";
 const LIME = "#8FFF4B";
+const ORANGE = "#FF9F43";
 
-const WORDS = ["No one", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
+const WORDS = [
+  "No one",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+  "Ten",
+];
 const word = (n: number) => WORDS[n] ?? String(n);
 const list = (names: string[]) =>
   names.length < 2
@@ -103,13 +116,37 @@ function Face({
  * from where the people are, the dot dissolve, and the faces themselves — lime-ringed if
  * they're here in the last half hour, the rest of the team quieter behind them.
  */
-export function TeamField({ members }: { members: Member[] }) {
+export function TeamField({
+  members,
+  invites,
+  onInvites,
+}: {
+  members: Member[];
+  invites: Invite[];
+  onInvites: () => void;
+}) {
   const sorted = [...members].sort((a, b) => minutesAgo(a) - minutesAgo(b));
   const live = sorted.filter((m) => minutesAgo(m) <= 30);
   const rest = sorted.filter((m) => minutesAgo(m) > 30);
   const first = (m: Member) => m.name.split(" ")[0];
   const now = live.filter((m) => minutesAgo(m) === 0).map(first);
   const recent = live.filter((m) => minutesAgo(m) > 0).map(first);
+
+  const capOf = (m: Member) => {
+    const role = ROLES.find((r) => r.id === m.role);
+    return role ? reachOf(role).sendCap : undefined;
+  };
+  const senders = members.filter((m) => capOf(m) !== undefined);
+  const unlimited = senders.filter((m) => capOf(m) === null).length;
+  const admins = members.filter(
+    (m) => m.role === "owner" || m.role === "admin",
+  ).length;
+  const noTwoStep = members.filter((m) => !m.twoFactor).map(first);
+  const soonest = invites.find((i) => i.expires === "tomorrow") ?? invites[0];
+  const inviteeOf = (i: Invite) => {
+    const n = i.email.split("@")[0].split(".")[0];
+    return n[0].toUpperCase() + n.slice(1);
+  };
 
   return (
     <section
@@ -127,7 +164,74 @@ export function TeamField({ members }: { members: Member[] }) {
       />
       <Dissolve />
 
-      <div className="relative flex min-h-[208px] items-end justify-between gap-10 px-8 pt-8 pb-8">
+      {/* The team in numbers, split by faint cream hairlines */}
+      <div className="relative grid grid-cols-4 px-8 pt-7">
+        {(
+          [
+            [
+              "Members",
+              members.length,
+              `${new Set(members.map((m) => m.role)).size} roles · ${admins} admins`,
+            ],
+            ["Can send money", senders.length, `${unlimited} with no limit`],
+            [
+              "Two-step login",
+              <>
+                {members.length - noTwoStep.length}
+                <span
+                  className="text-[14px]"
+                  style={{ color: "rgb(255 252 204 / 0.45)" }}
+                >
+                  {" "}
+                  of {members.length}
+                </span>
+              </>,
+              noTwoStep.length ? (
+                <span style={{ color: ORANGE }}>Off for {list(noTwoStep)}</span>
+              ) : (
+                "On for everyone"
+              ),
+            ],
+            [
+              "Invites waiting",
+              invites.length,
+              soonest
+                ? `${inviteeOf(soonest)}'s expires ${soonest.expires}`
+                : "None out",
+            ],
+          ] as const
+        ).map(([label, figure, note], i) => {
+          const Tag = i === 3 && invites.length ? "button" : "div";
+          return (
+            <Tag
+              key={label}
+              {...(Tag === "button"
+                ? { type: "button" as const, onClick: onInvites }
+                : {})}
+              className={`group min-w-0 text-left ${i ? "border-l pl-6" : ""} pr-6`}
+              style={{ borderColor: "rgb(255 252 204 / 0.1)" }}
+            >
+              <div
+                className="text-[12.5px]"
+                style={{ color: "rgb(255 252 204 / 0.55)" }}
+              >
+                {label}
+              </div>
+              <div className="mt-1.5 text-[24px] leading-none font-medium tracking-[-0.02em] tabular-nums">
+                {figure}
+              </div>
+              <div
+                className={`mt-2 truncate text-[12px] ${Tag === "button" ? "group-hover:underline" : ""}`}
+                style={{ color: "rgb(255 252 204 / 0.55)" }}
+              >
+                {note}
+              </div>
+            </Tag>
+          );
+        })}
+      </div>
+
+      <div className="relative flex items-end justify-between gap-10 px-8 pt-10 pb-8">
         <div className="max-w-[420px]">
           <h2 className="text-[26px] leading-[1.15] font-medium tracking-[-0.02em]">
             {word(live.length)} of you are in right now.
@@ -136,7 +240,11 @@ export function TeamField({ members }: { members: Member[] }) {
             className="mt-3 text-[13.5px] leading-relaxed"
             style={{ color: "rgb(255 252 204 / 0.68)" }}
           >
-            {now.length > 0 && <>{list(now)} {now.length > 1 ? "are" : "is"} here now</>}
+            {now.length > 0 && (
+              <>
+                {list(now)} {now.length > 1 ? "are" : "is"} here now
+              </>
+            )}
             {now.length > 0 && recent.length > 0 && ", and "}
             {recent.length > 0 && (
               <>

@@ -117,7 +117,11 @@ export function TeamWorkspace() {
         </button>
       </div>
 
-      <TeamField members={members} />
+      <TeamField
+        members={members}
+        invites={invites}
+        onInvites={() => setTab("invites")}
+      />
 
       <UpdateNotice id="u-approval" place="team" />
 
