@@ -3,31 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { photoOf } from "@/app/_components/person-avatar";
-import { ROLES, reachOf, type Invite, type Member } from "../../roles/_data";
+import { ROLES, reachOf, type Member } from "../../roles/_data";
 
 const DEEP = "#0D1906";
 const CREAM = "#FFFCCC";
-const LIME = "#8FFF4B";
 const ORANGE = "#FF9F43";
-
-const WORDS = [
-  "No one",
-  "One",
-  "Two",
-  "Three",
-  "Four",
-  "Five",
-  "Six",
-  "Seven",
-  "Eight",
-  "Nine",
-  "Ten",
-];
-const word = (n: number) => WORDS[n] ?? String(n);
-const list = (names: string[]) =>
-  names.length < 2
-    ? names.join("")
-    : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 
 const minutesAgo = (m: Member) => {
   if (m.lastActive === "Now") return 0;
@@ -78,215 +58,170 @@ function Dissolve() {
   );
 }
 
-function Face({
-  m,
-  size,
-  live,
-  z,
+const roleName = (id: string) => ROLES.find((r) => r.id === id)?.name ?? id;
+const first = (m: Member) => m.name.split(" ")[0];
+
+/** People in a fact, grouped by role: "Admin  (face) Oluwatobi  (face) Amara". */
+function ByRole({
+  people,
+  detail,
+  onOpen,
 }: {
-  m: Member;
-  size: number;
-  live?: boolean;
-  z: number;
+  people: Member[];
+  detail?: (m: Member) => string;
+  onOpen: (name: string) => void;
 }) {
+  const order = ROLES.map((r) => r.id);
+  const roles = [...new Set(people.map((m) => m.role))].sort(
+    (a, b) => order.indexOf(a) - order.indexOf(b),
+  );
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- remote placeholder portraits
-    <img
-      src={photoOf(m.name)}
-      alt={m.name}
-      title={`${m.name} · ${m.lastActive === "Now" ? "here now" : m.lastActive}`}
-      width={size}
-      height={size}
-      className="relative shrink-0 rounded-full object-cover transition-transform duration-300 hover:z-20 hover:-translate-y-1"
-      style={{
-        width: size,
-        height: size,
-        zIndex: z,
-        boxShadow: live
-          ? `0 0 0 2px ${DEEP}, 0 0 0 3.5px ${LIME}, 0 8px 28px rgb(143 255 75 / 0.25)`
-          : `0 0 0 2px ${DEEP}`,
-        filter: live ? undefined : "grayscale(1) brightness(0.8)",
-        opacity: live ? 1 : 0.55,
-      }}
-    />
+    <div className="mt-5 grid gap-2.5">
+      {roles.map((r) => {
+        const here = people.filter((m) => m.role === r);
+        return (
+          <div key={r} className="flex items-center gap-3">
+            <span
+              className="w-[92px] shrink-0 truncate text-[12px] leading-5"
+              style={{ color: "rgb(255 252 204 / 0.5)" }}
+            >
+              {here.length} {roleName(r)}
+              {here.length > 1 && !roleName(r).endsWith("s") ? "s" : ""}
+            </span>
+            <span className="flex min-w-0 flex-wrap gap-x-3 gap-y-1.5">
+              {here.map((m) => (
+                <button
+                  key={m.name}
+                  type="button"
+                  onClick={() => onOpen(m.name)}
+                  className="flex items-center gap-1.5 text-[12.5px] font-medium underline-offset-4 hover:underline"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- remote placeholder portraits */}
+                  <img
+                    src={photoOf(m.name)}
+                    alt=""
+                    width={20}
+                    height={20}
+                    className="size-5 rounded-full object-cover"
+                  />
+                  {first(m)}
+                  {detail && (
+                    <span
+                      className="font-normal"
+                      style={{ color: "rgb(255 252 204 / 0.5)" }}
+                    >
+                      {detail(m)}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
 /**
- * Who's in, told as a sentence over the Gravv green: the brand's deep ground, light rising
- * from where the people are, the dot dissolve, and the faces themselves — lime-ringed if
- * they're here in the last half hour, the rest of the team quieter behind them.
+ * What needs looking at on the team, over the Gravv green: deep ground, light rising from
+ * the base, the dot dissolve. Three facts only — each a count, the people in it grouped by
+ * role, and the way to fix it. A fact goes away when there's nothing in it.
  */
 export function TeamField({
   members,
-  invites,
   onRemind,
-  onResend,
   onOpen,
 }: {
   members: Member[];
-  invites: Invite[];
   onRemind: () => void;
-  onResend: (email: string) => void;
   onOpen: (name: string) => void;
 }) {
   const router = useRouter();
-  const sorted = [...members].sort((a, b) => minutesAgo(a) - minutesAgo(b));
-  const live = sorted.filter((m) => minutesAgo(m) <= 30);
-  const rest = sorted.filter((m) => minutesAgo(m) > 30);
-  const first = (m: Member) => m.name.split(" ")[0];
-  const now = live.filter((m) => minutesAgo(m) === 0).map(first);
-  const recent = live.filter((m) => minutesAgo(m) > 0).map(first);
-
   const capOf = (m: Member) => {
     const role = ROLES.find((r) => r.id === m.role);
     return role ? reachOf(role).sendCap : undefined;
   };
-  const unlimited = members.filter((m) => capOf(m) === null);
   const noTwoStep = members.filter((m) => !m.twoFactor);
-  const quiet = members.filter((m) => /days ago|week/.test(m.lastActive));
-  const expiring = invites.filter((i) => /today|tomorrow/.test(i.expires));
-  const inviteeOf = (i: Invite) => {
-    const n = i.email.split("@")[0].split(".")[0];
-    return n[0].toUpperCase() + n.slice(1);
-  };
+  const unlimited = members.filter((m) => capOf(m) === null);
+  const quiet = members.filter(
+    (m) => minutesAgo(m) === Infinity && /days ago|week/.test(m.lastActive),
+  );
 
-  /** Only what someone should act on — each with the way to act on it. */
-  const facts: {
-    label: string;
-    figure: number;
-    note: string;
-    warn?: boolean;
-    action: string;
-    run: () => void;
-  }[] = [];
-  if (noTwoStep.length)
-    facts.push({
+  const facts = [
+    {
       label: "Signing in without two-step",
-      figure: noTwoStep.length,
-      note: list(noTwoStep.map(first)),
+      people: noTwoStep,
       warn: true,
       action: "Send a reminder",
       run: onRemind,
-    });
-  if (unlimited.length)
-    facts.push({
+    },
+    {
       label: "Can send any amount",
-      figure: unlimited.length,
-      note: list(unlimited.map(first)),
+      people: unlimited,
       action: "Review roles",
       run: () => router.push("/manage/roles"),
-    });
-  if (quiet.length)
-    facts.push({
+    },
+    {
       label: "Not in for 3+ days",
-      figure: quiet.length,
-      note: `${list(quiet.map(first))} · still have access`,
-      action: "Review",
+      people: quiet,
+      detail: (m: Member) => m.lastActive.replace(" ago", "").toLowerCase(),
+      action: "Review access",
       run: () => onOpen(quiet.at(-1)!.name),
-    });
-  if (expiring.length)
-    facts.push({
-      label: "Invite running out",
-      figure: expiring.length,
-      note: `${list(expiring.map(inviteeOf))}'s expires ${expiring[0].expires}`,
-      action: "Resend",
-      run: () => expiring.forEach((i) => onResend(i.email)),
-    });
+    },
+  ].filter((f) => f.people.length);
 
+  if (!facts.length) return null;
   return (
     <section
       className="relative isolate mt-8 overflow-hidden rounded-2xl"
       style={{ background: DEEP, color: CREAM }}
     >
-      {/* Light rising from under the faces, brighter at the base */}
+      {/* Light rising from the base */}
       <div
         aria-hidden
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(60% 90% at 78% 120%, rgb(143 255 75 / 0.30), rgb(52 109 17 / 0.28) 45%, transparent 75%)",
+            "radial-gradient(70% 90% at 75% 125%, rgb(143 255 75 / 0.26), rgb(52 109 17 / 0.26) 45%, transparent 75%)",
         }}
       />
       <Dissolve />
 
-      {facts.length > 0 && (
-        <div
-          className="relative grid px-8 pt-7"
-          style={{
-            gridTemplateColumns: `repeat(${facts.length}, minmax(0, 1fr))`,
-          }}
-        >
-          {facts.map((f, i) => (
-            <div
-              key={f.label}
-              className={`min-w-0 pr-6 ${i ? "border-l pl-6" : ""}`}
-              style={{ borderColor: "rgb(255 252 204 / 0.1)" }}
-            >
-              <div
-                className="text-[12.5px]"
-                style={{ color: "rgb(255 252 204 / 0.55)" }}
-              >
-                {f.label}
-              </div>
-              <div
-                className="mt-1.5 text-[24px] leading-none font-medium tracking-[-0.02em] tabular-nums"
-                style={f.warn ? { color: ORANGE } : undefined}
-              >
-                {f.figure}
-              </div>
-              <div
-                className="mt-2 truncate text-[12px]"
-                style={{ color: "rgb(255 252 204 / 0.55)" }}
-              >
-                {f.note}
-              </div>
-              <button
-                type="button"
-                onClick={f.run}
-                className="mt-2 text-[12px] font-medium underline-offset-4 hover:underline"
-                style={{ color: CREAM }}
-              >
-                {f.action} →
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="relative flex items-end justify-between gap-10 px-8 pt-10 pb-8">
-        <div className="max-w-[420px]">
-          <h2 className="text-[26px] leading-[1.15] font-medium tracking-[-0.02em]">
-            {word(live.length)} of you are in right now.
-          </h2>
-          <p
-            className="mt-3 text-[13.5px] leading-relaxed"
-            style={{ color: "rgb(255 252 204 / 0.68)" }}
+      <div
+        className="relative grid px-8 py-7"
+        style={{
+          gridTemplateColumns: `repeat(${facts.length}, minmax(0, 1fr))`,
+        }}
+      >
+        {facts.map((f, i) => (
+          <div
+            key={f.label}
+            className={`flex min-w-0 flex-col pr-6 ${i ? "border-l pl-6" : ""}`}
+            style={{ borderColor: "rgb(255 252 204 / 0.1)" }}
           >
-            {now.length > 0 && (
-              <>
-                {list(now)} {now.length > 1 ? "are" : "is"} here now
-              </>
-            )}
-            {now.length > 0 && recent.length > 0 && ", and "}
-            {recent.length > 0 && (
-              <>
-                {list(recent)} {now.length ? "" : "were "}in the last half hour
-              </>
-            )}
-            . The other {word(rest.length).toLowerCase()} are away.
-          </p>
-        </div>
-
-        <div className="flex shrink-0 items-end">
-          <div className="flex items-center">
-            {live.map((m, i) => (
-              <span key={m.name} className={i ? "-ml-2.5" : ""}>
-                <Face m={m} size={52} live z={live.length - i} />
-              </span>
-            ))}
+            <div
+              className="text-[12.5px]"
+              style={{ color: "rgb(255 252 204 / 0.55)" }}
+            >
+              {f.label}
+            </div>
+            <div
+              className="mt-1.5 text-[28px] leading-none font-medium tracking-[-0.02em] tabular-nums"
+              style={f.warn ? { color: ORANGE } : undefined}
+            >
+              {f.people.length}
+            </div>
+            <ByRole people={f.people} detail={f.detail} onOpen={onOpen} />
+            <button
+              type="button"
+              onClick={f.run}
+              className="mt-auto self-start pt-5 text-[12.5px] font-medium underline-offset-4 hover:underline"
+            >
+              {f.action} →
+            </button>
           </div>
-        </div>
+        ))}
       </div>
     </section>
   );

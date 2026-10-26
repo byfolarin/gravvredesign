@@ -119,22 +119,11 @@ export function TeamWorkspace() {
 
       <TeamField
         members={members}
-        invites={invites}
         onRemind={() =>
           setToast(
             `Reminder sent to ${noTwoStep.length} ${noTwoStep.length === 1 ? "person" : "people"}`,
           )
         }
-        onResend={(email) => {
-          setInvites((all) =>
-            all.map((x) =>
-              x.email === email
-                ? { ...x, sent: "just now", expires: "in 7 days" }
-                : x,
-            ),
-          );
-          setToast(`Invite sent again to ${email}`);
-        }}
         onOpen={setSheet}
       />
 
