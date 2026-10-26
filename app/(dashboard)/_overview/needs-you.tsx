@@ -46,12 +46,13 @@ const ART: Record<
 
 function NeedArt({ k, className = "" }: { k: string; className?: string }) {
   const a = ART[k];
-  if (!a) return <div className={`bg-surface-2 ${className}`} />;
+  if (!a) return <div className={`bg-[#e6f9f0] ${className}`} />;
   return (
     <div
       className={`relative overflow-hidden ${className}`}
       style={{
-        background: `radial-gradient(120% 90% at 0% 0%, ${a.glow[0]}38, transparent 60%), radial-gradient(110% 90% at 100% 100%, ${a.glow[1]}3d, transparent 62%), var(--surface-2)`,
+        // Its own light green base in every theme — never the dark surface.
+        background: `radial-gradient(120% 90% at 0% 0%, ${a.glow[0]}66, transparent 60%), radial-gradient(110% 90% at 100% 100%, ${a.glow[1]}73, transparent 62%), linear-gradient(135deg, #f1fcf7, #d9f6e8)`,
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- local product screenshots */}
