@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, type CSSProperties, type ReactNode } from "react";
+import { BrandLayers } from "./brand-layers";
 
 /** The Gravv green ramp (brand guidelines 04.4), darkest to lightest. */
 const RAMP = [
@@ -186,7 +187,7 @@ const TILES: Tile[] = [
               width={8}
               height={8}
               fill={LIME}
-              opacity={o}
+              opacity={Math.round(o * 100) / 100}
             />
           ))}
         </svg>
@@ -388,6 +389,11 @@ export function GradientLab() {
           ))}
         </div>
 
+        <BrandLayers />
+
+        <div className="mt-16 font-mono text-[11px] tracking-[0.12em] text-neutral-500">
+          THE GRADIENTS ON THEIR OWN
+        </div>
         <div className="mt-10 grid gap-x-6 gap-y-10 md:grid-cols-2 xl:grid-cols-3">
           {TILES.map((t) => (
             <figure key={t.n}>
