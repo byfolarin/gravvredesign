@@ -9,34 +9,37 @@ import { compact, needs, plural, type Need } from "./widgets";
 const TODAY = "2026-10-20";
 const DONE_KEY = "gravv-needs-done";
 
-/** Each decision's page, as a real screenshot on two soft stops — the product-updates look. */
+/** One light green for every decision's art (owner's call), soft at two corners. */
+const MINT: [string, string] = ["#00ffb4", "#7dd3a8"];
+
+/** Each decision's page, as a real screenshot on the soft gradient — the product-updates look. */
 const ART: Record<
   string,
   { image: string; glow: [string, string]; area: string }
 > = {
   disputes: {
     image: "/updates/disputes.png",
-    glow: ["#f43f5e", "#a78bfa"],
+    glow: MINT,
     area: "Disputes",
   },
   stuck: {
     image: "/updates/funnel.png",
-    glow: ["#f43f5e", "#f59e0b"],
+    glow: MINT,
     area: "Collections",
   },
   approvals: {
     image: "/updates/approval.png",
-    glow: ["#f59e0b", "#a78bfa"],
+    glow: MINT,
     area: "Approvals",
   },
   desk: {
     image: "/updates/trade-desk.png",
-    glow: ["#00ffb4", "#38bdf8"],
+    glow: MINT,
     area: "Trade desk",
   },
   cards: {
     image: "/updates/cards.png",
-    glow: ["#f59e0b", "#00ffb4"],
+    glow: MINT,
     area: "Cards",
   },
 };
@@ -56,7 +59,8 @@ function NeedArt({ k, className = "" }: { k: string; className?: string }) {
         src={a.image}
         alt=""
         loading="lazy"
-        className="absolute top-[14%] left-[8%] w-[92%] max-w-none rounded-tl-lg border-t border-l border-black/10 shadow-[0_12px_40px_-12px_rgb(0_0_0/0.35)]"
+        // Scaled to the frame and read from the top (header + key figures), never a stray corner.
+        className="absolute top-[13%] left-[9%] h-auto w-[82%] max-w-none rounded-t-md border border-b-0 border-black/10 shadow-[0_12px_40px_-12px_rgb(0_0_0/0.35)]"
       />
     </div>
   );
@@ -237,7 +241,7 @@ export function NeedsSidebar() {
             style={{ top: Math.max(-160, top - 110) }}
             onMouseEnter={() => setHover(hover)}
           >
-            <NeedArt k={h.key} className="h-[120px]" />
+            <NeedArt k={h.key} className="h-[150px]" />
             <div className="px-4 pt-3.5 pb-4">
               <div className="text-[11.5px] text-neutral-500">
                 {ART[h.key]?.area} ·{" "}
