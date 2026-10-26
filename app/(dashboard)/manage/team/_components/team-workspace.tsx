@@ -120,7 +120,22 @@ export function TeamWorkspace() {
       <TeamField
         members={members}
         invites={invites}
-        onInvites={() => setTab("invites")}
+        onRemind={() =>
+          setToast(
+            `Reminder sent to ${noTwoStep.length} ${noTwoStep.length === 1 ? "person" : "people"}`,
+          )
+        }
+        onResend={(email) => {
+          setInvites((all) =>
+            all.map((x) =>
+              x.email === email
+                ? { ...x, sent: "just now", expires: "in 7 days" }
+                : x,
+            ),
+          );
+          setToast(`Invite sent again to ${email}`);
+        }}
+        onOpen={setSheet}
       />
 
       <UpdateNotice id="u-approval" place="team" />
@@ -186,31 +201,6 @@ export function TeamWorkspace() {
           />
         </div>
       </div>
-
-      {tab === "members" && noTwoStep.length > 0 && (
-        <div className="mt-5 flex items-center justify-between gap-4 rounded-lg bg-white/[0.04] px-4 py-3 text-[13px]">
-          <span className="text-neutral-300">
-            {noTwoStep.length}{" "}
-            {noTwoStep.length === 1 ? "person hasn't" : "people haven't"} turned
-            on two-step login
-            <span className="text-neutral-500">
-              {" "}
-              — {noTwoStep.map((m) => m.name.split(" ")[0]).join(", ")}
-            </span>
-          </span>
-          <button
-            type="button"
-            onClick={() =>
-              setToast(
-                `Reminder sent to ${noTwoStep.length} ${noTwoStep.length === 1 ? "person" : "people"}`,
-              )
-            }
-            className="shrink-0 text-neutral-200 hover:text-white"
-          >
-            Send a reminder
-          </button>
-        </div>
-      )}
 
       {tab === "members" ? (
         <>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { photoOf } from "@/app/_components/person-avatar";
 import { ROLES, reachOf, type Invite, type Member } from "../../roles/_data";
 
@@ -119,12 +120,17 @@ function Face({
 export function TeamField({
   members,
   invites,
-  onInvites,
+  onRemind,
+  onResend,
+  onOpen,
 }: {
   members: Member[];
   invites: Invite[];
-  onInvites: () => void;
+  onRemind: () => void;
+  onResend: (email: string) => void;
+  onOpen: (name: string) => void;
 }) {
+  const router = useRouter();
   const sorted = [...members].sort((a, b) => minutesAgo(a) - minutesAgo(b));
   const live = sorted.filter((m) => minutesAgo(m) <= 30);
   const rest = sorted.filter((m) => minutesAgo(m) > 30);
@@ -136,17 +142,57 @@ export function TeamField({
     const role = ROLES.find((r) => r.id === m.role);
     return role ? reachOf(role).sendCap : undefined;
   };
-  const senders = members.filter((m) => capOf(m) !== undefined);
-  const unlimited = senders.filter((m) => capOf(m) === null).length;
-  const admins = members.filter(
-    (m) => m.role === "owner" || m.role === "admin",
-  ).length;
-  const noTwoStep = members.filter((m) => !m.twoFactor).map(first);
-  const soonest = invites.find((i) => i.expires === "tomorrow") ?? invites[0];
+  const unlimited = members.filter((m) => capOf(m) === null);
+  const noTwoStep = members.filter((m) => !m.twoFactor);
+  const quiet = members.filter((m) => /days ago|week/.test(m.lastActive));
+  const expiring = invites.filter((i) => /today|tomorrow/.test(i.expires));
   const inviteeOf = (i: Invite) => {
     const n = i.email.split("@")[0].split(".")[0];
     return n[0].toUpperCase() + n.slice(1);
   };
+
+  /** Only what someone should act on — each with the way to act on it. */
+  const facts: {
+    label: string;
+    figure: number;
+    note: string;
+    warn?: boolean;
+    action: string;
+    run: () => void;
+  }[] = [];
+  if (noTwoStep.length)
+    facts.push({
+      label: "Signing in without two-step",
+      figure: noTwoStep.length,
+      note: list(noTwoStep.map(first)),
+      warn: true,
+      action: "Send a reminder",
+      run: onRemind,
+    });
+  if (unlimited.length)
+    facts.push({
+      label: "Can send any amount",
+      figure: unlimited.length,
+      note: list(unlimited.map(first)),
+      action: "Review roles",
+      run: () => router.push("/manage/roles"),
+    });
+  if (quiet.length)
+    facts.push({
+      label: "Not in for 3+ days",
+      figure: quiet.length,
+      note: `${list(quiet.map(first))} · still have access`,
+      action: "Review",
+      run: () => onOpen(quiet.at(-1)!.name),
+    });
+  if (expiring.length)
+    facts.push({
+      label: "Invite running out",
+      figure: expiring.length,
+      note: `${list(expiring.map(inviteeOf))}'s expires ${expiring[0].expires}`,
+      action: "Resend",
+      run: () => expiring.forEach((i) => onResend(i.email)),
+    });
 
   return (
     <section
@@ -164,72 +210,49 @@ export function TeamField({
       />
       <Dissolve />
 
-      {/* The team in numbers, split by faint cream hairlines */}
-      <div className="relative grid grid-cols-4 px-8 pt-7">
-        {(
-          [
-            [
-              "Members",
-              members.length,
-              `${new Set(members.map((m) => m.role)).size} roles · ${admins} admins`,
-            ],
-            ["Can send money", senders.length, `${unlimited} with no limit`],
-            [
-              "Two-step login",
-              <>
-                {members.length - noTwoStep.length}
-                <span
-                  className="text-[14px]"
-                  style={{ color: "rgb(255 252 204 / 0.45)" }}
-                >
-                  {" "}
-                  of {members.length}
-                </span>
-              </>,
-              noTwoStep.length ? (
-                <span style={{ color: ORANGE }}>Off for {list(noTwoStep)}</span>
-              ) : (
-                "On for everyone"
-              ),
-            ],
-            [
-              "Invites waiting",
-              invites.length,
-              soonest
-                ? `${inviteeOf(soonest)}'s expires ${soonest.expires}`
-                : "None out",
-            ],
-          ] as const
-        ).map(([label, figure, note], i) => {
-          const Tag = i === 3 && invites.length ? "button" : "div";
-          return (
-            <Tag
-              key={label}
-              {...(Tag === "button"
-                ? { type: "button" as const, onClick: onInvites }
-                : {})}
-              className={`group min-w-0 text-left ${i ? "border-l pl-6" : ""} pr-6`}
+      {facts.length > 0 && (
+        <div
+          className="relative grid px-8 pt-7"
+          style={{
+            gridTemplateColumns: `repeat(${facts.length}, minmax(0, 1fr))`,
+          }}
+        >
+          {facts.map((f, i) => (
+            <div
+              key={f.label}
+              className={`min-w-0 pr-6 ${i ? "border-l pl-6" : ""}`}
               style={{ borderColor: "rgb(255 252 204 / 0.1)" }}
             >
               <div
                 className="text-[12.5px]"
                 style={{ color: "rgb(255 252 204 / 0.55)" }}
               >
-                {label}
-              </div>
-              <div className="mt-1.5 text-[24px] leading-none font-medium tracking-[-0.02em] tabular-nums">
-                {figure}
+                {f.label}
               </div>
               <div
-                className={`mt-2 truncate text-[12px] ${Tag === "button" ? "group-hover:underline" : ""}`}
+                className="mt-1.5 text-[24px] leading-none font-medium tracking-[-0.02em] tabular-nums"
+                style={f.warn ? { color: ORANGE } : undefined}
+              >
+                {f.figure}
+              </div>
+              <div
+                className="mt-2 truncate text-[12px]"
                 style={{ color: "rgb(255 252 204 / 0.55)" }}
               >
-                {note}
+                {f.note}
               </div>
-            </Tag>
-          );
-        })}
-      </div>
+              <button
+                type="button"
+                onClick={f.run}
+                className="mt-2 text-[12px] font-medium underline-offset-4 hover:underline"
+                style={{ color: CREAM }}
+              >
+                {f.action} →
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="relative flex items-end justify-between gap-10 px-8 pt-10 pb-8">
         <div className="max-w-[420px]">
@@ -255,28 +278,13 @@ export function TeamField({
           </p>
         </div>
 
-        <div className="flex shrink-0 items-end gap-6">
+        <div className="flex shrink-0 items-end">
           <div className="flex items-center">
             {live.map((m, i) => (
               <span key={m.name} className={i ? "-ml-2.5" : ""}>
                 <Face m={m} size={52} live z={live.length - i} />
               </span>
             ))}
-          </div>
-          <div className="pb-1">
-            <div className="flex items-center">
-              {rest.slice(0, 6).map((m, i) => (
-                <span key={m.name} className={i ? "-ml-2" : ""}>
-                  <Face m={m} size={26} z={6 - i} />
-                </span>
-              ))}
-            </div>
-            <div
-              className="mt-2 text-[12px]"
-              style={{ color: "rgb(255 252 204 / 0.5)" }}
-            >
-              Away
-            </div>
           </div>
         </div>
       </div>
