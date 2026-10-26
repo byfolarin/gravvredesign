@@ -1,5 +1,6 @@
 "use client";
 
+import { CommandPalette, openCommand } from "./command/command-palette";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -27,7 +28,6 @@ export const SEND_EVENT = "gravv:send-money";
 
 /** Global bar above the content: search, move money, privacy, settings, notifications, account. */
 export function TopBar() {
-  const search = useRef<HTMLInputElement>(null);
   const [hidden, setHidden] = useState(false);
 
   // On "System" (nothing saved), follow OS theme changes live — the menu that sets it isn't always mounted.
@@ -48,17 +48,7 @@ export function TopBar() {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  // ⌘K / Ctrl+K jumps to search.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        search.current?.focus();
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  // ⌘K / Ctrl+K opens the command palette (it listens for the keys itself).
 
   // ⇧H toggles "hide amounts" (not while typing).
   useEffect(() => {
@@ -114,21 +104,25 @@ export function TopBar() {
           <feMorphology operator="dilate" radius="4" />
         </filter>
       </svg>
-      <label className="flex h-8 w-full max-w-[420px] items-center gap-2 rounded-md px-2 text-[13px] text-neutral-400 transition-colors focus-within:bg-white/[0.05] hover:bg-white/[0.03]">
+      {/* Search opens the command palette — ⌘K anywhere does the same */}
+      <button
+        type="button"
+        onClick={openCommand}
+        aria-label="Search Gravv (⌘K)"
+        className="flex h-8 w-full max-w-[420px] items-center gap-2 rounded-md px-2 text-left text-[13px] text-neutral-400 transition-colors hover:bg-white/[0.04]"
+      >
         <HugeiconsIcon
           icon={Search01Icon}
           size={15}
           strokeWidth={1.6}
           className="shrink-0"
         />
-        <input
-          ref={search}
-          type="search"
-          placeholder="Search for anything"
-          aria-label="Search for anything"
-          className="min-w-0 flex-1 bg-transparent text-white outline-none placeholder:text-neutral-400"
-        />
-      </label>
+        <span className="min-w-0 flex-1 truncate">Search or jump to…</span>
+        <kbd className="rounded border border-white/10 px-1.5 py-px font-sans text-[11px] text-neutral-500">
+          ⌘K
+        </kbd>
+      </button>
+      <CommandPalette />
 
       <div className="flex shrink-0 items-center gap-1">
         <ExperienceSwitch />

@@ -93,7 +93,12 @@ export function TransactionsTable({ initial }: { initial: Transaction[] }) {
     const t = setTimeout(() => {
       const q = new URLSearchParams(window.location.search).get("q");
       if (q) {
-        setScope("Customer ID");
+        // A transaction ID (from ⌘K) searches IDs; anything else is a customer.
+        setScope(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(q)
+            ? "Transaction ID"
+            : "Customer ID",
+        );
         setQuery(q);
       }
     }, 0);
