@@ -20,6 +20,8 @@ export function ConfirmDialog({
   irreversible = false,
   confirmText,
   action,
+  tone = "danger",
+  hold = false,
   cancel = "Cancel",
   onConfirm,
   onCancel,
@@ -37,6 +39,10 @@ export function ConfirmDialog({
   confirmText?: string;
   /** The button: the real verb, e.g. "Revoke key". */
   action: string;
+  /** danger = red; calm = ink, for the safe choice when the dialog offers one. */
+  tone?: "danger" | "calm";
+  /** Press and hold to confirm — for live, in-use, irreversible actions (replaces typing). */
+  hold?: boolean;
   cancel?: string;
   onConfirm: () => void;
   onCancel: () => void;
@@ -180,16 +186,64 @@ export function ConfirmDialog({
           >
             {cancel}
           </button>
-          <button
-            type="button"
-            disabled={!ready}
-            onClick={onConfirm}
-            className="h-9 rounded-full bg-rose-600 px-4 text-[13px] font-medium text-white transition-opacity hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-35"
-          >
-            {action}
-          </button>
+          {hold && tone === "danger" ? (
+            <HoldButton label={action} onDone={onConfirm} />
+          ) : (
+            <button
+              type="button"
+              disabled={!ready}
+              onClick={onConfirm}
+              className={`h-9 rounded-full px-4 text-[13px] font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-35 ${tone === "calm" ? "bg-white text-black hover:bg-neutral-200" : "bg-rose-600 text-white hover:bg-rose-500"}`}
+            >
+              {action}
+            </button>
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+const HOLD_MS = 1200;
+
+/**
+ * Press and hold: the fill runs left to right while you hold; let go early and it drains
+ * back. Deliberate without making anyone type. Space / Enter hold works the same.
+ */
+function HoldButton({ label, onDone }: { label: string; onDone: () => void }) {
+  const [holding, setHolding] = useState(false);
+  const start = () => setHolding(true);
+  const stop = () => setHolding(false);
+  return (
+    <button
+      type="button"
+      onPointerDown={start}
+      onPointerUp={stop}
+      onPointerLeave={stop}
+      onKeyDown={(e) => {
+        if ((e.key === " " || e.key === "Enter") && !e.repeat) {
+          e.preventDefault();
+          start();
+        }
+      }}
+      onKeyUp={(e) => (e.key === " " || e.key === "Enter") && stop()}
+      aria-label={`${label} — press and hold`}
+      className="relative isolate h-9 touch-none overflow-hidden rounded-full border border-rose-500/50 px-4 text-[13px] font-medium text-rose-200 select-none"
+    >
+      <span
+        aria-hidden
+        onTransitionEnd={() => holding && onDone()}
+        className="absolute inset-y-0 left-0 -z-10 bg-rose-600"
+        style={{
+          width: holding ? "100%" : "0%",
+          transition: holding
+            ? `width ${HOLD_MS}ms linear`
+            : "width 250ms ease-out",
+        }}
+      />
+      <span className={holding ? "text-white" : ""}>
+        {holding ? "Keep holding…" : `Hold to ${label.toLowerCase()}`}
+      </span>
+    </button>
   );
 }

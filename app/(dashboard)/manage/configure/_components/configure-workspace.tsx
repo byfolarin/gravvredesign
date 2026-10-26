@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { CopyButton } from "@/app/_components/copy-button";
 import { ConfirmDialog } from "@/app/_components/confirm-dialog";
+import { RevokeKeyDialog } from "./revoke-key-dialog";
 import {
   DiscardConfirm,
   useDiscardGuard,
@@ -703,61 +704,27 @@ export function ConfigureWorkspace() {
         />
       )}
 
-      {revoking &&
-        (() => {
-          const k = revoking;
-          const usage = KEY_USAGE[k.id];
-          // Live and taking traffic: type the name. Anything else: one click.
-          const inUse =
-            k.env === "live" &&
-            !!usage &&
-            !!k.lastUsed &&
-            AS_OF - Date.parse(k.lastUsed) < 7 * 86_400_000;
-          return (
-            <ConfirmDialog
-              title={`Revoke ${k.name}?`}
-              subject={{
-                mark: (
-                  <span
-                    className={`rounded-md px-1.5 py-0.5 font-mono text-[10.5px] font-medium ${k.env === "live" ? "bg-[var(--ok-bg)] text-[var(--ok-fg)]" : "bg-white/[0.07] text-neutral-300"}`}
-                  >
-                    {k.env.toUpperCase()}
-                  </span>
-                ),
-                title: k.name,
-                sub: `sk_${k.env}_••••${k.last4}`,
-                meta:
-                  k.lastUsed && AS_OF - Date.parse(k.lastUsed) >= 7 * 86_400_000
-                    ? `Unused ${lasted(k.lastUsed)}`
-                    : usage
-                      ? `${usage.requests.toLocaleString("en-US")} today`
-                      : "Not used yet",
-              }}
-              lines={[
-                `Every request signed with ••${k.last4} fails with 401 straight away.`,
-                inUse && usage
-                  ? `It's in use — last call ${ago(k.lastUsed)} from ${usage.lastIp}. Whatever runs there stops working.`
-                  : k.lastUsed
-                    ? `Unused for ${lasted(k.lastUsed)}, so nothing should break.`
-                    : "It hasn't been used yet.",
-                ...(inUse
-                  ? [
-                      "Want a 24-hour overlap instead? Roll the key from its ⋮ menu.",
-                    ]
-                  : []),
-              ]}
-              irreversible
-              confirmText={inUse ? k.name : undefined}
-              action="Revoke key"
-              onCancel={() => setRevoking(null)}
-              onConfirm={() => {
-                setKeys((all) => all.filter((x) => x.id !== k.id));
-                setRevoking(null);
-                setToast(`${k.name} revoked — requests using it now fail`);
-              }}
-            />
-          );
-        })()}
+      {revoking && (
+        <RevokeKeyDialog
+          k={revoking}
+          usage={KEY_USAGE[revoking.id]}
+          source={
+            KEY_USAGE[revoking.id]
+              ? allowedBy(KEY_USAGE[revoking.id].lastIp, allowlist)?.label
+              : undefined
+          }
+          onCancel={() => setRevoking(null)}
+          onRoll={() => {
+            rollKey(revoking);
+            setRevoking(null);
+          }}
+          onRevoke={() => {
+            setKeys((all) => all.filter((x) => x.id !== revoking.id));
+            setRevoking(null);
+            setToast(`${revoking.name} revoked — requests using it now fail`);
+          }}
+        />
+      )}
 
       {deleting && (
         <ConfirmDialog
