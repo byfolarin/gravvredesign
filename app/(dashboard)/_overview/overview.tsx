@@ -12,7 +12,8 @@ import {
   type Width,
 } from "./widgets";
 
-const LAYOUT_KEY = "gravv-overview-layout";
+// v2: Balance became full width by default (Oct 26).
+const LAYOUT_KEY = "gravv-overview-layout-v2";
 const STYLE_KEY = "gravv-overview-customize";
 type Style = "panel" | "inplace";
 

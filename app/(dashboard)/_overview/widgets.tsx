@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeftRight,
@@ -11,13 +12,17 @@ import {
   Send,
 } from "lucide-react";
 import { Roll } from "@/app/_components/roll";
-import { CurrencyFlag } from "@/app/_components/currency-flag";
 import {
+  ALL_CURRENCIES,
   AS_OF as ACCOUNTS_AS_OF,
   accounts,
   type Currency,
 } from "../account/_data";
-import { SYMBOL } from "../account/_components/currency";
+import {
+  BalancePanel,
+  MAX_SHOWN,
+  SHOWN_KEY,
+} from "../account/_components/accounts-workspace";
 import {
   MONTH_DAYS,
   PROGRAM_LIMIT,
@@ -93,116 +98,70 @@ export function Open({
 
 /* ——— Balance ——— */
 
-const SHOWN: Currency[] = ["USD", "EUR", "GBP", "NGN"];
-
+/**
+ * The Accounts page's own balance chart — same line, previous period, daily change, 7D/30D/90D
+ * and currency set (shared with Accounts through storage), so both pages always agree.
+ */
 function BalanceWidget() {
+  const router = useRouter();
+  const [shown, setShown] = useState<Currency[]>(["USD", "EUR", "GBP", "NGN"]);
   const [c, setC] = useState<Currency>("USD");
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(SHOWN_KEY) ?? "null");
+        if (Array.isArray(saved)) {
+          const valid = saved
+            .filter((x): x is Currency => ALL_CURRENCIES.includes(x))
+            .slice(0, MAX_SHOWN);
+          if (valid.length) {
+            setShown(valid);
+            setC(valid[0]);
+          }
+        }
+      } catch {}
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+  const save = (next: Currency[]) => {
+    setShown(next);
+    if (!next.includes(c) && next.length) setC(next[0]);
+    try {
+      localStorage.setItem(SHOWN_KEY, JSON.stringify(next));
+    } catch {}
+  };
   const held = accounts.filter(
     (a) => a.currency === c && (a.status === "Active" || a.status === "Frozen"),
   );
-  const total = held.reduce((s, a) => s + a.balance, 0);
-  const pending = accounts.filter(
+  const waiting = accounts.filter(
     (a) => a.currency === c && a.status === "Pending",
-  ).length;
-  // A stable 30-day change per currency for the prototype.
-  const change = { USD: 6.8, EUR: 2.1, GBP: -1.4, NGN: 11.2 }[c as "USD"] ?? 0;
-  const banks = [...new Set(held.map((a) => a.bank))];
-  return (
-    <div>
-      <div role="tablist" className="flex items-center gap-0.5">
-        {SHOWN.map((k) => (
-          <button
-            key={k}
-            type="button"
-            role="tab"
-            aria-selected={c === k}
-            onClick={() => setC(k)}
-            className={`flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] ${c === k ? "" : "text-neutral-500 hover:text-neutral-200"}`}
-          >
-            <CurrencyFlag code={k} size={14} />
-            {k}
-          </button>
-        ))}
-      </div>
-      <div className="mt-4 text-[34px] leading-none font-medium tracking-[-0.035em] text-white">
-        <Big value={total} symbol={SYMBOL[c]} />
-      </div>
-      <p className="mt-2.5 text-[13px] text-neutral-400">
-        <span
-          className={change >= 0 ? "text-[var(--ok-fg)]" : "text-neutral-300"}
-        >
-          {change >= 0 ? "+" : "−"}
-          {Math.abs(change).toFixed(1)}%
-        </span>{" "}
-        in 30 days · across {held.length.toLocaleString("en-US")} accounts at{" "}
-        {banks.length} bank{banks.length === 1 ? "" : "s"}
-        {pending > 0 && ` · ${pending} more being set up`}
-      </p>
-      <Trend
-        total={total}
-        change={change}
-        symbol={SYMBOL[c]}
-        seed={c.charCodeAt(0)}
-      />
-    </div>
   );
-}
-
-/** The last 30 days as daily bars; hover a day for its balance. */
-function Trend({
-  total,
-  change,
-  symbol,
-  seed,
-}: {
-  total: number;
-  change: number;
-  symbol: string;
-  seed: number;
-}) {
-  const [day, setDay] = useState<number | null>(null);
-  const start = total / (1 + change / 100);
-  const days = Array.from({ length: 30 }, (_, i) => {
-    if (i === 29) return total;
-    const wobble =
-      Math.sin((i + 1) * 1.7 + seed) * 0.012 +
-      Math.sin((i + 3) * 0.6 + seed) * 0.008;
-    return (start + ((total - start) * i) / 29) * (1 + wobble);
-  });
-  const lo = Math.min(...days) * 0.985;
-  const hi = Math.max(...days);
-  const fmt = (v: number) =>
-    `${symbol}${Math.round(v).toLocaleString("en-US")}`;
+  const all = accounts.filter((a) => a.currency === c).length;
   return (
-    <div className="mt-6">
-      <div className="flex items-baseline justify-between text-[12px] text-neutral-500 tabular-nums">
-        <span>Last 30 days</span>
-        <span className={day !== null ? "amount text-neutral-300" : ""}>
-          {day !== null
-            ? `${fmt(days[day])} · ${dayFmt.format(NOW - (29 - day) * DAY)}`
-            : "Today"}
-        </span>
-      </div>
-      <div
-        className="mt-2 flex h-16 items-end gap-[2px]"
-        onMouseLeave={() => setDay(null)}
-      >
-        {days.map((v, i) => (
-          <span
-            key={i}
-            className="flex h-full flex-1 items-end"
-            onMouseEnter={() => setDay(i)}
-          >
-            <span
-              className={`block w-full rounded-t-[2px] transition-opacity ${i === 29 ? "bg-[var(--flow-in)]" : "bg-[color-mix(in_srgb,var(--flow-in)_35%,transparent)]"} ${day !== null && day !== i ? "opacity-40" : ""}`}
-              style={{
-                height: `${Math.max(6, ((v - lo) / (hi - lo || 1)) * 100)}%`,
-              }}
-            />
-          </span>
-        ))}
-      </div>
-    </div>
+    <BalancePanel
+      label=""
+      total={held.reduce((s, a) => s + a.balance, 0)}
+      currency={c}
+      currencies={shown}
+      onCurrency={setC}
+      onCurrencies={save}
+      counts={
+        Object.fromEntries(
+          ALL_CURRENCIES.map((k) => [
+            k,
+            accounts.filter((a) => a.currency === k).length,
+          ]),
+        ) as Record<Currency, number>
+      }
+      onOpenAccount={() => router.push("/account")}
+      funded={held.length}
+      waiting={
+        waiting.length
+          ? { count: waiting.length, bank: waiting[0].bank }
+          : undefined
+      }
+      accountsNote={`Across ${held.length.toLocaleString("en-US")} of ${all.toLocaleString("en-US")} accounts`}
+    />
   );
 }
 
@@ -776,13 +735,13 @@ export const WIDGETS: Record<
 export type Slot = { id: WidgetId; w: Width };
 
 export const DEFAULT_LAYOUT: Slot[] = [
-  { id: "balance", w: 4 },
+  { id: "balance", w: 6 },
   { id: "needs", w: 2 },
   { id: "flow", w: 2 },
   { id: "cards", w: 2 },
-  { id: "collections", w: 2 },
   { id: "recent", w: 4 },
+  { id: "collections", w: 2 },
   { id: "desk", w: 2 },
-  { id: "links", w: 3 },
-  { id: "provisioning", w: 3 },
+  { id: "links", w: 2 },
+  { id: "provisioning", w: 2 },
 ];

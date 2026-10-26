@@ -105,8 +105,8 @@ function withProblems(all: Account[]): Account[] {
 }
 const CURRENCIES: ("All" | Currency)[] = ["All", ...ALL_CURRENCIES];
 /** The balance can be shown in up to this many currencies at once. */
-const MAX_SHOWN = 4;
-const SHOWN_KEY = "gravv-accounts-currencies";
+export const MAX_SHOWN = 4;
+export const SHOWN_KEY = "gravv-accounts-currencies";
 const DEFAULT_SHOWN: Currency[] = ["USD", "EUR", "GBP", "NGN"];
 const CATEGORIES: ("All" | Category)[] = ["All", "Individual", "Business"];
 
@@ -1526,7 +1526,7 @@ const compactMoney = (v: number) =>
  * moves the headline to that day (Stripe-style), the previous period sits behind as a dashed
  * line, and a strip of daily net change gives the shape its reasons.
  */
-function BalancePanel({
+export function BalancePanel({
   total,
   currency,
   currencies,
@@ -1537,7 +1537,10 @@ function BalancePanel({
   funded,
   waiting,
   accountsNote,
+  label = "Balance",
 }: {
+  /** The word before the currency switch; "" when a frame already titles it (Overview). */
+  label?: string;
   total: number;
   currency: Currency;
   currencies: Currency[];
@@ -1594,7 +1597,7 @@ function BalancePanel({
       <div className="flex items-start justify-between gap-6">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-[13px] text-neutral-500">
-            <span>Balance</span>
+            {label && <span>{label}</span>}
             {/* Currency switch lives with the number it changes */}
             <span className="flex rounded-full bg-white/[0.06] p-0.5">
               {currencies.map((c) => (
