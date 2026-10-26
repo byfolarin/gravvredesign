@@ -12,12 +12,20 @@ import {
   PanelLeftOpen,
   Pencil,
   X,
+  MoreHorizontal,
 } from "lucide-react";
 import { NavIcon } from "../icons/nav-icon";
 import { navSections, type NavLink, type NavSection } from "./nav-config";
 import { AccountMenu } from "./account-menu";
 import { NeedsSidebar } from "@/app/(dashboard)/_overview/needs-you";
 import { UPDATES, UpdateArt, useDismissed } from "../updates";
+
+/** Group names in the collapsed rail, short enough for 60px. */
+const SHORT: Record<string, string> = {
+  "Card Collection": "CARD",
+  Manage: "MANAGE",
+  Billing: "BILLING",
+};
 
 function cx(...classes: (string | false | null | undefined)[]) {
   return classes.filter(Boolean).join(" ");
@@ -222,11 +230,23 @@ export function Sidebar({
           </p>
         )}
         {sections.map((section, s) => {
+          // Folding works in the rail too: a folded group shows as one "…" button.
           const open =
-            editing ||
-            collapsed ||
-            !section.label ||
-            !closedSections.has(section.label);
+            editing || !section.label || !closedSections.has(section.label);
+          const fold = () => {
+            setTip(null);
+            setClosedSections((prev) => {
+              const next = new Set(prev);
+              if (next.has(section.label!)) next.delete(section.label!);
+              else next.add(section.label!);
+              return next;
+            });
+          };
+          const tipAt = (label: string, el: HTMLElement) =>
+            setTip({
+              label,
+              top: el.getBoundingClientRect().top + el.offsetHeight / 2,
+            });
           const items = editing
             ? section.items
             : section.items.filter((it) => !hidden.has(it.href));
@@ -237,9 +257,29 @@ export function Sidebar({
               className={cx(s > 0 && (collapsed ? "mt-3" : "mt-5"))}
             >
               {collapsed
-                ? s > 0 && (
+                ? s > 0 &&
+                  (section.label ? (
+                    // The group's name, short, under a hairline — full name on hover; click folds it.
+                    <button
+                      type="button"
+                      onClick={fold}
+                      aria-expanded={open}
+                      aria-label={`${section.label}: ${open ? "fold" : "show"}`}
+                      onMouseEnter={(e) =>
+                        tipAt(
+                          `${section.label} · ${open ? "click to fold" : `${items.length} pages`}`,
+                          e.currentTarget,
+                        )
+                      }
+                      onMouseLeave={() => setTip(null)}
+                      className="mb-1.5 block w-full border-t border-white/8 pt-2 text-center font-mono text-[8.5px] leading-none tracking-[0.08em] text-neutral-600 transition-colors hover:text-neutral-300"
+                    >
+                      {SHORT[section.label] ??
+                        section.label.slice(0, 6).toUpperCase()}
+                    </button>
+                  ) : (
                     <div aria-hidden className="mx-2 mb-3 h-px bg-white/8" />
-                  )
+                  ))
                 : section.label && (
                     <button
                       type="button"
@@ -269,6 +309,23 @@ export function Sidebar({
                       )}
                     </button>
                   )}
+              {collapsed && !open && (
+                <button
+                  type="button"
+                  onClick={fold}
+                  aria-label={`Show ${section.label}`}
+                  onMouseEnter={(e) =>
+                    tipAt(
+                      `${section.label} · ${items.length} pages · click to show`,
+                      e.currentTarget,
+                    )
+                  }
+                  onMouseLeave={() => setTip(null)}
+                  className="flex h-8 w-9 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-white/[0.06] hover:text-white"
+                >
+                  <MoreHorizontal size={16} strokeWidth={1.75} />
+                </button>
+              )}
               {open && (
                 <ul
                   className="flex flex-col gap-px"
