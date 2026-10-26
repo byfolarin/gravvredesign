@@ -12,8 +12,8 @@ import {
   type Width,
 } from "./widgets";
 
-// v2: Balance became full width by default (Oct 26).
-const LAYOUT_KEY = "gravv-overview-layout-v2";
+// v3: Mercury-style two columns, Money in / Money out split (Oct 26).
+const LAYOUT_KEY = "gravv-overview-layout-v3";
 const STYLE_KEY = "gravv-overview-customize";
 type Style = "panel" | "inplace";
 
@@ -257,7 +257,7 @@ export function Overview() {
 
             {/* The widgets */}
             <div
-              className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-6"
+              className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-6"
               onDragOver={(e) => editing && drag && e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
@@ -387,9 +387,9 @@ function Frame({
             : e.clientX > r.left + r.width / 2;
         onOver(after);
       }}
-      className={`relative min-w-0 rounded-2xl transition-[opacity,box-shadow] ${w.bare ? (editing ? "p-3" : "") : "bg-white/[0.025] p-5"} ${SPAN[s.w]} ${editing ? "cursor-grab ring-1 ring-white/12 active:cursor-grabbing" : ""} ${dragging ? "opacity-40" : ""}`}
+      className={`relative min-w-0 rounded-2xl transition-[opacity,box-shadow] ${w.bare ? (editing ? "p-3" : "") : "bg-white/[0.025] p-6"} ${SPAN[s.w]} ${editing ? "cursor-grab ring-1 ring-white/12 active:cursor-grabbing" : ""} ${dragging ? "opacity-40" : ""}`}
     >
-      <header className="mb-4 flex items-center justify-between gap-3">
+      <header className="mb-6 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-1.5">
           {editing && (
             <GripVertical

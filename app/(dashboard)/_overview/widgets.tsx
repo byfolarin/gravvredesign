@@ -280,75 +280,111 @@ function NeedsWidget() {
   );
 }
 
-/* ——— Money in / out ——— */
+/* ——— Stat cards: one figure, one sentence, at most one visual (Mercury home) ——— */
+
+function Stat({
+  figure,
+  line,
+  children,
+}: {
+  figure: React.ReactNode;
+  line: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="text-[26px] leading-none font-medium tracking-[-0.03em] text-white">
+        {figure}
+      </div>
+      <p className="mt-3 text-[13px] leading-relaxed text-neutral-400">
+        {line}
+      </p>
+      {children && <div className="mt-5">{children}</div>}
+    </div>
+  );
+}
 
 const month = transactions.filter(
   (t) =>
     t.status === "Completed" &&
     NOW - new Date(t.createdAt).getTime() <= 30 * DAY,
 );
+const party = (t: Transaction) =>
+  (t.direction === "Credit" ? t.source : t.destination).name;
+/** The counterparty that moved the most, one direction. */
+function topParty(dir: "Credit" | "Debit") {
+  const by = new Map<string, number>();
+  for (const t of month.filter((t) => t.direction === dir))
+    by.set(party(t), (by.get(party(t)) ?? 0) + t.amount);
+  return [...by.entries()].sort((x, y) => y[1] - x[1])[0];
+}
 
-function FlowWidget() {
-  const inn = month
-    .filter((t) => t.direction === "Credit")
-    .reduce((s, t) => s + t.amount, 0);
-  const out = month
-    .filter((t) => t.direction === "Debit")
-    .reduce((s, t) => s + t.amount, 0);
-  const net = inn - out;
-  const total = Math.max(1, inn + out);
+function MoneyInWidget() {
+  const list = month.filter((t) => t.direction === "Credit");
+  const top = topParty("Credit");
   return (
-    <div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <div className="text-[12px] text-neutral-500">In</div>
-          <div className="amount mt-1 text-[22px] font-medium tracking-[-0.03em] text-[var(--ok-fg)] tabular-nums">
-            +{compact(inn)}
-          </div>
-        </div>
-        <div>
-          <div className="text-[12px] text-neutral-500">Out</div>
-          <div className="amount mt-1 text-[22px] font-medium tracking-[-0.03em] text-white tabular-nums">
-            −{compact(out)}
-          </div>
-        </div>
-      </div>
-      {/* In and out as one bar, split where they meet */}
-      <div className="mt-4 flex h-2 gap-[3px]" aria-hidden>
-        <span
-          className="h-full rounded-full bg-[var(--flow-in)]"
-          style={{ width: `${(inn / total) * 100}%` }}
-        />
-        <span className="h-full flex-1 rounded-full bg-[color-mix(in_srgb,var(--color-white)_55%,transparent)]" />
-      </div>
-      <p className="mt-3 text-[12.5px] text-neutral-400">
-        {net >= 0 ? "Up" : "Down"}{" "}
-        <span className="amount text-neutral-200">
-          {compact(Math.abs(net))}
-        </span>{" "}
-        over 30 days · {month.length} completed transactions
-      </p>
-    </div>
+    <Stat
+      figure={
+        <span className="amount text-[var(--ok-fg)] tabular-nums">
+          +$<Roll value={usd(list.reduce((s, t) => s + t.amount, 0)).slice(1)} />
+        </span>
+      }
+      line={
+        <>
+          {list.length} payments in over 30 days
+          {top && (
+            <>
+              {" "}
+              · most from <span className="text-neutral-200">{top[0]}</span>
+            </>
+          )}
+        </>
+      }
+    />
   );
 }
 
-/* ——— Card spend ——— */
+function MoneyOutWidget() {
+  const list = month.filter((t) => t.direction === "Debit");
+  const top = topParty("Debit");
+  return (
+    <Stat
+      figure={
+        <span className="amount tabular-nums">
+          −$<Roll value={usd(list.reduce((s, t) => s + t.amount, 0)).slice(1)} />
+        </span>
+      }
+      line={
+        <>
+          {list.length} payments out over 30 days
+          {top && (
+            <>
+              {" "}
+              · most to <span className="text-neutral-200">{top[0]}</span>
+            </>
+          )}
+        </>
+      }
+    />
+  );
+}
 
 function CardsWidget() {
   const spent = monthlySpend.spent;
   const pace = (spent / SPEND_DAY) * MONTH_DAYS;
   const at = (v: number) => `${Math.min(100, (v / PROGRAM_LIMIT) * 100)}%`;
   return (
-    <div>
-      <div className="text-[22px] leading-none font-medium tracking-[-0.03em] text-white">
-        <Big value={spent} />
-      </div>
-      <p className="mt-2 text-[12.5px] text-neutral-400">
-        On pace for{" "}
-        <span className="amount text-neutral-200">{compact(pace)}</span> of the{" "}
-        {compact(PROGRAM_LIMIT)} limit
-      </p>
-      <div className="mt-4 flex h-2 gap-[3px]" aria-hidden>
+    <Stat
+      figure={<Big value={spent} />}
+      line={
+        <>
+          Spent on cards this month · on pace for{" "}
+          <span className="amount text-neutral-200">{compact(pace)}</span> of{" "}
+          {compact(PROGRAM_LIMIT)}
+        </>
+      }
+    >
+      <div className="flex h-2 gap-[3px]" aria-hidden>
         <span
           className="h-full rounded-full bg-[var(--flow-in)]"
           style={{ width: at(spent) }}
@@ -359,162 +395,106 @@ function CardsWidget() {
         />
         <span className="h-full flex-1 rounded-full bg-white/[0.07]" />
       </div>
-      <p className="mt-3 text-[12px] text-neutral-500">
-        {cards.filter((c) => c.status === "Active").length} active of{" "}
-        {cards.length} cards
-      </p>
-    </div>
+    </Stat>
   );
 }
-
-/* ——— Collections ——— */
 
 function CollectionsWidget() {
   const recent = collections.filter(
     (c) => NOW - new Date(c.createdAt).getTime() <= 30 * DAY,
   );
   const settled = recent.filter((c) => c.status === "Settlement completed");
-  const charged = recent.filter(
-    (c) => !["Payment failed", "Expired", "Abandoned"].includes(c.status),
-  );
-  const steps = [
-    { label: "Started", n: recent.length },
-    { label: "Charged", n: charged.length },
-    { label: "Settled", n: settled.length },
-  ];
+  const stuck = recent.filter(isStuck).length;
   return (
-    <div>
-      <div className="text-[22px] leading-none font-medium tracking-[-0.03em] text-white">
-        <Big value={settled.reduce((s, c) => s + c.subtotal, 0)} />
-        <span className="ml-1.5 text-[13px] font-normal text-neutral-500">
-          USDC
-        </span>
-      </div>
-      <p className="mt-2 text-[12.5px] text-neutral-400">
-        Settled from card payments in 30 days
-      </p>
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        {steps.map((s) => (
-          <div key={s.label}>
-            <div className="text-[15px] font-medium text-white tabular-nums">
-              {s.n}
-            </div>
-            <div className="mt-1 h-1 rounded-full bg-white/[0.06]">
-              <div
-                className="h-full rounded-full bg-[color-mix(in_srgb,var(--color-white)_60%,transparent)]"
-                style={{
-                  width: `${(s.n / Math.max(1, recent.length)) * 100}%`,
-                }}
-              />
-            </div>
-            <div className="mt-1 text-[11.5px] text-neutral-500">{s.label}</div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <Stat
+      figure={
+        <>
+          <Big value={settled.reduce((s, c) => s + c.subtotal, 0)} />
+          <span className="ml-1.5 text-[13px] font-normal tracking-normal text-neutral-500">
+            USDC
+          </span>
+        </>
+      }
+      line={
+        <>
+          Settled from cards in 30 days · {settled.length} of {recent.length}{" "}
+          payments made it
+          {stuck > 0 && `, ${stuck} waiting to settle`}
+        </>
+      }
+    />
   );
 }
-
-/* ——— Payment links ——— */
 
 function LinksWidget() {
   const toUsd = (v: number, c: string) => (c === "NGN" ? v / 1500 : v);
   const rows = links
-    .map((l) => {
-      const paid = l.payments.filter(
-        (p) =>
-          p.status === "Paid" && NOW - new Date(p.date).getTime() <= 30 * DAY,
-      );
-      return {
-        l,
-        n: paid.length,
-        v: paid.reduce((s, p) => s + toUsd(p.amount, l.currency), 0),
-      };
-    })
-    .filter((r) => r.n > 0)
+    .map((l) => ({
+      l,
+      v: l.payments
+        .filter(
+          (p) =>
+            p.status === "Paid" && NOW - new Date(p.date).getTime() <= 30 * DAY,
+        )
+        .reduce((s, p) => s + toUsd(p.amount, l.currency), 0),
+    }))
     .sort((a, b) => b.v - a.v);
   const total = rows.reduce((s, r) => s + r.v, 0);
-  const active = links.filter((l) => l.status === "Active").length;
   return (
-    <div>
-      <div className="text-[22px] leading-none font-medium tracking-[-0.03em] text-white">
-        <Big value={total} />
-      </div>
-      <p className="mt-2 text-[12.5px] text-neutral-400">
-        Collected in 30 days (USD-eq) · {active} links live
-      </p>
-      <ul className="mt-3 space-y-1.5">
-        {rows.slice(0, 3).map((r) => (
-          <li
-            key={r.l.id}
-            className="flex items-baseline justify-between gap-3 text-[12.5px]"
-          >
-            <Link
-              href={`/payment-links/${r.l.id}`}
-              className="min-w-0 truncate text-neutral-200 hover:text-white"
-            >
-              {r.l.name}
-            </Link>
-            <span className="amount shrink-0 text-neutral-400 tabular-nums">
-              {compact(r.v)} · {r.n} paid
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Stat
+      figure={<Big value={total} />}
+      line={
+        <>
+          Collected by payment links in 30 days · most from{" "}
+          <span className="text-neutral-200">{rows[0]?.l.name}</span>
+        </>
+      }
+    />
   );
 }
 
-/* ——— Trade desk ——— */
-
 function DeskWidget() {
+  const p = PAIRS[0];
   const open = ORDERS.filter(
     (o) => !["Settled", "Cancelled", "Rejected"].includes(o.status),
-  );
+  ).length;
   return (
-    <div>
-      <ul className="space-y-2">
-        {PAIRS.slice(0, 4).map((p) => (
-          <li
-            key={p.id}
-            className="flex items-baseline justify-between gap-3 text-[13px]"
+    <Stat
+      figure={
+        <span className="tabular-nums">
+          {p.rate.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+          <span className="ml-1.5 text-[13px] font-normal tracking-normal text-neutral-500">
+            {p.sell} → {p.get}
+          </span>
+        </span>
+      }
+      line={
+        <>
+          <span
+            className={
+              p.change24h > 0.05
+                ? "text-[var(--ok-fg)]"
+                : p.change24h < -0.05
+                  ? "text-rose-300"
+                  : ""
+            }
           >
-            <span className="text-neutral-200">
-              {p.sell} <span className="text-neutral-600">→</span> {p.get}
-            </span>
-            <span className="flex items-baseline gap-2 tabular-nums">
-              <span className="text-white">
-                {p.rate.toLocaleString("en-US", {
-                  maximumFractionDigits: p.rate < 10 ? 4 : 2,
-                })}
-              </span>
-              <span
-                className={`w-12 text-right text-[12px] ${p.change24h > 0.05 ? "text-[var(--ok-fg)]" : p.change24h < -0.05 ? "text-rose-300" : "text-neutral-500"}`}
-              >
-                {p.change24h > 0 ? "+" : ""}
-                {p.change24h.toFixed(2)}%
-              </span>
-            </span>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-3 border-t border-white/6 pt-2.5 text-[12px] text-neutral-500">
-        {open.length} open order{open.length === 1 ? "" : "s"} · rates are
-        indicative
-      </p>
-    </div>
+            {p.change24h > 0 ? "+" : ""}
+            {p.change24h.toFixed(2)}%
+          </span>{" "}
+          in 24h · {open} open order{open === 1 ? "" : "s"} on the desk
+        </>
+      }
+    />
   );
 }
 
 /* ——— Recent transactions ——— */
 
-const party = (t: Transaction) =>
-  (t.direction === "Credit" ? t.source : t.destination).name;
-
 function RecentWidget() {
   const rows = [...transactions]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 6);
+    .slice(0, 5);
   return (
     <ul className="-my-1 divide-y divide-white/6">
       {rows.map((t) => (
@@ -562,38 +542,19 @@ function ProvisioningWidget() {
     (o, a) => (!o || a.createdAt < o.createdAt ? a : o),
     null,
   );
-  const byBank = Object.entries(
-    pending.reduce<Record<string, number>>(
-      (m, a) => ((m[a.bank] = (m[a.bank] ?? 0) + 1), m),
-      {},
-    ),
-  )
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3);
   const days = oldest
     ? Math.round((ACCOUNTS_AS_OF - new Date(oldest.createdAt).getTime()) / DAY)
     : 0;
   return (
-    <div>
-      <div className="text-[22px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
-        <Roll value={pending.length.toLocaleString("en-US")} />
-      </div>
-      <p className="mt-2 text-[12.5px] text-neutral-400">
-        Accounts being set up
-        {oldest && ` · oldest waiting ${days}d at ${oldest.bank}`}
-      </p>
-      <ul className="mt-3 space-y-1.5">
-        {byBank.map(([bank, n]) => (
-          <li
-            key={bank}
-            className="flex items-baseline justify-between text-[12.5px]"
-          >
-            <span className="text-neutral-300">{bank}</span>
-            <span className="text-neutral-500 tabular-nums">{n}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Stat
+      figure={<Roll value={pending.length.toLocaleString("en-US")} />}
+      line={
+        <>
+          Accounts the banks are still opening
+          {oldest && ` · oldest waiting ${days} days at ${oldest.bank}`}
+        </>
+      }
+    />
   );
 }
 
@@ -636,7 +597,8 @@ function ActionsWidget() {
 export type WidgetId =
   | "balance"
   | "needs"
-  | "flow"
+  | "moneyIn"
+  | "moneyOut"
   | "cards"
   | "collections"
   | "links"
@@ -677,12 +639,19 @@ export const WIDGETS: Record<
     widths: [2, 3, 4, 6],
     body: () => <NeedsWidget />,
   },
-  flow: {
-    title: "Money in and out",
-    about: "What came in and went out over 30 days",
+  moneyIn: {
+    title: "Money in",
+    about: "What came in over 30 days, and from whom",
     href: "/transactions",
     widths: [2, 3, 4, 6],
-    body: () => <FlowWidget />,
+    body: () => <MoneyInWidget />,
+  },
+  moneyOut: {
+    title: "Money out",
+    about: "What went out over 30 days, and to whom",
+    href: "/transactions",
+    widths: [2, 3, 4, 6],
+    body: () => <MoneyOutWidget />,
   },
   cards: {
     title: "Card spend",
@@ -737,14 +706,15 @@ export const WIDGETS: Record<
 
 export type Slot = { id: WidgetId; w: Width };
 
+/** Mercury-style: two columns, cards of the same kind side by side so rows come out even. */
 export const DEFAULT_LAYOUT: Slot[] = [
   { id: "balance", w: 6 },
-  { id: "needs", w: 2 },
-  { id: "flow", w: 2 },
-  { id: "cards", w: 2 },
-  { id: "recent", w: 4 },
-  { id: "collections", w: 2 },
-  { id: "desk", w: 2 },
-  { id: "links", w: 2 },
-  { id: "provisioning", w: 2 },
+  { id: "needs", w: 3 },
+  { id: "recent", w: 3 },
+  { id: "moneyIn", w: 3 },
+  { id: "moneyOut", w: 3 },
+  { id: "cards", w: 3 },
+  { id: "collections", w: 3 },
+  { id: "links", w: 3 },
+  { id: "desk", w: 3 },
 ];
