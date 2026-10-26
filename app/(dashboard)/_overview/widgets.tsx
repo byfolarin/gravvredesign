@@ -34,7 +34,7 @@ import { REQUESTS } from "../manage/approvals/_data";
 import { daysUntil, disputes } from "../card-collection/disputes/_data";
 import { collections, isStuck } from "../card-collection/collections/_data";
 import { links } from "../payment-links/_data";
-import { ORDERS, PAIRS } from "../trade-desk/_data";
+import { ORDERS, PAIRS, usdValue } from "../trade-desk/_data";
 import { transactions, type Transaction } from "../transactions/_data";
 
 /* ——— Shared bits ——— */
@@ -167,50 +167,87 @@ function BalanceWidget() {
 
 /* ——— Needs you ——— */
 
+/**
+ * One decision waiting on you: said as the thing to do, with what's at stake, how long it has
+ * waited (or when it's due), and the one action that clears it. Deel's "For you today" rows and
+ * Gusto's task cards, with money and deadlines up front because this is a money product.
+ */
 type Need = {
-  count: number;
-  line: string;
+  key: string;
+  /** Imperative: "Approve 42 payments". */
+  title: string;
   detail: string;
+  /** USD-eq at stake, when there is money on the line. */
+  stake?: number;
+  /** "Due in 2 days" / "Oldest 3d" — the clock on it. */
+  when: string;
+  urgent: boolean;
+  action: string;
   href: string;
-  tone: "amber" | "rose";
+  /** Lower goes first. */
+  rank: number;
 };
+
+const TO_USD: Record<string, number> = {
+  USD: 1,
+  USDC: 1,
+  EUR: 1.08,
+  GBP: 1.27,
+  NGN: 1 / 1600,
+};
+const plural = (n: number, one: string, many = `${one}s`) =>
+  `${n} ${n === 1 ? one : many}`;
 
 function needs(): Need[] {
   const out: Need[] = [];
-  const pending = REQUESTS.filter((r) => r.state === "pending");
-  if (pending.length) {
-    const big = [...pending].sort((a, b) => b.amount - a.amount)[0];
-    out.push({
-      count: pending.length,
-      line: `payment${pending.length === 1 ? "" : "s"} waiting for approval`,
-      detail: `Biggest ${big.currency === "USD" || big.currency === "USDC" ? usd(big.amount) : `${big.amount.toLocaleString("en-US")} ${big.currency}`} to ${big.recipient.name}`,
-      href: "/manage/approvals",
-      tone: "amber",
-    });
-  }
   const respond = disputes.filter((d) => d.status === "Needs response");
   if (respond.length) {
     const next = Math.min(...respond.map((d) => daysUntil(d.dueAt)));
     out.push({
-      count: respond.length,
-      line: `dispute${respond.length === 1 ? "" : "s"} to answer`,
+      key: "disputes",
+      title: `Answer ${plural(respond.length, "dispute")}`,
       detail:
-        next <= 0
-          ? "Next one is due today"
-          : `Next one due in ${next} day${next === 1 ? "" : "s"}`,
+        "Held until you respond — the bank decides without you after the deadline",
+      stake: respond.reduce((s, d) => s + d.amount, 0),
+      when: next <= 0 ? "Due today" : `Due in ${plural(next, "day")}`,
+      urgent: next <= 3,
+      action: "Respond",
       href: "/card-collection/disputes",
-      tone: next <= 3 ? "rose" : "amber",
+      rank: next <= 3 ? 0 : 3,
     });
   }
   const stuck = collections.filter(isStuck);
   if (stuck.length)
     out.push({
-      count: stuck.length,
-      line: `card payment${stuck.length === 1 ? "" : "s"} charged but not settled`,
-      detail: `${usd(stuck.reduce((s, c) => s + c.subtotal, 0))} in USDC waiting · Retry from Collections`,
+      key: "stuck",
+      title: `Retry ${plural(stuck.length, "card payment")}`,
+      detail: "Charged to the card but not settled to you in USDC",
+      stake: stuck.reduce((s, c) => s + c.subtotal, 0),
+      when: "Waiting now",
+      urgent: true,
+      action: "Retry",
       href: "/card-collection/collections",
-      tone: "rose",
+      rank: 1,
     });
+  const pending = REQUESTS.filter((r) => r.state === "pending");
+  if (pending.length) {
+    const oldest = Math.min(...pending.map((r) => Date.parse(r.requestedAt)));
+    const days = Math.max(1, Math.round((NOW - oldest) / DAY));
+    out.push({
+      key: "approvals",
+      title: `Approve ${plural(pending.length, "payment")}`,
+      detail: `Requested by your team — nothing goes out until someone signs off`,
+      stake: pending.reduce(
+        (s, r) => s + r.amount * (TO_USD[r.currency] ?? 1),
+        0,
+      ),
+      when: `Oldest ${days}d`,
+      urgent: false,
+      action: "Review",
+      href: "/manage/approvals",
+      rank: 2,
+    });
+  }
   const desk = ORDERS.filter((o) =>
     [
       "Awaiting approval",
@@ -221,25 +258,32 @@ function needs(): Need[] {
   );
   if (desk.length)
     out.push({
-      count: desk.length,
-      line: `trade desk order${desk.length === 1 ? "" : "s"} waiting on you`,
+      key: "desk",
+      title: `Finish ${plural(desk.length, "trade desk order")}`,
       detail: desk
         .slice(0, 2)
         .map((o) => `${o.id} ${o.status.toLowerCase()}`)
         .join(" · "),
+      stake: desk.reduce((s, o) => s + usdValue(o.sell, o.sellAmount), 0),
+      when: "Rate held 15 min",
+      urgent: false,
+      action: "Open",
       href: "/trade-desk",
-      tone: "amber",
+      rank: 4,
     });
   const near = cards.filter((c) => c.spentThisMonth / c.monthlyLimit >= 0.85);
   if (near.length)
     out.push({
-      count: near.length,
-      line: `card${near.length === 1 ? "" : "s"} near their limit`,
-      detail: near.map((c) => c.holder).join(", "),
+      key: "cards",
+      title: `Check ${plural(near.length, "card")} near the limit`,
+      detail: `${near.map((c) => c.holder.split(" ")[0]).join(" and ")} will start declining at the limit`,
+      when: `Resets ${dayFmt.format(Date.UTC(2026, 10, 1))}`,
+      urgent: false,
+      action: "Raise limit",
       href: "/cards",
-      tone: "amber",
+      rank: 5,
     });
-  return out;
+  return out.sort((x, y) => x.rank - y.rank);
 }
 
 function NeedsWidget() {
@@ -250,33 +294,74 @@ function NeedsWidget() {
         Nothing needs you right now.
       </p>
     );
+  const [first, ...rest] = list;
+  const total = list.reduce((s, n) => s + (n.stake ?? 0), 0);
   return (
-    <ul className="-my-1 divide-y divide-white/6">
-      {list.map((n) => (
-        <li key={n.href}>
-          <Link href={n.href} className="group flex items-start gap-3 py-2.5">
-            <span
-              className={`w-7 shrink-0 text-[18px] leading-6 font-medium tabular-nums ${n.tone === "rose" ? "text-rose-300" : "text-amber-200"}`}
-            >
-              {n.count}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] text-neutral-100">
-                {n.line}
-              </span>
-              <span className="block truncate text-[12px] text-neutral-500">
-                {n.detail}
-              </span>
-            </span>
-            <ChevronRight
-              size={14}
-              strokeWidth={1.75}
-              className="mt-1 shrink-0 text-neutral-600 transition-colors group-hover:text-white"
-            />
+    <div>
+      <p className="-mt-2 text-[13px] text-neutral-400">
+        <span className="amount font-medium text-white">{compact(total)}</span>{" "}
+        waiting on {plural(list.length, "decision")}
+      </p>
+
+      {/* Do this first */}
+      <div className="mt-4 rounded-xl bg-white/[0.04] p-4">
+        <div
+          className={`text-[12px] ${first.urgent ? "text-rose-300" : "text-amber-200"}`}
+        >
+          Do this first · {first.when}
+        </div>
+        <div className="mt-1.5 flex items-end justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-[15px] font-medium text-white">
+              {first.title}
+              {first.stake !== undefined && (
+                <span className="amount ml-2 font-normal text-neutral-400 tabular-nums">
+                  {compact(first.stake)}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-[12.5px] leading-snug text-neutral-500">
+              {first.detail}
+            </p>
+          </div>
+          <Link
+            href={first.href}
+            className="flex h-8 shrink-0 items-center rounded-full bg-white px-3.5 text-[12.5px] font-medium text-black hover:bg-neutral-200"
+          >
+            {first.action}
           </Link>
-        </li>
-      ))}
-    </ul>
+        </div>
+      </div>
+
+      {/* Then the rest, most pressing first */}
+      <ul className="mt-2 divide-y divide-white/6">
+        {rest.map((n) => (
+          <li key={n.key} className="flex items-center gap-4 py-3">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13px] text-neutral-100">
+                {n.title}
+              </div>
+              <div className="mt-0.5 truncate text-[12px] text-neutral-500">
+                {n.stake !== undefined && (
+                  <span className="amount text-neutral-300 tabular-nums">
+                    {compact(n.stake)} ·{" "}
+                  </span>
+                )}
+                <span className={n.urgent ? "text-rose-300" : ""}>
+                  {n.when}
+                </span>
+              </div>
+            </div>
+            <Link
+              href={n.href}
+              className="flex h-7 shrink-0 items-center rounded-full border border-white/12 px-3 text-[12px] text-neutral-200 transition-colors hover:border-white/30 hover:text-white"
+            >
+              {n.action}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -326,7 +411,8 @@ function MoneyInWidget() {
     <Stat
       figure={
         <span className="amount text-[var(--ok-fg)] tabular-nums">
-          +$<Roll value={usd(list.reduce((s, t) => s + t.amount, 0)).slice(1)} />
+          +$
+          <Roll value={usd(list.reduce((s, t) => s + t.amount, 0)).slice(1)} />
         </span>
       }
       line={
@@ -351,7 +437,8 @@ function MoneyOutWidget() {
     <Stat
       figure={
         <span className="amount tabular-nums">
-          −$<Roll value={usd(list.reduce((s, t) => s + t.amount, 0)).slice(1)} />
+          −$
+          <Roll value={usd(list.reduce((s, t) => s + t.amount, 0)).slice(1)} />
         </span>
       }
       line={
@@ -494,7 +581,7 @@ function DeskWidget() {
 function RecentWidget() {
   const rows = [...transactions]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 5);
+    .slice(0, 7);
   return (
     <ul className="-my-1 divide-y divide-white/6">
       {rows.map((t) => (
