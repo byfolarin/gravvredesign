@@ -5,6 +5,7 @@ import { toneClass, toneFor } from "./tone";
  * same source as Cards and Recipients); a few stay as initials, the way real teams look.
  */
 const PHOTOS: Record<string, string> = {
+  "Folarin Folarin": "men/46",
   "Oluwatobi Bello": "men/75",
   "Amara Nwosu": "women/68",
   "Tolu Adeyemi": "men/86",
