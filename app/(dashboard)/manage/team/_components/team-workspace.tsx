@@ -30,6 +30,7 @@ import {
 } from "../../roles/_data";
 import { RULES } from "../../approvals/_data";
 import { UpdateNotice } from "@/app/_components/updates";
+import { TeamField } from "./team-field";
 
 type Tab = "members" | "invites";
 
@@ -115,6 +116,8 @@ export function TeamWorkspace() {
           Invite people
         </button>
       </div>
+
+      <TeamField members={members} />
 
       <UpdateNotice id="u-approval" place="team" />
 
