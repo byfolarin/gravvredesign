@@ -132,7 +132,7 @@ export function WhatsNewModal() {
           </div>
           <h2
             id="whats-new-title"
-            className="mt-3 font-mono text-[22px] leading-[1.2] font-medium tracking-[-0.02em]"
+            className="mt-3 text-[22px] leading-[1.2] font-medium tracking-[-0.025em]"
           >
             {u.title}
           </h2>
