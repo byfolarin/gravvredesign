@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { UpdateArt } from "@/app/_components/updates";
+import { ReplayWhatsNew } from "@/app/_components/whats-new-modal";
 import { UPDATES, updateDate } from "@/app/_components/updates-data";
 
 /** Everything Gravv shipped, newest first, each with the screen it changed. */
@@ -8,12 +9,17 @@ export default function WhatsNewPage() {
   return (
     <div className="sidebar-scroll h-full overflow-y-auto">
       <div className="mx-auto max-w-(--page-max-narrow) px-8 pt-12 pb-24">
-        <h1 className="text-[26px] font-medium tracking-[-0.025em] text-white">
-          What&apos;s new
-        </h1>
-        <p className="mt-1 text-[14px] text-neutral-500">
-          What changed in Gravv, and where to find it.
-        </p>
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <h1 className="text-[26px] font-medium tracking-[-0.025em] text-white">
+              What&apos;s new
+            </h1>
+            <p className="mt-1 text-[14px] text-neutral-500">
+              What changed in Gravv, and where to find it.
+            </p>
+          </div>
+          <ReplayWhatsNew />
+        </div>
         <ol className="mt-10 space-y-14">
           {UPDATES.map((u) => (
             <li

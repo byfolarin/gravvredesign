@@ -1,5 +1,6 @@
 "use client";
 
+import { WhatsNewModal } from "./whats-new-modal";
 import { CommandPalette, openCommand } from "./command/command-palette";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -123,6 +124,7 @@ export function TopBar() {
         </kbd>
       </button>
       <CommandPalette />
+      <WhatsNewModal />
 
       <div className="flex shrink-0 items-center gap-1">
         <ExperienceSwitch />
