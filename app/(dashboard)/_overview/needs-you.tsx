@@ -7,7 +7,7 @@ import { ArrowRight, X } from "lucide-react";
 import { compact, needs, plural, type Need } from "./widgets";
 
 const TODAY = "2026-10-20";
-const DONE_KEY = "gravv-needs-done";
+const DONE_KEY = "gravv-needs-resolved";
 
 /** One light green for every decision's art (owner's call), soft at two corners. */
 const MINT: [string, string] = ["#00ffb4", "#7dd3a8"];
@@ -175,7 +175,8 @@ function Mark({ n, done }: { n: Need; done: boolean }) {
  */
 export function NeedsSidebar() {
   const all = needs();
-  const { done, mark } = useDone();
+  // Opening a decision doesn't clear it — only resolving it on its page would.
+  const { done } = useDone();
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState<number | null>(null);
   const [top, setTop] = useState(0);
@@ -208,7 +209,6 @@ export function NeedsSidebar() {
               >
                 <Link
                   href={n.href}
-                  onClick={() => mark(n.key)}
                   onFocus={() => setHover(i)}
                   className={`flex items-center gap-2 rounded-lg px-1.5 py-1.5 text-[12.5px] transition-colors ${hover === i ? "bg-white/[0.07] text-white" : isDone ? "text-neutral-600" : "text-neutral-300"}`}
                 >
@@ -264,7 +264,6 @@ export function NeedsSidebar() {
               </p>
               <Link
                 href={h.href}
-                onClick={() => mark(h.key)}
                 className="mt-3.5 inline-flex h-8 items-center rounded-full bg-white px-3.5 text-[12.5px] font-medium text-black hover:bg-neutral-200"
               >
                 {h.action}
@@ -277,7 +276,6 @@ export function NeedsSidebar() {
         <NeedsDrawer
           lead={all[0].key}
           done={done}
-          onAct={mark}
           onClose={() => setOpen(false)}
         />
       )}
@@ -289,12 +287,10 @@ export function NeedsSidebar() {
 function NeedsDrawer({
   lead,
   done,
-  onAct,
   onClose,
 }: {
   lead: string;
   done: Set<string>;
-  onAct: (k: string) => void;
   onClose: () => void;
 }) {
   const all = needs();
@@ -355,7 +351,6 @@ function NeedsDrawer({
           <Link
             href={first.href}
             onClick={() => {
-              onAct(first.key);
               onClose();
             }}
             className="group block overflow-hidden rounded-xl ring-1 ring-white/8"
