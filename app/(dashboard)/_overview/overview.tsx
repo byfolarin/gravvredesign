@@ -12,8 +12,8 @@ import {
   type Width,
 } from "./widgets";
 
-// v3: Mercury-style two columns, Money in / Money out split (Oct 26).
-const LAYOUT_KEY = "gravv-overview-layout-v3";
+// v4: Needs you hidden by default, Recent transactions full width (Oct 26).
+const LAYOUT_KEY = "gravv-overview-layout-v4";
 const STYLE_KEY = "gravv-overview-customize";
 type Style = "panel" | "inplace";
 

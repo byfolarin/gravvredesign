@@ -796,8 +796,7 @@ export type Slot = { id: WidgetId; w: Width };
 /** Mercury-style: two columns, cards of the same kind side by side so rows come out even. */
 export const DEFAULT_LAYOUT: Slot[] = [
   { id: "balance", w: 6 },
-  { id: "needs", w: 3 },
-  { id: "recent", w: 3 },
+  { id: "recent", w: 6 },
   { id: "moneyIn", w: 3 },
   { id: "moneyOut", w: 3 },
   { id: "cards", w: 3 },
