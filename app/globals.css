@@ -760,3 +760,18 @@ sub {
     transparent 1.5px 5px
   );
 }
+
+/* Overview empty state: the page screenshot drifts down its page and back, like a short loop. */
+@keyframes shot-pan {
+  0%, 12% { transform: translate3d(0, 0, 0) scale(1); }
+  50%, 62% { transform: translate3d(-2%, -34%, 0) scale(1.03); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+.shot-pan {
+  animation: shot-pan 16s cubic-bezier(.45,0,.25,1) infinite;
+  transform-origin: top left;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shot-pan { animation: none; }
+}

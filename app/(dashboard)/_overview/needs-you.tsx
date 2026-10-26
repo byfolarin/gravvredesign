@@ -44,27 +44,47 @@ const ART: Record<
   },
 };
 
-function NeedArt({ k, className = "" }: { k: string; className?: string }) {
-  const a = ART[k];
-  if (!a) return <div className={`bg-[#e6f9f0] ${className}`} />;
+/** A page screenshot (16:10, from public/needs) on the light green — shared with Overview's empty state. */
+export function ShotArt({
+  src,
+  className = "",
+  moving = false,
+  delay = 0,
+}: {
+  src?: string;
+  className?: string;
+  /** Bleed off the right edge and drift down the page and back, on a loop. */
+  moving?: boolean;
+  /** Seconds, so cards side by side don't move in step. */
+  delay?: number;
+}) {
+  if (!src) return <div className={`bg-[#e6f9f0] ${className}`} />;
   return (
     <div
       className={`relative overflow-hidden ${className}`}
       style={{
         // Its own light green base in every theme — never the dark surface.
-        background: `radial-gradient(120% 90% at 0% 0%, ${a.glow[0]}66, transparent 60%), radial-gradient(110% 90% at 100% 100%, ${a.glow[1]}73, transparent 62%), linear-gradient(135deg, #f1fcf7, #d9f6e8)`,
+        background: `radial-gradient(120% 90% at 0% 0%, ${MINT[0]}66, transparent 60%), radial-gradient(110% 90% at 100% 100%, ${MINT[1]}73, transparent 62%), linear-gradient(135deg, #f1fcf7, #d9f6e8)`,
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- local product screenshots */}
       <img
-        src={a.image}
+        src={src}
         alt=""
         loading="lazy"
-        // Scaled to the frame and read from the top (header + key figures), never a stray corner.
-        className="absolute top-[13%] left-[9%] h-auto w-[82%] max-w-none rounded-t-md border border-b-0 border-black/10 shadow-[0_12px_40px_-12px_rgb(0_0_0/0.35)]"
+        className={
+          moving
+            ? "shot-pan absolute top-[12%] left-[8%] h-auto w-[112%] max-w-none rounded-tl-lg border-t border-l border-black/10 shadow-[0_12px_40px_-12px_rgb(0_0_0/0.35)]"
+            : "absolute top-[13%] left-[9%] h-auto w-[82%] max-w-none rounded-t-md border border-b-0 border-black/10 shadow-[0_12px_40px_-12px_rgb(0_0_0/0.35)]"
+        }
+        style={moving ? { animationDelay: `${-delay}s` } : undefined}
       />
     </div>
   );
+}
+
+function NeedArt({ k, className = "" }: { k: string; className?: string }) {
+  return <ShotArt src={ART[k]?.image} className={className} />;
 }
 
 /** Decisions acted on today (their action was clicked), for the ring. */

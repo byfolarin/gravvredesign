@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,6 +12,7 @@ import {
   Send,
 } from "lucide-react";
 import { Roll } from "@/app/_components/roll";
+import { toneClass, toneFor } from "@/app/_components/tone";
 import {
   ALL_CURRENCIES,
   AS_OF as ACCOUNTS_AS_OF,
@@ -499,46 +500,162 @@ function DeskWidget() {
 
 /* ——— Recent transactions ——— */
 
-function RecentWidget() {
-  const rows = [...transactions]
+export type RecentStyle = "list" | "feed";
+/** How Recent transactions reads — set by the Overview header (prototype switch). */
+export const RecentStyleContext = createContext<RecentStyle>("list");
+
+const latest = () =>
+  [...transactions]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 7);
+    .slice(0, 8);
+const dayLabel = (iso: string) => {
+  const d = Math.floor((NOW - Date.parse(iso)) / DAY);
+  if (d <= 0) return "Today";
+  if (d === 1) return "Yesterday";
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(iso));
+};
+const agoShort = (iso: string) => {
+  const m = Math.max(1, Math.round((NOW - Date.parse(iso)) / 60_000));
+  if (m < 60) return `${m}m`;
+  const h = Math.round(m / 60);
+  return h < 24 ? `${h}h` : dayFmt.format(new Date(iso));
+};
+const isWallet = (t: Transaction) =>
+  (t.direction === "Credit" ? t.source : t.destination).kind === "wallet";
+
+/** Who's on the other side: a tinted initial for a bank or business, "0x" for a wallet. */
+function PartyMark({ t, size = 30 }: { t: Transaction; size?: number }) {
+  const name = party(t);
   return (
-    <ul className="-my-1 divide-y divide-white/6">
-      {rows.map((t) => (
-        <li key={t.id}>
-          <Link
-            href={`/transactions?q=${encodeURIComponent(t.id)}`}
-            className="flex items-center gap-4 py-2.5 text-[13px]"
-          >
-            <span className="w-14 shrink-0 text-[12px] text-neutral-500 tabular-nums">
-              {dayFmt.format(new Date(t.createdAt))}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium text-white">
-                {party(t)}
-              </span>
-              <span className="block truncate text-[12px] text-neutral-500">
-                {t.type} · {t.channel}
-              </span>
-            </span>
-            {t.status !== "Completed" && (
-              <span
-                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${t.status === "Failed" ? "bg-rose-400/10 text-rose-300" : "bg-amber-300/10 text-amber-200"}`}
-              >
-                {t.status}
-              </span>
-            )}
-            <span
-              className={`amount w-24 shrink-0 text-right tabular-nums ${t.status === "Failed" ? "text-neutral-600 line-through" : t.direction === "Credit" ? "text-[var(--ok-fg)]" : "text-white"}`}
-            >
-              {t.direction === "Credit" ? "+" : "−"}
-              {usd(t.amount, 2)}
-            </span>
-          </Link>
-        </li>
+    <span
+      className={`flex shrink-0 items-center justify-center rounded-full text-[11px] font-medium ${isWallet(t) ? "bg-white/[0.07] font-mono text-neutral-300" : toneClass(toneFor(name))}`}
+      style={{ width: size, height: size }}
+      aria-hidden
+    >
+      {isWallet(t) ? "0x" : name[0]}
+    </span>
+  );
+}
+
+/** Mercury-style ledger: grouped by day, one line per movement, open on the page. */
+function RecentList() {
+  const rows = latest();
+  const groups: { label: string; rows: Transaction[] }[] = [];
+  for (const t of rows) {
+    const l = dayLabel(t.createdAt);
+    const g = groups[groups.length - 1];
+    if (g?.label === l) g.rows.push(t);
+    else groups.push({ label: l, rows: [t] });
+  }
+  return (
+    <div className="-mt-1">
+      {groups.map((g) => (
+        <div key={g.label} className="mt-4 first:mt-0">
+          <div className="text-[12px] text-neutral-500">{g.label}</div>
+          <ul className="mt-1 divide-y divide-white/6">
+            {g.rows.map((t) => (
+              <li key={t.id}>
+                <Link
+                  href={`/transactions?q=${encodeURIComponent(t.id)}`}
+                  className="group flex items-center gap-3.5 py-2.5"
+                >
+                  <PartyMark t={t} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13.5px] font-medium text-white">
+                      {party(t)}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[12px] text-neutral-500">
+                      {t.type} · {t.channel}
+                    </span>
+                  </span>
+                  {t.status !== "Completed" && (
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${t.status === "Failed" ? "bg-rose-400/10 text-rose-300" : "bg-amber-300/10 text-amber-200"}`}
+                    >
+                      {t.status}
+                    </span>
+                  )}
+                  <span
+                    className={`amount w-28 shrink-0 text-right text-[13.5px] tabular-nums ${t.status === "Failed" ? "text-neutral-600 line-through" : t.direction === "Credit" ? "text-[var(--ok-fg)]" : "text-white"}`}
+                  >
+                    {t.direction === "Credit" ? "+" : "−"}
+                    {usd(t.amount, 2)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       ))}
+    </div>
+  );
+}
+
+/** The same movements as plain sentences — who, how much, how, and when. */
+function RecentFeed() {
+  return (
+    <ul className="-mt-1 divide-y divide-white/6">
+      {latest().map((t) => {
+        const failed = t.status === "Failed";
+        const amt = (
+          <span
+            className={`amount font-medium tabular-nums ${failed ? "text-neutral-500 line-through" : t.direction === "Credit" ? "text-[var(--ok-fg)]" : "text-white"}`}
+          >
+            {t.direction === "Credit" ? "+" : "−"}
+            {usd(t.amount, 2)}
+          </span>
+        );
+        const who = <span className="font-medium text-white">{party(t)}</span>;
+        return (
+          <li key={t.id}>
+            <Link
+              href={`/transactions?q=${encodeURIComponent(t.id)}`}
+              className="flex items-center gap-3 py-3"
+            >
+              <PartyMark t={t} size={26} />
+              <span className="min-w-0 flex-1 truncate text-[13px] text-neutral-400">
+                {failed ? (
+                  <>
+                    {who}
+                    {t.direction === "Credit" ? "\u2019s" : ""} {amt} by{" "}
+                    {t.channel}{" "}
+                    <span className="text-rose-300">
+                      didn&apos;t go through
+                    </span>
+                  </>
+                ) : t.direction === "Credit" ? (
+                  <>
+                    {who} sent you {amt} by {t.channel}
+                  </>
+                ) : (
+                  <>
+                    You sent {amt} to {who} on {t.channel}
+                  </>
+                )}
+                {t.status === "Pending" && (
+                  <span className="text-amber-200"> · pending</span>
+                )}
+              </span>
+              <span className="shrink-0 text-[12px] text-neutral-500 tabular-nums">
+                {agoShort(t.createdAt)}
+              </span>
+            </Link>
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+function RecentWidget() {
+  return useContext(RecentStyleContext) === "feed" ? (
+    <RecentFeed />
+  ) : (
+    <RecentList />
   );
 }
 
@@ -614,8 +731,8 @@ export type WidgetId =
   | "provisioning"
   | "actions";
 
-/** Width in a 6-column grid: ⅓ = 2, ½ = 3, ⅔ = 4, full = 6. */
-export type Width = 2 | 3 | 4 | 6;
+/** Main = the wide column (Balance, Recent transactions); side = the fact cards beside it. */
+export type Column = "main" | "side";
 
 export const WIDGETS: Record<
   WidgetId,
@@ -624,96 +741,86 @@ export const WIDGETS: Record<
     /** One line for the Add panel. */
     about: string;
     href: string;
-    /** Widths this widget reads well at. */
-    widths: Width[];
-    /** Sits open on the page — no panel, no inner padding (Balance, like on Accounts). */
-    bare?: boolean;
+    column: Column;
     body: () => React.ReactNode;
   }
 > = {
   balance: {
+    column: "main",
     title: "Balance",
-    bare: true,
     about: "Every account in one currency, and how it moved in 30 days",
     href: "/account",
-    widths: [3, 4, 6],
     body: () => <BalanceWidget />,
   },
   moneyIn: {
+    column: "side",
     title: "Money in",
     about: "What came in over 30 days, and from whom",
     href: "/transactions",
-    widths: [2, 3, 4, 6],
     body: () => <MoneyInWidget />,
   },
   moneyOut: {
+    column: "side",
     title: "Money out",
     about: "What went out over 30 days, and to whom",
     href: "/transactions",
-    widths: [2, 3, 4, 6],
     body: () => <MoneyOutWidget />,
   },
   cards: {
+    column: "side",
     title: "Card spend",
     about: "This month's spend against the program limit",
     href: "/cards",
-    widths: [2, 3, 4, 6],
     body: () => <CardsWidget />,
   },
   collections: {
+    column: "side",
     title: "Collections",
     about: "What card payments settled, and where they dropped off",
     href: "/card-collection/collections",
-    widths: [2, 3, 4, 6],
     body: () => <CollectionsWidget />,
   },
   links: {
+    column: "side",
     title: "Payment links",
     about: "What your links collected, and the top earners",
     href: "/payment-links",
-    widths: [2, 3, 4, 6],
     body: () => <LinksWidget />,
   },
   desk: {
+    column: "side",
     title: "Trade desk",
     about: "Live rates for your pairs and open orders",
     href: "/trade-desk",
-    widths: [2, 3, 4, 6],
     body: () => <DeskWidget />,
   },
   recent: {
+    column: "main",
     title: "Recent transactions",
     about: "The latest money in and out",
     href: "/transactions",
-    widths: [3, 4, 6],
     body: () => <RecentWidget />,
   },
   provisioning: {
+    column: "side",
     title: "Accounts being set up",
     about: "Accounts the banks are still opening",
     href: "/account",
-    widths: [2, 3, 4, 6],
     body: () => <ProvisioningWidget />,
   },
   actions: {
+    column: "side",
     title: "Quick actions",
     about: "Send, request, move and convert in one click",
     href: "/transactions",
-    widths: [4, 6],
     body: () => <ActionsWidget />,
   },
 };
 
-export type Slot = { id: WidgetId; w: Width };
+/** Accounts-style: a wide main column with a column of fact cards beside it. */
+export type Layout = { main: WidgetId[]; side: WidgetId[] };
 
-/** Mercury-style: two columns, cards of the same kind side by side so rows come out even. */
-export const DEFAULT_LAYOUT: Slot[] = [
-  { id: "balance", w: 6 },
-  { id: "recent", w: 6 },
-  { id: "moneyIn", w: 3 },
-  { id: "moneyOut", w: 3 },
-  { id: "cards", w: 3 },
-  { id: "collections", w: 3 },
-  { id: "links", w: 3 },
-  { id: "desk", w: 3 },
-];
+export const DEFAULT_LAYOUT: Layout = {
+  main: ["balance", "recent"],
+  side: ["moneyIn", "moneyOut", "cards", "collections", "links", "desk"],
+};
