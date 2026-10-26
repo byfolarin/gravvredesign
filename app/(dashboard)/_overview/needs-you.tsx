@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { ArrowRight, X } from "lucide-react";
@@ -179,6 +179,15 @@ export function NeedsSidebar() {
   const { done } = useDone();
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState<number | null>(null);
+  // A short grace period on leave, so a diagonal move to the card doesn't close it.
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stay = () => {
+    if (timer.current) clearTimeout(timer.current);
+  };
+  const leave = () => {
+    stay();
+    timer.current = setTimeout(() => setHover(null), 260);
+  };
   const [top, setTop] = useState(0);
   if (!all.length) return null;
   const cleared = all.filter((n) => done.has(n.key)).length;
@@ -187,7 +196,8 @@ export function NeedsSidebar() {
     <>
       <div
         className="relative mx-3 mb-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
-        onMouseLeave={() => setHover(null)}
+        onMouseEnter={stay}
+        onMouseLeave={leave}
       >
         <Ring value={cleared / all.length} />
         <div className="mt-2.5 flex items-baseline justify-between">
@@ -203,6 +213,7 @@ export function NeedsSidebar() {
               <li
                 key={n.key}
                 onMouseEnter={(e) => {
+                  stay();
                   setHover(i);
                   setTop(e.currentTarget.offsetTop);
                 }}
@@ -236,38 +247,44 @@ export function NeedsSidebar() {
 
         {/* The hovered decision beside the sidebar: its page on a gradient, then the action */}
         {h && hover !== null && (
+          // The padding bridges the gap to the sidebar, so the pointer can travel to the button.
           <div
-            className="orbit-pop absolute left-full z-50 ml-4 w-[300px] overflow-hidden rounded-2xl border border-white/10 bg-neutral-950 shadow-[0_24px_60px_-12px_rgb(0_0_0/0.6)]"
+            className="absolute left-full z-50 pl-4"
             style={{ top: Math.max(-160, top - 110) }}
-            onMouseEnter={() => setHover(hover)}
+            onMouseEnter={stay}
           >
-            <NeedArt k={h.key} className="h-[150px]" />
-            <div className="px-4 pt-3.5 pb-4">
-              <div className="text-[11.5px] text-neutral-500">
-                {ART[h.key]?.area} ·{" "}
-                <span className={h.urgent ? "text-rose-300" : "text-amber-200"}>
-                  {h.when}
-                </span>
-              </div>
-              <div className="mt-1 flex items-baseline justify-between gap-3">
-                <span className="text-[14px] font-medium text-white">
-                  {h.title}
-                </span>
-                {h.stake !== undefined && (
-                  <span className="amount shrink-0 text-[13px] text-neutral-300 tabular-nums">
-                    {compact(h.stake)}
+            <div className="orbit-pop w-[300px] overflow-hidden rounded-2xl border border-white/10 bg-neutral-950 shadow-[0_24px_60px_-12px_rgb(0_0_0/0.6)]">
+              <NeedArt k={h.key} className="h-[150px]" />
+              <div className="px-4 pt-3.5 pb-4">
+                <div className="text-[11.5px] text-neutral-500">
+                  {ART[h.key]?.area} ·{" "}
+                  <span
+                    className={h.urgent ? "text-rose-300" : "text-amber-200"}
+                  >
+                    {h.when}
                   </span>
-                )}
+                </div>
+                <div className="mt-1 flex items-baseline justify-between gap-3">
+                  <span className="text-[14px] font-medium text-white">
+                    {h.title}
+                  </span>
+                  {h.stake !== undefined && (
+                    <span className="amount shrink-0 text-[13px] text-neutral-300 tabular-nums">
+                      {compact(h.stake)}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-neutral-400">
+                  {h.detail}
+                </p>
+                <Link
+                  href={h.href}
+                  onClick={() => setHover(null)}
+                  className="mt-3.5 inline-flex h-8 items-center rounded-full bg-white px-3.5 text-[12.5px] font-medium text-black hover:bg-neutral-200"
+                >
+                  {h.action}
+                </Link>
               </div>
-              <p className="mt-1 text-[12.5px] leading-relaxed text-neutral-400">
-                {h.detail}
-              </p>
-              <Link
-                href={h.href}
-                className="mt-3.5 inline-flex h-8 items-center rounded-full bg-white px-3.5 text-[12.5px] font-medium text-black hover:bg-neutral-200"
-              >
-                {h.action}
-              </Link>
             </div>
           </div>
         )}
