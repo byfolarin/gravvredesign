@@ -30,7 +30,6 @@ import {
 } from "../../roles/_data";
 import { RULES } from "../../approvals/_data";
 import { UpdateNotice } from "@/app/_components/updates";
-import { TeamStories } from "./team-stories";
 
 type Tab = "members" | "invites";
 
@@ -118,8 +117,6 @@ export function TeamWorkspace() {
       </div>
 
       <UpdateNotice id="u-approval" place="team" />
-
-      <TeamStories />
 
       <div className="mt-8 flex items-end justify-between gap-6 border-b border-white/8">
         <div role="tablist" className="flex gap-6">

@@ -776,16 +776,3 @@ sub {
   .shot-pan { animation: none; }
 }
 
-/* Team stories: each card's lines rise in, one after another. */
-@keyframes story-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: none; }
-}
-.story-in { animation: story-in 420ms cubic-bezier(.2,.8,.2,1) both; }
-@media (prefers-reduced-motion: reduce) { .story-in { animation: none; } }
-/* Team stories: the green blooms first, then the screen rises onto it. */
-@keyframes story-bloom { from { opacity: 0; transform: scaleY(0.6); } to { opacity: 1; transform: none; } }
-.story-bloom { transform-origin: top center; animation: story-bloom 520ms cubic-bezier(.2,.8,.2,1) both; }
-@keyframes story-rise { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
-.story-rise { animation: story-rise 560ms cubic-bezier(.2,.8,.2,1) 220ms both; }
-@media (prefers-reduced-motion: reduce) { .story-bloom, .story-rise { animation: none; } }
