@@ -110,6 +110,7 @@ export function WhatsNewModal() {
       >
         <div className="relative">
           <UpdateArt key={u.id} u={u} className="aspect-[16/8]" />
+          <PixelSeam seed={u.id} />
           <button
             type="button"
             aria-label="Close"
@@ -190,5 +191,56 @@ export function ReplayWhatsNew() {
     >
       Show the announcement
     </button>
+  );
+}
+
+/**
+ * The image's bottom edge breaking into the deep green body in 5px pixels — solid at the
+ * seam, thinning out upward (the brand's dot dissolve).
+ */
+/** Which 8px cells are filled: every cell on the seam row, thinning out upward. */
+function seamCells(seed: string, COLS: number, ROWS: number) {
+  let x = [...seed].reduce(
+    (h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619),
+    2166136261,
+  );
+  const rand = () => {
+    x =
+      Math.imul(x ^ (x >>> 15), 2246822507) ^
+      Math.imul(x ^ (x >>> 13), 3266489909);
+    return ((x >>> 0) % 1000) / 1000;
+  };
+  const cells: [number, number][] = [];
+  for (let r = 0; r < ROWS; r++) {
+    // 0 at the top of the band, 1 at the seam
+    const t = r / (ROWS - 1);
+    const keep = r === ROWS - 1 ? 1 : Math.pow(t, 2) * 0.7;
+    for (let c = 0; c < COLS; c++) if (rand() < keep) cells.push([c, r]);
+  }
+  return cells;
+}
+
+function PixelSeam({ seed }: { seed: string }) {
+  const COLS = 120;
+  const ROWS = 4;
+  const cells = seamCells(seed, COLS, ROWS);
+  return (
+    <svg
+      aria-hidden
+      viewBox={`0 0 ${COLS * 5} ${ROWS * 5}`}
+      preserveAspectRatio="xMidYMax slice"
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-5 w-full"
+    >
+      {cells.map(([c, r]) => (
+        <rect
+          key={`${c}-${r}`}
+          x={c * 5}
+          y={r * 5}
+          width={5}
+          height={5}
+          fill="#0D1906"
+        />
+      ))}
+    </svg>
   );
 }
