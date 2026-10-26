@@ -194,7 +194,7 @@ function Mark({ n, done }: { n: Need; done: boolean }) {
  * the Needs you drawer — laid out like the Inbox's Promotions tab: the picked decision
  * large with its page's screenshot on a soft gradient, the rest as thumbnail rows.
  */
-export function NeedsSidebar() {
+export function NeedsSidebar({ collapsed = false }: { collapsed?: boolean }) {
   const all = needs();
   // Opening a decision doesn't clear it — only resolving it on its page would.
   const { done } = useDone();
@@ -213,6 +213,38 @@ export function NeedsSidebar() {
   if (!all.length) return null;
   const cleared = all.filter((n) => done.has(n.key)).length;
   const h = hover === null ? null : all[hover];
+  const urgent = all.some((n) => n.urgent && !done.has(n.key));
+  const left = all.length - cleared;
+
+  // Collapsed rail: still there, as the ring with how many are left.
+  if (collapsed)
+    return (
+      <>
+        <div className="mb-2 flex justify-center">
+          <button
+            type="button"
+            aria-label={`Needs you: ${left} waiting`}
+            title={`Needs you · ${left} waiting`}
+            onClick={() => setOpen(true)}
+            className="relative flex size-9 items-center justify-center rounded-lg text-neutral-300 transition-colors hover:bg-white/[0.07] hover:text-white"
+          >
+            <Ring value={cleared / all.length} size={22} />
+            <span
+              className={`absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-medium tabular-nums ring-2 ring-black ${urgent ? "bg-rose-400 text-black" : "bg-amber-300 text-black"}`}
+            >
+              {left}
+            </span>
+          </button>
+        </div>
+        {open && (
+          <NeedsDrawer
+            lead={all[0].key}
+            done={done}
+            onClose={() => setOpen(false)}
+          />
+        )}
+      </>
+    );
   return (
     <>
       <div

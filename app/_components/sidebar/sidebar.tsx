@@ -433,7 +433,7 @@ export function Sidebar({
         )}
       </nav>
 
-      {!collapsed && <NeedsSidebar />}
+      <NeedsSidebar collapsed={collapsed} />
       {!collapsed && <SidebarNews />}
 
       {/* You — opens the account menu upward */}
