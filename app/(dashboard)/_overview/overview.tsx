@@ -387,7 +387,7 @@ function Frame({
             : e.clientX > r.left + r.width / 2;
         onOver(after);
       }}
-      className={`relative min-w-0 rounded-2xl bg-white/[0.025] p-5 transition-[opacity,box-shadow] ${SPAN[s.w]} ${editing ? "cursor-grab ring-1 ring-white/12 active:cursor-grabbing" : ""} ${dragging ? "opacity-40" : ""}`}
+      className={`relative min-w-0 rounded-2xl transition-[opacity,box-shadow] ${w.bare ? (editing ? "p-3" : "") : "bg-white/[0.025] p-5"} ${SPAN[s.w]} ${editing ? "cursor-grab ring-1 ring-white/12 active:cursor-grabbing" : ""} ${dragging ? "opacity-40" : ""}`}
     >
       <header className="mb-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-1.5">

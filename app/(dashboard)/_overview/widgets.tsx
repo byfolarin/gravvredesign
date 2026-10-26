@@ -657,11 +657,14 @@ export const WIDGETS: Record<
     href: string;
     /** Widths this widget reads well at. */
     widths: Width[];
+    /** Sits open on the page — no panel, no inner padding (Balance, like on Accounts). */
+    bare?: boolean;
     body: () => React.ReactNode;
   }
 > = {
   balance: {
     title: "Balance",
+    bare: true,
     about: "Every account in one currency, and how it moved in 30 days",
     href: "/account",
     widths: [3, 4, 6],
