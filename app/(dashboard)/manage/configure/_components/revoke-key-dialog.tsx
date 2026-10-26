@@ -74,7 +74,7 @@ export function RevokeKeyDialog({
       onConfirm={choice === "roll" ? onRoll : onRevoke}
     >
       {/* What would stop: the traffic, up to now */}
-      <div className="-mt-1">
+      <div className="mt-1">
         <div className="flex items-baseline justify-between gap-3">
           <span className="amount text-[26px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
             {usage!.requests.toLocaleString("en-US")}
@@ -83,7 +83,7 @@ export function RevokeKeyDialog({
             calls in the last 24h
           </span>
         </div>
-        <div className="relative mt-4 flex h-12 items-end gap-[3px]">
+        <div className="relative mt-5 flex h-14 items-end gap-[3px]">
           {bars.map((v, i) => (
             <span
               key={i}
@@ -100,7 +100,7 @@ export function RevokeKeyDialog({
           <span>Yesterday 10:00</span>
           <span>Now</span>
         </div>
-        <p className="mt-3 text-[13px] leading-relaxed text-neutral-300">
+        <p className="mt-4 text-[13px] leading-relaxed text-neutral-300">
           Last call {ago(k.lastUsed)} from{" "}
           <span className="font-mono text-[12px] text-white">
             {usage!.lastIp}
@@ -114,7 +114,7 @@ export function RevokeKeyDialog({
       <div
         role="radiogroup"
         aria-label="What to do"
-        className="mt-5 grid gap-2"
+        className="mt-7 grid gap-3"
       >
         {(
           [
@@ -140,7 +140,7 @@ export function RevokeKeyDialog({
               role="radio"
               aria-checked={on}
               onClick={() => setChoice(id)}
-              className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${on ? (id === "revoke" ? "border-rose-400/50 bg-rose-500/[0.06]" : "border-white/40 bg-white/[0.04]") : "border-white/10 hover:border-white/20"}`}
+              className={`flex items-start gap-3 rounded-xl border px-4 py-4 text-left transition-colors ${on ? (id === "revoke" ? "border-rose-400/50 bg-rose-500/[0.06]" : "border-white/40 bg-white/[0.04]") : "border-white/10 hover:border-white/20"}`}
             >
               <span
                 className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${on ? (id === "revoke" ? "border-rose-400" : "border-white") : "border-white/25"}`}
@@ -160,7 +160,7 @@ export function RevokeKeyDialog({
                     </span>
                   )}
                 </span>
-                <span className="mt-0.5 block text-[12.5px] leading-relaxed text-neutral-400">
+                <span className="mt-1 block text-[12.5px] leading-relaxed text-neutral-400">
                   {line}
                 </span>
               </span>

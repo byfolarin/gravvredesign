@@ -83,7 +83,7 @@ export function ConfirmDialog({
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
-        className="orbit-pop relative w-[460px] max-w-full rounded-2xl border border-white/10 bg-raised p-6 shadow-[0_24px_80px_-12px_rgb(0_0_0/0.6)]"
+        className="orbit-pop relative w-[460px] max-w-full rounded-2xl border border-white/10 bg-raised p-7 shadow-[0_24px_80px_-12px_rgb(0_0_0/0.6)]"
       >
         <div className="flex items-start justify-between gap-4">
           <h2
@@ -103,7 +103,7 @@ export function ConfirmDialog({
         </div>
 
         {subject && (
-          <div className="mt-4 flex items-center gap-3 rounded-xl border border-white/8 px-3.5 py-3">
+          <div className="mt-5 flex items-center gap-3 rounded-xl border border-white/8 px-4 py-3.5">
             {subject.mark}
             <div className="min-w-0 flex-1">
               <div className="truncate text-[13.5px] font-medium text-white">
@@ -144,7 +144,7 @@ export function ConfirmDialog({
         )}
 
         {(lines.length > 0 || irreversible) && (
-          <ul className="mt-4 space-y-1.5 text-[13px] leading-relaxed text-neutral-300">
+          <ul className="mt-5 space-y-2.5 text-[13px] leading-relaxed text-neutral-300">
             {lines.map((l) => (
               <li key={l}>{l}</li>
             ))}
@@ -154,7 +154,7 @@ export function ConfirmDialog({
           </ul>
         )}
 
-        {children && <div className="mt-5">{children}</div>}
+        {children && <div className="mt-6">{children}</div>}
 
         {confirmText && (
           <label className="mt-5 block">
@@ -178,7 +178,7 @@ export function ConfirmDialog({
           </label>
         )}
 
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-8 flex justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
