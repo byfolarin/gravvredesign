@@ -308,3 +308,232 @@ export function NeedsDrawer({ onClose }: { onClose: () => void }) {
     </>
   );
 }
+
+/* ——— Variant C: a checklist card in the sidebar, on every page ——— */
+
+export const NEEDS_STYLE_KEY = "gravv-overview-needs";
+export const NEEDS_STYLE_EVENT = "gravv-needs-style";
+const DONE_KEY = "gravv-needs-done";
+
+/** Which home Needs you has — the Overview dropdown sets it; the sidebar listens. */
+export function useNeedsStyle() {
+  const [style, setStyle] = useState<string>("stack");
+  useEffect(() => {
+    const read = () => {
+      try {
+        setStyle(
+          JSON.parse(localStorage.getItem(NEEDS_STYLE_KEY) ?? '"stack"'),
+        );
+      } catch {}
+    };
+    const t = setTimeout(read, 0);
+    window.addEventListener(NEEDS_STYLE_EVENT, read);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener(NEEDS_STYLE_EVENT, read);
+    };
+  }, []);
+  return style;
+}
+
+/** Decisions acted on today (their action was clicked), for the ring. */
+function useDone() {
+  const [done, setDone] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        const v = JSON.parse(localStorage.getItem(DONE_KEY) ?? "null");
+        if (v?.day === TODAY && Array.isArray(v.keys)) setDone(new Set(v.keys));
+      } catch {}
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+  return {
+    done,
+    mark: (k: string) => {
+      const next = new Set([...done, k]);
+      setDone(next);
+      try {
+        localStorage.setItem(
+          DONE_KEY,
+          JSON.stringify({ day: TODAY, keys: [...next] }),
+        );
+      } catch {}
+    },
+  };
+}
+
+function Ring({ value, size = 18 }: { value: number; size?: number }) {
+  const r = (size - 3) / 2;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      aria-hidden
+      className="-rotate-90"
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="rgb(255 255 255 / 0.12)"
+        strokeWidth={2.5}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="var(--brand)"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeDasharray={`${Math.max(0.001, value) * c} ${c}`}
+        className="transition-[stroke-dasharray] duration-500"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Needs you as a checklist in the sidebar (from a "Getting started" pattern): a ring for
+ * how much you've cleared today, one row per decision, and on hover a dark card beside the
+ * sidebar with what's at stake and the action. Lives on every page, out of the content.
+ */
+export function NeedsSidebar() {
+  const { all } = useNeeds();
+  const { done, mark } = useDone();
+  const [hover, setHover] = useState<number | null>(null);
+  const [top, setTop] = useState(0);
+  if (!all.length) return null;
+  const cleared = all.filter((n) => done.has(n.key)).length;
+  const h = hover === null ? null : all[hover];
+
+  return (
+    <div
+      className="relative mx-3 mb-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
+      onMouseLeave={() => setHover(null)}
+    >
+      <Ring value={cleared / all.length} />
+      <div className="mt-2.5 flex items-baseline justify-between">
+        <span className="text-[13px] font-medium text-white">Needs you</span>
+        <span className="text-[11.5px] text-neutral-500 tabular-nums">
+          {cleared}/{all.length}
+        </span>
+      </div>
+      <ul className="mt-2 space-y-0.5">
+        {all.map((n, i) => {
+          const isDone = done.has(n.key);
+          return (
+            <li
+              key={n.key}
+              onMouseEnter={(e) => {
+                setHover(i);
+                setTop(e.currentTarget.offsetTop);
+              }}
+            >
+              <Link
+                href={n.href}
+                onClick={() => mark(n.key)}
+                onFocus={() => setHover(i)}
+                className={`flex items-center gap-2 rounded-lg px-1.5 py-1.5 text-[12.5px] transition-colors ${hover === i ? "bg-white/[0.07] text-white" : isDone ? "text-neutral-600" : "text-neutral-300"}`}
+              >
+                {isDone ? (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    aria-hidden
+                    className="shrink-0"
+                  >
+                    <circle cx="7" cy="7" r="6" fill="var(--brand)" />
+                    <path
+                      d="M4.2 7.2l1.8 1.8 3.8-4"
+                      fill="none"
+                      stroke="#04301c"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    aria-hidden
+                    className={`shrink-0 ${n.urgent ? "text-rose-300" : "text-neutral-500"}`}
+                  >
+                    <circle
+                      cx="7"
+                      cy="7"
+                      r="5.8"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeDasharray="1.6 2"
+                    />
+                  </svg>
+                )}
+                <span
+                  className={`min-w-0 flex-1 truncate ${isDone ? "line-through" : ""}`}
+                >
+                  {n.title}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      <Link
+        href="/?needs=1"
+        className="mt-2 block px-1.5 text-[12px] text-neutral-400 hover:text-white"
+      >
+        View all
+      </Link>
+
+      {/* The hovered decision, beside the sidebar */}
+      {h && hover !== null && (
+        <div
+          className="orbit-pop absolute left-full z-50 ml-4 w-[290px] overflow-hidden rounded-2xl border border-white/10 bg-neutral-950 shadow-[0_24px_60px_-12px_rgb(0_0_0/0.6)]"
+          style={{ top: Math.max(-120, top - 70) }}
+          onMouseEnter={() => setHover(hover)}
+        >
+          <div className="border-b border-white/8 px-4 pt-4 pb-3.5">
+            <div
+              className={`text-[12px] ${h.urgent ? "text-rose-300" : "text-amber-200"}`}
+            >
+              {h.when}
+            </div>
+            {h.stake !== undefined && (
+              <div className="amount mt-1.5 text-[24px] leading-none font-medium tracking-[-0.03em] text-white tabular-nums">
+                {compact(h.stake)}
+              </div>
+            )}
+          </div>
+          <div className="px-4 pt-3.5 pb-4">
+            <div className="text-[14px] font-medium text-white">{h.title}</div>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-neutral-400">
+              {h.detail}
+            </p>
+            <Link
+              href={h.href}
+              onClick={() => mark(h.key)}
+              className="mt-4 inline-flex h-8 items-center rounded-full bg-white px-3.5 text-[12.5px] font-medium text-black hover:bg-neutral-200"
+            >
+              {h.action}
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The sidebar slot: shows the checklist only when Needs you lives in the sidebar. */
+export function NeedsSidebarSlot() {
+  const style = useNeedsStyle();
+  return style === "sidebar" ? <NeedsSidebar /> : null;
+}
