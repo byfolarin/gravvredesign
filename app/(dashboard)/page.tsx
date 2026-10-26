@@ -1,5 +1,5 @@
-import { PagePlaceholder } from "@/app/_components/page-placeholder";
+import { Overview } from "./_overview/overview";
 
 export default function OverviewPage() {
-  return <PagePlaceholder title="Overview" />;
+  return <Overview />;
 }
