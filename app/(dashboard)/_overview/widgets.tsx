@@ -48,7 +48,7 @@ const usd = (v: number, digits = 0) =>
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(v);
-const compact = (v: number) =>
+export const compact = (v: number) =>
   v >= 1_000_000
     ? `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
     : v >= 10_000
@@ -172,7 +172,7 @@ function BalanceWidget() {
  * waited (or when it's due), and the one action that clears it. Deel's "For you today" rows and
  * Gusto's task cards, with money and deadlines up front because this is a money product.
  */
-type Need = {
+export type Need = {
   key: string;
   /** Imperative: "Approve 42 payments". */
   title: string;
@@ -195,10 +195,10 @@ const TO_USD: Record<string, number> = {
   GBP: 1.27,
   NGN: 1 / 1600,
 };
-const plural = (n: number, one: string, many = `${one}s`) =>
+export const plural = (n: number, one: string, many = `${one}s`) =>
   `${n} ${n === 1 ? one : many}`;
 
-function needs(): Need[] {
+export function needs(): Need[] {
   const out: Need[] = [];
   const respond = disputes.filter((d) => d.status === "Needs response");
   if (respond.length) {
@@ -284,85 +284,6 @@ function needs(): Need[] {
       rank: 5,
     });
   return out.sort((x, y) => x.rank - y.rank);
-}
-
-function NeedsWidget() {
-  const list = needs();
-  if (!list.length)
-    return (
-      <p className="py-6 text-[13px] text-neutral-500">
-        Nothing needs you right now.
-      </p>
-    );
-  const [first, ...rest] = list;
-  const total = list.reduce((s, n) => s + (n.stake ?? 0), 0);
-  return (
-    <div>
-      <p className="-mt-2 text-[13px] text-neutral-400">
-        <span className="amount font-medium text-white">{compact(total)}</span>{" "}
-        waiting on {plural(list.length, "decision")}
-      </p>
-
-      {/* Do this first */}
-      <div className="mt-4 rounded-xl bg-white/[0.04] p-4">
-        <div
-          className={`text-[12px] ${first.urgent ? "text-rose-300" : "text-amber-200"}`}
-        >
-          Do this first · {first.when}
-        </div>
-        <div className="mt-1.5 flex items-end justify-between gap-4">
-          <div className="min-w-0">
-            <div className="text-[15px] font-medium text-white">
-              {first.title}
-              {first.stake !== undefined && (
-                <span className="amount ml-2 font-normal text-neutral-400 tabular-nums">
-                  {compact(first.stake)}
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-[12.5px] leading-snug text-neutral-500">
-              {first.detail}
-            </p>
-          </div>
-          <Link
-            href={first.href}
-            className="flex h-8 shrink-0 items-center rounded-full bg-white px-3.5 text-[12.5px] font-medium text-black hover:bg-neutral-200"
-          >
-            {first.action}
-          </Link>
-        </div>
-      </div>
-
-      {/* Then the rest, most pressing first */}
-      <ul className="mt-2 divide-y divide-white/6">
-        {rest.map((n) => (
-          <li key={n.key} className="flex items-center gap-4 py-3">
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] text-neutral-100">
-                {n.title}
-              </div>
-              <div className="mt-0.5 truncate text-[12px] text-neutral-500">
-                {n.stake !== undefined && (
-                  <span className="amount text-neutral-300 tabular-nums">
-                    {compact(n.stake)} ·{" "}
-                  </span>
-                )}
-                <span className={n.urgent ? "text-rose-300" : ""}>
-                  {n.when}
-                </span>
-              </div>
-            </div>
-            <Link
-              href={n.href}
-              className="flex h-7 shrink-0 items-center rounded-full border border-white/12 px-3 text-[12px] text-neutral-200 transition-colors hover:border-white/30 hover:text-white"
-            >
-              {n.action}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
 }
 
 /* ——— Stat cards: one figure, one sentence, at most one visual (Mercury home) ——— */
@@ -683,7 +604,6 @@ function ActionsWidget() {
 
 export type WidgetId =
   | "balance"
-  | "needs"
   | "moneyIn"
   | "moneyOut"
   | "cards"
@@ -718,13 +638,6 @@ export const WIDGETS: Record<
     href: "/account",
     widths: [3, 4, 6],
     body: () => <BalanceWidget />,
-  },
-  needs: {
-    title: "Needs you",
-    about: "Approvals, disputes, stuck payments and orders waiting on you",
-    href: "/manage/approvals",
-    widths: [2, 3, 4, 6],
-    body: () => <NeedsWidget />,
   },
   moneyIn: {
     title: "Money in",
