@@ -12,33 +12,33 @@ const DONE_KEY = "gravv-needs-resolved";
 /** One light green for every decision's art (owner's call), soft at two corners. */
 const MINT: [string, string] = ["#00ffb4", "#7dd3a8"];
 
-/** Each decision's page, as a real screenshot on the soft gradient — the product-updates look. */
+/** Each decision's page: a real screenshot, all cut to the same 16:10 from the top of the page (public/needs), on the soft gradient — the product-updates look. */
 const ART: Record<
   string,
   { image: string; glow: [string, string]; area: string }
 > = {
   disputes: {
-    image: "/updates/disputes.png",
+    image: "/needs/disputes.png",
     glow: MINT,
     area: "Disputes",
   },
   stuck: {
-    image: "/updates/funnel.png",
+    image: "/needs/collections.png",
     glow: MINT,
     area: "Collections",
   },
   approvals: {
-    image: "/updates/approval.png",
+    image: "/needs/approvals.png",
     glow: MINT,
     area: "Approvals",
   },
   desk: {
-    image: "/updates/trade-desk.png",
+    image: "/needs/trade-desk.png",
     glow: MINT,
     area: "Trade desk",
   },
   cards: {
-    image: "/updates/cards.png",
+    image: "/needs/cards.png",
     glow: MINT,
     area: "Cards",
   },
