@@ -3,12 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, GripVertical, LayoutGrid, Plus, X } from "lucide-react";
-import {
-  NEEDS_STYLE_EVENT,
-  NeedsButton,
-  NeedsDrawer,
-  NeedsStack,
-} from "./needs-you";
 import { Dropdown } from "@/app/_components/dropdown";
 import {
   DEFAULT_LAYOUT,
@@ -21,8 +15,6 @@ import {
 // v4: Needs you hidden by default, Recent transactions full width (Oct 26).
 const LAYOUT_KEY = "gravv-overview-layout-v4";
 const STYLE_KEY = "gravv-overview-customize";
-const NEEDS_KEY = "gravv-overview-needs";
-type NeedsStyle = "stack" | "drawer" | "sidebar";
 type Style = "panel" | "inplace";
 
 const SPAN: Record<Width, string> = {
@@ -70,17 +62,8 @@ const valid = (l: unknown): l is Slot[] =>
 export function Overview() {
   const [layout, setLayout] = useState<Slot[]>(DEFAULT_LAYOUT);
   const [style, setStyle] = useState<Style>("panel");
-  // Needs you lives off the grid: a stack under the heading, or a drawer from the header.
-  const [needsStyle, setNeedsStyle] = useState<NeedsStyle>("stack");
-  const [needsOpen, setNeedsOpen] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => {
-      const ns = read<NeedsStyle>(NEEDS_KEY);
-      if (ns === "stack" || ns === "drawer" || ns === "sidebar")
-        setNeedsStyle(ns);
-      // "View all" from the sidebar checklist lands here with ?needs=1.
-      if (new URLSearchParams(window.location.search).get("needs") === "1")
-        setNeedsOpen(true);
       const l = read<Slot[]>(LAYOUT_KEY);
       if (valid(l)) setLayout(l);
       const s = read<Style>(STYLE_KEY);
@@ -218,25 +201,6 @@ export function Overview() {
                 <p className="mt-2 text-[13px] text-neutral-500">{today}</p>
               </div>
               <div className="flex items-center gap-2">
-                {needsStyle === "drawer" && !editing && (
-                  <NeedsButton onOpen={() => setNeedsOpen(true)} />
-                )}
-                <Dropdown<NeedsStyle>
-                  label="Needs you"
-                  variant="compact"
-                  align="right"
-                  value={needsStyle}
-                  options={[
-                    { value: "stack", label: "Needs you as a stack" },
-                    { value: "drawer", label: "Needs you in a drawer" },
-                    { value: "sidebar", label: "Needs you in the sidebar" },
-                  ]}
-                  onChange={(v) => {
-                    setNeedsStyle(v);
-                    write(NEEDS_KEY, v);
-                    window.dispatchEvent(new Event(NEEDS_STYLE_EVENT));
-                  }}
-                />
                 <Dropdown<Style>
                   label="Customize style"
                   variant="compact"
@@ -290,8 +254,6 @@ export function Overview() {
                 )}
               </div>
             </div>
-
-            {needsStyle === "stack" && !editing && <NeedsStack />}
 
             {/* The widgets */}
             <div
@@ -367,8 +329,6 @@ export function Overview() {
           )}
         </div>
       </div>
-
-      {needsOpen && <NeedsDrawer onClose={() => setNeedsOpen(false)} />}
 
       {toast && (
         <div

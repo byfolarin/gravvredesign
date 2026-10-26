@@ -16,7 +16,7 @@ import {
 import { NavIcon } from "../icons/nav-icon";
 import { navSections, type NavLink, type NavSection } from "./nav-config";
 import { AccountMenu } from "./account-menu";
-import { NeedsSidebarSlot } from "@/app/(dashboard)/_overview/needs-you";
+import { NeedsSidebar } from "@/app/(dashboard)/_overview/needs-you";
 import { UPDATES, UpdateArt, useDismissed } from "../updates";
 
 function cx(...classes: (string | false | null | undefined)[]) {
@@ -433,7 +433,7 @@ export function Sidebar({
         )}
       </nav>
 
-      {!collapsed && <NeedsSidebarSlot />}
+      {!collapsed && <NeedsSidebar />}
       {!collapsed && <SidebarNews />}
 
       {/* You — opens the account menu upward */}
