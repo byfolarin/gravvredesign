@@ -26,6 +26,20 @@ export type Story = {
   /** Minutes ago. */
   mins: number;
   href: string;
+  /** The screen it happened on (public/needs); defaults by kind. */
+  shot?: string;
+};
+
+const SHOT: Record<Kind, string> = {
+  approved: "/needs/approvals.png",
+  sent: "/needs/transactions.png",
+  received: "/needs/transactions.png",
+  opened: "/needs/accounts.png",
+  invited: "/needs/team.png",
+  role: "/needs/team.png",
+  key: "/needs/configure.png",
+  dispute: "/needs/disputes.png",
+  card: "/needs/cards.png",
 };
 
 const KIND: Record<Kind, string> = {
@@ -75,6 +89,7 @@ export const STORIES: { name: string; role: string; stories: Story[] }[] = [
         detail: "USDC → NGN at ₦1,611.87 · OTC-2292",
         mins: 52,
         href: "/trade-desk",
+        shot: "/needs/trade-desk.png",
       },
       {
         kind: "dispute",
@@ -163,6 +178,7 @@ export const STORIES: { name: string; role: string; stories: Story[] }[] = [
         detail: "Lagos Fintech Week · Early bird · paid 4 min later",
         mins: 5,
         href: "/payment-links",
+        shot: "/needs/payment-links.png",
       },
     ],
   },
@@ -366,13 +382,34 @@ function StoryViewer({
         onPointerDown={() => setPaused(true)}
         onPointerUp={() => setPaused(false)}
       >
-        {/* Soft lime light from the base, the brand's gradient direction */}
+        {/* The green comes first: it blooms from the top, then the screen lands on it */}
         <div
+          key={`glow-${p}-${s}`}
           aria-hidden
-          className="pointer-events-none absolute inset-0"
+          className="story-bloom pointer-events-none absolute inset-x-0 top-0 h-[64%]"
           style={{
             background:
-              "radial-gradient(120% 60% at 50% 115%, rgb(143 255 75 / 0.32), transparent 60%), radial-gradient(80% 40% at 100% 0%, rgb(163 255 110 / 0.08), transparent 70%)",
+              "radial-gradient(90% 80% at 50% 0%, #8FFF4B 0%, rgb(77 160 26 / 0.85) 38%, rgb(30 53 34 / 0.6) 66%, transparent 100%)",
+          }}
+        />
+        {/* The screen it happened on — bleeding off the right, fading into the ground */}
+        <div
+          key={`shot-${p}-${s}`}
+          aria-hidden
+          className="story-rise pointer-events-none absolute top-[88px] left-6 w-[118%] overflow-hidden rounded-[10px] border border-[#FFFCCC]/20 bg-[#FFFCCC] shadow-[0_24px_60px_-18px_rgb(0_0_0/0.7)]"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- local product screenshots */}
+          <img
+            src={story.shot ?? SHOT[story.kind]}
+            alt=""
+            className="block w-full"
+          />
+        </div>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-[34%] h-[30%]"
+          style={{
+            background: "linear-gradient(to bottom, transparent, #0D1906 85%)",
           }}
         />
 
