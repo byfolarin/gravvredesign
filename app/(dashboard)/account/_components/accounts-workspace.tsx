@@ -1623,7 +1623,7 @@ export function BalancePanel({
               onOpenAccount={onOpenAccount}
             />
           </div>
-          <div className="amount mt-3 text-[34px] leading-none font-medium tracking-[-0.035em] text-white tabular-nums">
+          <div className="amount mt-5 text-[34px] leading-none font-medium tracking-[-0.035em] text-white tabular-nums">
             {SYMBOL[currency]}
             {whole}
             {cents && (
@@ -1632,7 +1632,7 @@ export function BalancePanel({
               </sub>
             )}
           </div>
-          <div className="mt-2.5 flex h-5 items-center gap-2 text-[12px] text-neutral-500 tabular-nums">
+          <div className="mt-4 flex h-5 items-center gap-2 text-[12px] text-neutral-500 tabular-nums">
             {funded === 0 ? (
               <span>
                 {waiting
@@ -1757,7 +1757,7 @@ export function BalancePanel({
       ) : (
         <>
           {/* Plot */}
-          <div className="relative mt-6" onMouseLeave={() => setHover(null)}>
+          <div className="relative mt-8" onMouseLeave={() => setHover(null)}>
             <div className="relative" style={{ height: H }}>
               <svg
                 viewBox={`0 0 ${W} ${H}`}
